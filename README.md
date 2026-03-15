@@ -37,13 +37,13 @@ User Query
     │
     ▼
 ┌─────────────────────────────┐
-│    Conversational UI         │  ← Next.js · Tailwind · shadcn/ui
-│    (Chat Interface)          │
+│    Conversational UI        │  ← Next.js · Tailwind · shadcn/ui
+│    (Chat Interface)         │
 └────────────┬────────────────┘
              │  POST /api/intelligence (SSE Stream)
              ▼
 ┌─────────────────────────────┐
-│       Orchestrator           │  ← Runs all agents via asyncio.gather / Promise.all()
+│       Orchestrator          │  ← Runs all agents via asyncio.gather / Promise.all()
 └──┬──────┬──────┬──────┬─────┘
    │      │      │      │
    ▼      ▼      ▼      ▼
@@ -57,15 +57,15 @@ User Query
              │
              ▼
 ┌─────────────────────────────┐
-│   Confidence Verifier        │  ← Normalises, downgrades weak claims, flags conflicts
+│   Confidence Verifier       │  ← Normalises, downgrades weak claims, flags conflicts
 └────────────┬────────────────┘
              ▼
 ┌─────────────────────────────┐
-│      Synthesis Agent         │  ← Executive summary · Opportunities · Risks · Bets
+│      Synthesis Agent        │  ← Executive summary · Opportunities · Risks · Bets
 └────────────┬────────────────┘
              ▼
 ┌─────────────────────────────┐
-│   Structured JSON Response   │  → Rendered as inline artifacts in the UI
+│   Structured JSON Response  │  → Rendered as inline artifacts in the UI
 └─────────────────────────────┘
 ```
 
@@ -110,8 +110,8 @@ A premium AI SaaS interface inspired by Linear, Vercel, Perplexity, and Notion A
 │  AGENT STATUS    │                                           │
 │                  │         CONVERSATION THREAD               │
 │  ● Mkt Trend     │                                           │
-│    running...    │   ┌─────────────────────────────────┐    │
-│  ✓ Comp Intel    │   │  User: Is Vector Agents          │    │
+│    running...    │   ┌─────────────────────────────────┐     │
+│  ✓ Comp Intel    │   │  User: Is Vector Agents         │    │
 │    done          │   │  competitive in AI SDR?          │    │
 │  ○ Win/Loss      │   └─────────────────────────────────┘    │
 │    queued        │                                           │
