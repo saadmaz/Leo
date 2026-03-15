@@ -9,17 +9,16 @@ from backend.schemas.finding_schema import Finding
 from backend.schemas.evidence_schema import Evidence
 from backend.schemas.artifact_schema import Artifact
 from backend.schemas.query_schema import QueryRequest
-from dotenv import load_dotenv
-import serpapi
 from backend.tools.news_tools import get_funding_news, search_news
 from backend.tools.gdelt_tools import get_trend_timeline, get_market_sentiment
-
-load_dotenv()
+from backend.config import settings
 
 class MarketTrendsAgent(BaseAgent):
     def __init__(self):
         super().__init__("MarketTrendsAgent")
-        self.client = serpapi.Client(api_key=os.getenv("SERPAPI_API_KEY"))
+        self.client = None
+        if settings.SERPAPI_API_KEY and "your_" not in settings.SERPAPI_API_KEY:
+            self.client = serpapi.Client(api_key=settings.SERPAPI_API_KEY)
         self._cache = {}
 
     def _cached_search(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,16 +37,19 @@ class MarketTrendsAgent(BaseAgent):
 
         try:
             # 1. Interest over time (Google Trends)
-            params_trends = {
-                "engine": "google_trends",
-                "q": f"{product},{category},sales automation",
-                "geo": "US",
-                "date": "today 12-m"
-            }
-            # Run in a thread pool if the client is blocking, but serpapi-python seems to be blocking.
-            # For a hackathon, we can use it directly or wrap in run_in_executor.
-            loop = asyncio.get_event_loop()
-            trends = await loop.run_in_executor(None, self._cached_search, params_trends)
+            if not self.client:
+                print("DEBUG: [MarketTrendsAgent] SerpAPI key missing or placeholder. Skipping Trends/News search.")
+                trends = {}
+            else:
+                params_trends = {
+                    "engine": "google_trends",
+                    "q": f"{product},{category},sales automation",
+                    "geo": "US",
+                    "date": "today 12-m"
+                }
+                # Run in a thread pool if the client is blocking
+                loop = asyncio.get_event_loop()
+                trends = await loop.run_in_executor(None, self._cached_search, params_trends)
             
             timeline_data = trends.get("interest_over_time", {}).get("timeline_data", [])
 

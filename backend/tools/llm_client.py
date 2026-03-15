@@ -16,10 +16,36 @@ class LLMClient:
     async def analyze_data(self, data: Any, prompt: str) -> Dict[str, Any]:
         """
         Sends raw data and a prompt to the LLM to get structured JSON analysis.
+        If API key is missing, performs a basic heuristic analysis to keep the system functional.
         """
         if not self.api_key or "your_" in self.api_key:
-            print("DEBUG: [LLM] OpenAI API key is missing or placeholder. Skipping LLM call.")
-            return {"error": "API key missing", "findings": []}
+            print("DEBUG: [LLM] OpenAI API key is missing. Falling back to Heuristic Analysis.")
+            # Heuristic fallback: simple keyword extraction and statement generation
+            heuristic_findings = []
+            if isinstance(data, list):
+                for item in data[:5]:
+                    title = item.get("title") or item.get("name") or "Key Discovery"
+                    snippet = item.get("snippet") or item.get("description") or "Details restricted."
+                    heuristic_findings.append({
+                        "statement": f"Detected signal: {title}. {snippet[:100]}...",
+                        "type": "fact",
+                        "confidence": "low",
+                        "rationale": "Extracted via heuristic fallback because OpenAI key is missing."
+                    })
+            elif isinstance(data, dict):
+                for key, val in data.items():
+                    if isinstance(val, list) and val:
+                        heuristic_findings.append({
+                            "statement": f"Found {len(val)} items for {key}.",
+                            "type": "fact",
+                            "confidence": "low",
+                            "rationale": "Heuristic count"
+                        })
+
+            return {
+                "findings": heuristic_findings,
+                "note": "This analysis was generated via heuristics because no OpenAI API key was provided."
+            }
             
         print(f"DEBUG: [LLM] Sending request to OpenAI ({self.model})...")
         headers = {

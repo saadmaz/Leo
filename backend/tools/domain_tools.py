@@ -4,8 +4,8 @@ from backend.config import settings
 
 async def find_domain_emails(domain: str) -> Dict[str, Any]:
     """Retrieve email patterns and team info for a competitor domain."""
-    if not settings.HUNTER_API_KEY:
-        return {"error": "Missing Hunter.io API Key"}
+    if not settings.HUNTER_API_KEY or "your_" in settings.HUNTER_API_KEY:
+        return {"error": "Missing or placeholder Hunter.io API Key"}
 
     url = "https://api.hunter.io/v2/domain-search"
     params = {

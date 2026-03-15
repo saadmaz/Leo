@@ -28,13 +28,18 @@ class ConfidenceVerifierAgent(BaseAgent):
         """
         
         verification_results = await self.llm.analyze_data(total_data, prompt)
-        v_map = {res['finding_id']: res for res in verification_results.get("verifications", [])}
+        v_map = {res['finding_id']: res for res in verification_results.get("verifications", []) if isinstance(res, dict) and 'finding_id' in res}
         
         # Update findings with verified confidence
         for output in all_agent_outputs:
+            if not output.findings:
+                continue
             for finding in output.findings:
                 if finding.id in v_map:
                     finding.confidence = v_map[finding.id].get("verified_confidence", finding.confidence)
                     finding.rationale += f" [Verified: {v_map[finding.id].get('verification_note', 'N/A')}]"
+                elif not self.llm.api_key or "your_" in self.llm.api_key:
+                    # In heuristic mode, default everything to medium if we can't verify
+                    finding.confidence = "medium"
                     
         return all_agent_outputs
