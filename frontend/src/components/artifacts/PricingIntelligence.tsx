@@ -1,6 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { ReceiptText } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ConfidenceBadge from "@/components/analysis/confidence-badge";
 
 interface CompetitorPricing {
   name: string;
@@ -23,81 +26,78 @@ interface Props {
   };
 }
 
-const confidenceBadge: Record<string, string> = {
-  high: "bg-emerald-500/20 text-emerald-400",
-  medium: "bg-amber-500/20 text-amber-400",
-  low: "bg-red-500/20 text-red-400",
-};
-
 export default function PricingIntelligence({ payload }: Props) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 space-y-4"
+      className=""
     >
-      <h3 className="text-sm font-semibold text-slate-200">Pricing Intelligence</h3>
-
-      {/* Pricing Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
+              <ReceiptText className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle>Pricing intelligence</CardTitle>
+              <p className="text-sm text-muted-foreground">Compare price architecture, willingness to pay, and packaging gaps.</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="overflow-x-auto rounded-[24px] border border-border bg-muted/30">
+            <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-700/50">
-              <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Competitor</th>
-              <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Model</th>
-              <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Entry Price</th>
-              <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Enterprise</th>
-              <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Packaging</th>
+            <tr className="border-b border-border">
+              <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Competitor</th>
+              <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Model</th>
+              <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Entry Price</th>
+              <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Enterprise</th>
+              <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Packaging</th>
             </tr>
           </thead>
           <tbody>
             {payload.competitors.map((c, i) => (
-              <tr key={c.name} className={`border-b border-slate-800/50 ${i % 2 === 0 ? "bg-slate-800/20" : ""}`}>
-                <td className="px-3 py-2 text-slate-200 font-medium">{c.name}</td>
+              <tr key={c.name} className={`border-b border-border ${i % 2 === 0 ? "bg-background/40" : ""}`}>
+                <td className="px-3 py-2 text-foreground font-medium">{c.name}</td>
                 <td className="px-3 py-2">
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-xs">{c.model}</span>
+                  <span className="rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1 text-xs text-primary">{c.model}</span>
                 </td>
-                <td className="px-3 py-2 text-slate-300 font-mono text-xs">{c.entry_price}</td>
-                <td className="px-3 py-2 text-slate-300 font-mono text-xs">{c.enterprise_price}</td>
-                <td className="px-3 py-2 text-slate-400 text-xs">{c.packaging}</td>
+                <td className="px-3 py-2 font-mono text-xs text-foreground">{c.entry_price}</td>
+                <td className="px-3 py-2 font-mono text-xs text-foreground">{c.enterprise_price}</td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{c.packaging}</td>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-
-      {/* Willingness to Pay */}
-      <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-          Willingness-to-Pay Signals
-        </h4>
-        <div className="space-y-2">
-          {payload.willingness_to_pay.map((s, i) => (
-            <div key={i} className="flex items-start gap-2 bg-slate-800/30 rounded-lg p-2">
-              <span className="text-slate-500 mt-0.5">•</span>
-              <span className="text-sm text-slate-300 flex-1">{s.signal}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${confidenceBadge[s.confidence]}`}>
-                {s.confidence}
-              </span>
+            </table>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+            <div>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Willingness-to-pay signals</h4>
+              <div className="space-y-3">
+                {payload.willingness_to_pay.map((s, i) => (
+                  <div key={i} className="flex items-start gap-3 rounded-2xl border border-border bg-muted/40 p-4">
+                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    <span className="flex-1 text-sm leading-6 text-foreground">{s.signal}</span>
+                    <ConfidenceBadge confidence={s.confidence} />
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Gaps */}
-      <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-          Pricing Gaps & Opportunities
-        </h4>
-        <div className="space-y-1.5">
-          {payload.gaps.map((gap, i) => (
-            <div key={i} className="flex items-start gap-2 bg-emerald-500/5 border-l-2 border-emerald-500/30 rounded-r-lg p-2">
-              <span className="text-emerald-500 mt-0.5 shrink-0">▸</span>
-              <span className="text-sm text-emerald-300">{gap}</span>
+            <div>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Pricing gaps and opportunities</h4>
+              <div className="space-y-3">
+                {payload.gaps.map((gap, i) => (
+                  <div key={i} className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm leading-6 text-emerald-700 dark:text-emerald-300">
+                    {gap}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { Radar } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface RadarNode {
   name: string;
@@ -38,12 +40,22 @@ export default function AdjacentMarketRadar({ payload }: Props) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 space-y-4"
+      className=""
     >
-      <h3 className="text-sm font-semibold text-slate-200">Adjacent Market Radar</h3>
-      <p className="text-xs text-slate-400">Markets converging with yours</p>
-
-      <div className="flex justify-center">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
+              <Radar className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle>Adjacent market radar</CardTitle>
+              <p className="text-sm text-muted-foreground">Markets converging with yours and their threat timeline.</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-center rounded-[24px] border border-border bg-muted/30 p-4">
         <svg viewBox="0 0 500 400" className="w-full max-w-lg">
           {/* Concentric circles */}
           {radii.map((r, i) => (
@@ -97,40 +109,40 @@ export default function AdjacentMarketRadar({ payload }: Props) {
             });
           })}
         </svg>
-      </div>
+          </div>
 
-      {/* Expanded node detail */}
-      <AnimatePresence>
-        {expandedNode && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-slate-800/40 rounded-lg p-3 space-y-1"
-          >
-            {payload.rings.flatMap((r) => r.nodes).filter((n) => n.name === expandedNode).map((node) => (
-              <div key={node.name}>
-                <h4 className="text-sm font-medium text-slate-200">{node.name}</h4>
-                <p className="text-xs text-slate-400">{node.description}</p>
-                <p className="text-xs text-slate-300 mt-1">{node.relevance}</p>
-                <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">
-                  Threat timeline: {node.threat_timeline}
-                </span>
+          <AnimatePresence>
+            {expandedNode && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="rounded-[24px] border border-border bg-muted/40 p-4 space-y-1"
+              >
+                {payload.rings.flatMap((r) => r.nodes).filter((n) => n.name === expandedNode).map((node) => (
+                  <div key={node.name}>
+                    <h4 className="text-sm font-medium text-foreground">{node.name}</h4>
+                    <p className="text-xs text-muted-foreground">{node.description}</p>
+                    <p className="mt-1 text-xs text-foreground">{node.relevance}</p>
+                    <span className="mt-2 inline-block rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground">
+                      Threat timeline: {node.threat_timeline}
+                    </span>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex flex-wrap gap-3">
+            {payload.rings.map((ring, i) => (
+              <div key={ring.label} className="flex items-center gap-1.5">
+                <div className={`h-3 w-3 rounded-full ${ringColors[i].bg} ${ringColors[i].border} border`} />
+                <span className="text-xs text-muted-foreground">{ring.label}</span>
               </div>
             ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3">
-        {payload.rings.map((ring, i) => (
-          <div key={ring.label} className="flex items-center gap-1.5">
-            <div className={`w-3 h-3 rounded-full ${ringColors[i].bg} ${ringColors[i].border} border`} />
-            <span className="text-xs text-slate-400">{ring.label}</span>
           </div>
-        ))}
-      </div>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }

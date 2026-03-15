@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { BrainCircuit, Lightbulb, ShieldCheck } from "lucide-react";
 import { Finding } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConfidenceBadge from "@/components/analysis/confidence-badge";
 
 interface Props {
   facts: Finding[];
@@ -12,106 +16,68 @@ interface Props {
 
 type FilterMode = "all" | "facts" | "analysis";
 
-const confidenceBadge: Record<string, string> = {
-  high: "bg-emerald-500/20 text-emerald-400",
-  medium: "bg-amber-500/20 text-amber-400",
-  low: "bg-red-500/20 text-red-400",
-};
-
 export default function FindingsDisplay({ facts, interpretations, recommendations }: Props) {
   const [filter, setFilter] = useState<FilterMode>("all");
 
   const showFacts = filter === "all" || filter === "facts";
   const showAnalysis = filter === "all" || filter === "analysis";
 
-  return (
-    <div className="space-y-3">
-      {/* Toggle */}
-      <div className="flex gap-1 bg-slate-800/50 rounded-lg p-0.5 w-fit">
-        {(["all", "facts", "analysis"] as FilterMode[]).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setFilter(mode)}
-            className={`px-3 py-1 rounded-md text-xs transition-colors ${
-              filter === mode
-                ? "bg-indigo-500/20 text-indigo-300"
-                : "text-slate-400 hover:text-slate-300"
-            }`}
+  const renderGroup = (items: Finding[], title: string, icon: React.ReactNode, tone: string) => (
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone}`}>{icon}</div>
+          <CardTitle>{title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.map((f, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="rounded-2xl border border-border bg-muted/40 p-4"
           >
-            {mode === "all" ? "Show all" : mode === "facts" ? "Facts only" : "Analysis only"}
-          </button>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm leading-7 text-foreground">{f.statement}</p>
+              <ConfidenceBadge confidence={f.confidence} />
+            </div>
+            {f.rationale ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{f.rationale}</p> : null}
+          </motion.div>
         ))}
-      </div>
+      </CardContent>
+    </Card>
+  );
 
-      {/* Facts */}
-      {showFacts && facts.length > 0 && (
-        <div className="space-y-2">
-          {facts.map((f, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="border-l-2 border-blue-500 bg-blue-500/5 rounded-r-lg p-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-slate-200">{f.statement}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${confidenceBadge[f.confidence]}`}>
-                  {f.confidence}
-                </span>
-              </div>
-              {f.rationale && <p className="text-xs text-slate-500 mt-1">{f.rationale}</p>}
-            </motion.div>
-          ))}
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Findings and recommendations</CardTitle>
+            <p className="text-sm text-muted-foreground">Separate observed facts from strategic interpretation and action.</p>
+          </div>
+          <Tabs value={filter} onValueChange={(value) => setFilter(value as FilterMode)}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="facts">Facts</TabsTrigger>
+              <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
-      )}
-
-      {/* Interpretations */}
-      {showAnalysis && interpretations.length > 0 && (
-        <div className="space-y-2">
-          {interpretations.map((f, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="border-l-2 border-slate-500 bg-slate-500/5 rounded-r-lg p-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-slate-300 italic">{f.statement}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${confidenceBadge[f.confidence]}`}>
-                  {f.confidence}
-                </span>
-              </div>
-              {f.rationale && <p className="text-xs text-slate-500 mt-1">{f.rationale}</p>}
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* Recommendations */}
-      {showAnalysis && recommendations.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Recommendations</h4>
-          {recommendations.map((f, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="border-l-2 border-indigo-500 bg-indigo-500/5 rounded-r-lg p-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-slate-200">{f.statement}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${confidenceBadge[f.confidence]}`}>
-                  {f.confidence}
-                </span>
-              </div>
-              {f.rationale && <p className="text-xs text-slate-500 mt-1">{f.rationale}</p>}
-            </motion.div>
-          ))}
-        </div>
-      )}
-    </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showFacts && facts.length > 0
+          ? renderGroup(facts, "Observed signals", <ShieldCheck className="h-5 w-5 text-sky-200" />, "bg-sky-400/10 text-sky-200")
+          : null}
+        {showAnalysis && interpretations.length > 0
+          ? renderGroup(interpretations, "Interpretation", <BrainCircuit className="h-5 w-5 text-foreground" />, "bg-muted text-foreground")
+          : null}
+        {showAnalysis && recommendations.length > 0
+          ? renderGroup(recommendations, "Recommended bets", <Lightbulb className="h-5 w-5 text-primary" />, "bg-primary/10 text-primary")
+          : null}
+      </CardContent>
+    </Card>
   );
 }

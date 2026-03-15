@@ -1,14 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Globe, PencilLine, Save } from "lucide-react";
 import { ProductContext } from "@/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Props {
   product: ProductContext;
   onUpdate: (product: ProductContext) => void;
+  compact?: boolean;
 }
 
-export default function ProductContextBar({ product, onUpdate }: Props) {
+export default function ProductContextBar({ product, onUpdate, compact = false }: Props) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(product.name);
   const [url, setUrl] = useState(product.url);
@@ -19,44 +26,55 @@ export default function ProductContextBar({ product, onUpdate }: Props) {
   };
 
   return (
-    <div className="flex items-center justify-between px-6 py-3 bg-slate-900/80 border-b border-slate-800">
-      <div className="flex items-center gap-3">
-        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">Analysing:</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-              autoFocus
-            />
-            <input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="product URL"
-              className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-400 focus:outline-none focus:border-indigo-500"
-            />
-            <button onClick={handleSave} className="text-xs text-indigo-400 hover:text-indigo-300">
-              Save
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">Analysing:</span>
-            <span className="text-sm font-medium text-slate-200">[{product.name}]</span>
-            <span className="text-sm text-slate-500">{product.url}</span>
-          </div>
+    <Card className="w-full rounded-[26px]">
+      <CardContent
+        className={cn(
+          "flex flex-col transition-all duration-300 md:flex-row md:items-center md:justify-between",
+          compact ? "gap-3 p-3" : "gap-4 p-4"
         )}
-      </div>
-      {!editing && (
-        <button
-          onClick={() => setEditing(true)}
-          className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700 rounded px-2 py-1 hover:border-slate-500 transition-colors"
-        >
-          Change product
-        </button>
-      )}
-    </div>
+      >
+        <div className={cn("flex items-center", compact ? "gap-2.5" : "gap-3")}>
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-2xl border border-border bg-muted text-foreground transition-all duration-300",
+              compact ? "h-9 w-9" : "h-11 w-11"
+            )}
+          >
+            <Globe className="h-5 w-5" />
+          </div>
+          {editing ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Company or product name" />
+              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="product URL" />
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <p className={cn("font-semibold text-foreground transition-all duration-300", compact ? "text-[13px]" : "text-sm")}>
+                  {product.name}
+                </p>
+                <Badge variant="default" className="normal-case tracking-normal text-[10px]">
+                  Active target
+                </Badge>
+              </div>
+              <p className={cn("text-muted-foreground transition-all duration-300", compact ? "mt-0.5 text-xs" : "mt-1 text-sm")}>
+                {product.url}
+              </p>
+            </div>
+          )}
+        </div>
+        {editing ? (
+          <Button onClick={handleSave} size="sm" className="rounded-xl">
+            <Save className="h-4 w-4" />
+            Save target
+          </Button>
+        ) : (
+          <Button onClick={() => setEditing(true)} variant="outline" size="sm" className={cn("rounded-xl", compact && "h-8 px-3 text-xs")}>
+            <PencilLine className="h-4 w-4" />
+            Change product
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }

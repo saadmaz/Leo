@@ -2,6 +2,8 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { Crosshair } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Competitor {
   name: string;
@@ -29,10 +31,22 @@ export default function PositioningMap({ payload }: Props) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-4"
+      className=""
     >
-      <h3 className="text-sm font-semibold text-slate-200 mb-4">Positioning Map</h3>
-      <div className="flex justify-center">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
+              <Crosshair className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle>Positioning map</CardTitle>
+              <p className="text-sm text-muted-foreground">Visualize the target against market competitors across two strategic axes.</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center rounded-[24px] border border-border bg-muted/30 p-4">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full max-w-lg">
           {/* Grid */}
           <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#334155" strokeDasharray="4 4" />
@@ -95,7 +109,9 @@ export default function PositioningMap({ payload }: Props) {
             );
           })}
         </svg>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }

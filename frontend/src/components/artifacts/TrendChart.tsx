@@ -1,7 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { TrendingUp } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ConfidenceBadge from "@/components/analysis/confidence-badge";
 
 interface DataPoint {
   month: string;
@@ -19,12 +22,6 @@ interface Props {
   };
 }
 
-const confidenceBadge: Record<string, string> = {
-  high: "bg-emerald-500/20 text-emerald-400",
-  medium: "bg-amber-500/20 text-amber-400",
-  low: "bg-red-500/20 text-red-400",
-};
-
 export default function TrendChart({ payload }: Props) {
   const eventsData = payload.data.filter((d) => d.event);
 
@@ -32,21 +29,28 @@ export default function TrendChart({ payload }: Props) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-4"
+      className=""
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-200">{payload.title}</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Based on {payload.sourceCount} sources</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${confidenceBadge[payload.confidence]}`}>
-            confidence: {payload.confidence}
-          </span>
-        </div>
-      </div>
-      <div className="h-64">
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>{payload.title}</CardTitle>
+                <p className="text-sm text-muted-foreground">Based on {payload.sourceCount} sources</p>
+              </div>
+            </div>
+            <ConfidenceBadge confidence={payload.confidence as "high" | "medium" | "low"} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72 rounded-[24px] border border-border bg-muted/30 p-3">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={payload.data} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
             <XAxis
               dataKey="month"
               tick={{ fill: "#64748b", fontSize: 11 }}
@@ -61,9 +65,9 @@ export default function TrendChart({ payload }: Props) {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1e293b",
-                border: "1px solid #334155",
-                borderRadius: "8px",
+                backgroundColor: "#020617",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "16px",
                 color: "#e2e8f0",
                 fontSize: "12px",
               }}
@@ -94,16 +98,18 @@ export default function TrendChart({ payload }: Props) {
             ))}
           </LineChart>
         </ResponsiveContainer>
-      </div>
-      {eventsData.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {eventsData.map((d) => (
-            <span key={d.month} className="text-xs px-2 py-1 rounded bg-amber-500/10 text-amber-400">
-              📌 {d.event}
-            </span>
-          ))}
-        </div>
-      )}
+          </div>
+          {eventsData.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {eventsData.map((d) => (
+                <span key={d.month} className="rounded-full border border-amber-400/15 bg-amber-400/10 px-3 py-1 text-xs text-amber-300">
+                  {d.event}
+                </span>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }
