@@ -17,9 +17,11 @@ class LLMClient:
         """
         Sends raw data and a prompt to the LLM to get structured JSON analysis.
         """
-        if not self.api_key:
+        if not self.api_key or "your_" in self.api_key:
+            print("DEBUG: [LLM] OpenAI API key is missing or placeholder. Skipping LLM call.")
             return {"error": "API key missing", "findings": []}
             
+        print(f"DEBUG: [LLM] Sending request to OpenAI ({self.model})...")
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -43,6 +45,7 @@ class LLMClient:
                 import json
                 return json.loads(result["choices"][0]["message"]["content"])
             except Exception as e:
+                print(f"ERROR: [LLM] OpenAI request failed: {e}")
                 return {"error": str(e), "findings": []}
 
 # Simple factory or global instance could be added here

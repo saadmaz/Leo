@@ -9,8 +9,11 @@ async def search_hiring_signals(query: str, country: str = "us", results: int = 
     """
     Deep search for hiring signals (job postings) using Adzuna API.
     """
-    if not settings.ADZUNA_APP_ID or not settings.ADZUNA_APP_KEY:
+    if not settings.ADZUNA_APP_ID or not settings.ADZUNA_APP_KEY or "your_" in settings.ADZUNA_APP_ID:
+        print(f"DEBUG: [Adzuna] Missing or placeholder API keys. Query: '{query}'")
         return []
+
+    print(f"DEBUG: [Adzuna] Searching jobs for '{query}'...")
 
     url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
     
@@ -29,7 +32,8 @@ async def search_hiring_signals(query: str, country: str = "us", results: int = 
             response.raise_for_status()
             data = response.json()
             return data.get("results", [])
-        except Exception:
+        except Exception as e:
+            print(f"ERROR: [Adzuna] Search failed for '{query}': {e}")
             return []
 
 async def get_hiring_velocity(company_name: str) -> Dict[str, Any]:

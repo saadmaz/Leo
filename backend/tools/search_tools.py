@@ -6,8 +6,11 @@ async def search_web(query: str) -> List[Dict]:
     """
     Real web search using SerpAPI.
     """
-    if not settings.SERPAPI_API_KEY:
+    if not settings.SERPAPI_API_KEY or "your_" in settings.SERPAPI_API_KEY:
+        print(f"DEBUG: [SerpAPI] Missing or placeholder API key. Query: '{query}'")
         return [{"error": "Missing SerpAPI Key"}]
+
+    print(f"DEBUG: [SerpAPI] Searching web for '{query}'...")
 
     url = "https://serpapi.com/search"
     params = {
@@ -33,6 +36,7 @@ async def search_web(query: str) -> List[Dict]:
                 for r in results
             ]
         except Exception as e:
+            print(f"ERROR: [SerpAPI] Search failed: {e}")
             return [{"error": str(e)}]
 
 async def search_reddit(query: str) -> List[Dict]:

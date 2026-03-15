@@ -4,8 +4,11 @@ from backend.config import settings
 
 async def search_organizations(keyword: str, limit: int = 10) -> List[Dict]:
     """Search Crunchbase companies by keyword in their description."""
-    if not settings.CRUNCHBASE_API_KEY:
+    if not settings.CRUNCHBASE_API_KEY or "your_" in settings.CRUNCHBASE_API_KEY:
+        print(f"DEBUG: [Crunchbase] Missing or placeholder API key. Skipping real-time search for '{keyword}'.")
         return []
+
+    print(f"DEBUG: [Crunchbase] Searching organizations for '{keyword}'...")
 
     url = "https://api.crunchbase.com/api/v4/searches/organizations"
     headers = {
@@ -47,13 +50,17 @@ async def search_organizations(keyword: str, limit: int = 10) -> List[Dict]:
             response = await client.post(url, headers=headers, json=payload, timeout=10.0)
             response.raise_for_status()
             return response.json().get("entities", [])
-        except Exception:
+        except Exception as e:
+            print(f"ERROR: [Crunchbase] Search failed: {e}")
             return []
 
 async def get_company_detail(permalink: str) -> Dict[str, Any]:
     """Get detailed info for a specific company by its Crunchbase permalink."""
-    if not settings.CRUNCHBASE_API_KEY:
+    if not settings.CRUNCHBASE_API_KEY or "your_" in settings.CRUNCHBASE_API_KEY:
+        print(f"DEBUG: [Crunchbase] Missing API key for detail lookup: {permalink}")
         return {"error": "Missing Crunchbase API Key"}
+
+    print(f"DEBUG: [Crunchbase] Fetching details for {permalink}...")
 
     url = f"https://api.crunchbase.com/api/v4/entities/organizations/{permalink}"
     params = {

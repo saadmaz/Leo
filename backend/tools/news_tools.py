@@ -6,8 +6,11 @@ async def search_news(query: str, days_back: int = 30) -> List[Dict]:
     """
     Search for recent news relevant to the query using NewsAPI.
     """
-    if not settings.NEWSAPI_KEY:
+    if not settings.NEWSAPI_KEY or "your_" in settings.NEWSAPI_KEY:
+        print(f"DEBUG: [NewsAPI] Missing or placeholder API key. Query: '{query}'")
         return [{"error": "Missing NewsAPI Key"}]
+
+    print(f"DEBUG: [NewsAPI] Searching everything for '{query}'...")
 
     from datetime import datetime, timedelta
     from_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
@@ -40,11 +43,13 @@ async def search_news(query: str, days_back: int = 30) -> List[Dict]:
                 for a in articles
             ]
         except Exception as e:
+            print(f"ERROR: [NewsAPI] Search failed: {e}")
             return [{"error": str(e)}]
 
 async def get_top_headlines(query: str) -> List[Dict]:
     """Get top headlines mentioning a product or category."""
-    if not settings.NEWSAPI_KEY:
+    if not settings.NEWSAPI_KEY or "your_" in settings.NEWSAPI_KEY:
+        print(f"DEBUG: [NewsAPI] Missing API key for headlines: '{query}'")
         return []
 
     url = "https://newsapi.org/v2/top-headlines"

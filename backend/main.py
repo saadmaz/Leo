@@ -31,6 +31,17 @@ def read_root():
 def health_check():
     return {"status": "ok"}
 
+@app.get("/debug/config")
+async def debug_config():
+    from backend.config import settings
+    return {
+        "SERPAPI_API_KEY": "SET" if settings.SERPAPI_API_KEY and "your_" not in settings.SERPAPI_API_KEY else "MISSING",
+        "OPENAI_API_KEY": "SET" if settings.OPENAI_API_KEY and "your_" not in settings.OPENAI_API_KEY else "MISSING",
+        "CRUNCHBASE_API_KEY": "SET" if settings.CRUNCHBASE_API_KEY and "your_" not in settings.CRUNCHBASE_API_KEY else "MISSING",
+        "ADZUNA_APP_ID": "SET" if settings.ADZUNA_APP_ID and "your_" not in settings.ADZUNA_APP_ID else "MISSING",
+        "NEWSAPI_KEY": "SET" if settings.NEWSAPI_KEY and "your_" not in settings.NEWSAPI_KEY else "MISSING",
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
