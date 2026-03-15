@@ -129,7 +129,7 @@ export default function Home() {
       setTimeout(() => {
         clearInterval(intervalTimer);
         resolve(agents);
-      }, 5500);
+      }, 3500);
     });
   }, []);
 
@@ -148,62 +148,68 @@ export default function Home() {
     setInput("");
     setIsProcessing(true);
 
-    const queryCost = 0.01 + Math.random() * 0.04;
-    setCurrentQueryCost(queryCost);
-    const startTime = Date.now();
-    const finalAgentStatuses = await simulateAgentExecution();
+    try {
+      const queryCost = 0.01 + Math.random() * 0.04;
+      setCurrentQueryCost(queryCost);
+      const startTime = Date.now();
+      const finalAgentStatuses = await simulateAgentExecution();
 
-    let response: OrchestratorResponse;
+      let response: OrchestratorResponse;
 
-    if (useMock) {
-      response = { ...MOCK_RESPONSE, query: trimmedQuery };
-    } else {
-      try {
-        response = await sendQuery({
-          query: trimmedQuery,
-          company_name: product.name,
-          product_name: product.name,
-          context:
-            messages.length > 0
-              ? `Previous queries: ${messages
-                  .filter((message) => message.role === "user")
-                  .map((message) => message.content)
-                  .join("; ")}`
-              : undefined,
-          session_id: sessionId,
-        });
-      } catch {
+      if (useMock) {
         response = { ...MOCK_RESPONSE, query: trimmedQuery };
+      } else {
+        try {
+          response = await sendQuery({
+            query: trimmedQuery,
+            company_name: product.name,
+            product_name: product.name,
+            context:
+              messages.length > 0
+                ? `Previous queries: ${messages
+                    .filter((message) => message.role === "user")
+                    .map((message) => message.content)
+                    .join("; ")}`
+                : undefined,
+            session_id: sessionId,
+          });
+        } catch (error) {
+          console.error("Query failed:", error);
+          response = { ...MOCK_RESPONSE, query: trimmedQuery };
+        }
       }
+
+      const totalLatency = (Date.now() - startTime) / 1000;
+      const totalSources = response.agent_outputs.reduce((sum, output) => sum + output.evidence.length, 0);
+
+      const metadata: QueryMetadata = {
+        timestamp: new Date(),
+        agentsUsed: response.agent_outputs.map((output) => output.agent_name),
+        sourcesHit: totalSources,
+        totalLatency,
+        estimatedCost: queryCost,
+      };
+
+      const assistantMessage: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content: response.executive_summary,
+        timestamp: new Date(),
+        response,
+        agentStatuses: finalAgentStatuses,
+        metadata,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+      setSessionCost((prev) => prev + queryCost);
+      setSuggestedChips(response.follow_up_questions.slice(0, 3));
+      
+      setTimeout(() => setAgentPanelCollapsed(true), 1500);
+    } catch (error) {
+      console.error("Submission error:", error);
+    } finally {
+      setIsProcessing(false);
     }
-
-    const totalLatency = (Date.now() - startTime) / 1000;
-    const totalSources = response.agent_outputs.reduce((sum, output) => sum + output.evidence.length, 0);
-
-    const metadata: QueryMetadata = {
-      timestamp: new Date(),
-      agentsUsed: response.agent_outputs.map((output) => output.agent_name),
-      sourcesHit: totalSources,
-      totalLatency,
-      estimatedCost: queryCost,
-    };
-
-    const assistantMessage: ChatMessage = {
-      id: generateId(),
-      role: "assistant",
-      content: response.executive_summary,
-      timestamp: new Date(),
-      response,
-      agentStatuses: finalAgentStatuses,
-      metadata,
-    };
-
-    setMessages((prev) => [...prev, assistantMessage]);
-    setSessionCost((prev) => prev + queryCost);
-    setSuggestedChips(response.follow_up_questions.slice(0, 3));
-    setIsProcessing(false);
-
-    setTimeout(() => setAgentPanelCollapsed(true), 1500);
   };
 
   const allSources = messages

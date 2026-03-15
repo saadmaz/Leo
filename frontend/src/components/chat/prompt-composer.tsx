@@ -68,8 +68,15 @@ export default function PromptComposer({
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && input.trim() && !isProcessing) {
+                    e.preventDefault();
+                    onSubmit(input);
+                  }
+                }}
                 placeholder="Ask about your market, competitors, pricing, positioning, or strategic risk..."
                 disabled={isProcessing}
+                autoFocus
                 className={cn("rounded-2xl text-[15px] transition-all duration-300", compact ? "h-12" : "h-14")}
               />
               <Button type="submit" size="lg" disabled={!input.trim() || isProcessing} className="min-w-[132px] rounded-2xl">
