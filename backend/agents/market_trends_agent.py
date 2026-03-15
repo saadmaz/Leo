@@ -1,81 +1,165 @@
+import os
+import uuid
 import asyncio
 from datetime import datetime
+from typing import Dict, Any, List
 from .base_agent import BaseAgent
 from ..schemas.agent_output import AgentOutput
 from ..schemas.finding_schema import Finding
 from ..schemas.evidence_schema import Evidence
 from ..schemas.artifact_schema import Artifact
-from ..tools.search_tools import search_web
-from ..tools.news_tools import search_news
+from ..schemas.query_schema import QueryRequest
+from dotenv import load_dotenv
+import serpapi
+
+load_dotenv()
 
 class MarketTrendsAgent(BaseAgent):
     def __init__(self):
         super().__init__("MarketTrendsAgent")
+        self.client = serpapi.Client(api_key=os.getenv("SERPAPI_API_KEY"))
+        self._cache = {}
 
-    async def run(self, query_context) -> AgentOutput:
-        # 1. Collect sources (Web + News)
-        search_query = f"market trends for {query_context.company_name or query_context.query}"
-        results = await asyncio.gather(
-            search_web(search_query),
-            search_news(search_query)
-        )
-        web_results, news_results = results
-        
-        # 2. Extract signals & 3. Generate findings using LLM
-        all_raw_data = {"web": web_results, "news": news_results}
-        llm_analysis = await self.analyze_with_llm(
-            data=all_raw_data, 
-            query=search_query, 
-            context_type="Market Trend"
-        )
-        
-        raw_findings = llm_analysis.get("findings", [])
+    def _cached_search(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        key = str(sorted(params.items()))
+        if key not in self._cache:
+            self._cache[key] = self.client.search(**params)
+        return self._cache[key]
+
+    async def run(self, query_context: QueryRequest) -> AgentOutput:
+        product = query_context.product_name or query_context.company_name or query_context.query
+        category = query_context.context.get("category", "AI SDR tools")
+
         findings = []
         evidence = []
-        
-        for i, f in enumerate(raw_findings):
-            fid = f"trend-{i}"
-            findings.append(
-                Finding(
-                    id=fid,
-                    statement=f.get("statement", "No statement"),
-                    type=f.get("type", "fact"),
-                    confidence=f.get("confidence", "low"),
-                    rationale=f.get("rationale", "No rationale"),
-                    domain="Market",
-                    evidence_ids=[f"ev-market-{i}"]
-                )
-            )
-            # Link to the first relevant result for evidence
-            source_list = web_results + news_results
-            source = source_list[0] if source_list else {"url": "N/A", "title": "N/A", "snippet": "N/A"}
+        artifacts = []
+
+        try:
+            # 1. Interest over time (Google Trends)
+            params_trends = {
+                "engine": "google_trends",
+                "q": f"{product},{category},sales automation",
+                "geo": "US",
+                "date": "today 12-m"
+            }
+            # Run in a thread pool if the client is blocking, but serpapi-python seems to be blocking.
+            # For a hackathon, we can use it directly or wrap in run_in_executor.
+            loop = asyncio.get_event_loop()
+            trends = await loop.run_in_executor(None, self._cached_search, params_trends)
             
-            evidence.append(
-                Evidence(
-                    id=f"ev-market-{i}",
-                    source_type="web/news",
-                    url=source.get("url", "N/A"),
-                    title=source.get("title", "N/A"),
-                    snippet=source.get("snippet", "N/A"),
-                    collected_at=datetime.now(),
-                    entity=query_context.company_name or "Market",
-                    tags=["growth", "signals"]
+            timeline_data = trends.get("interest_over_time", {}).get("timeline_data", [])
+
+            if timeline_data:
+                recent_points = timeline_data[-8:]
+                values = []
+                for pt in recent_points:
+                    try:
+                        val = pt["values"][0].get("extracted_value", 0)
+                        values.append(val)
+                    except (IndexError, KeyError):
+                        values.append(0)
+                
+                momentum = "accelerating" if values and values[-1] > values[0] else "declining"
+
+                ev_id = str(uuid.uuid4())
+                ev = Evidence(
+                    id=ev_id,
+                    source_type="google_trends",
+                    url="https://trends.google.com",
+                    title=f"Google Trends — {category}",
+                    snippet=f"Last 12 months interest data for {category}. Recent momentum: {momentum}.",
+                    collected_at=datetime.utcnow(),
+                    entity=product,
+                    tags=["trends", "search_volume"]
                 )
+                evidence.append(ev)
+
+                findings.append(Finding(
+                    id=str(uuid.uuid4()),
+                    statement=f"Search interest for '{category}' is {momentum} based on 12-month Google Trends data.",
+                    type="fact",
+                    confidence="high",
+                    rationale="Derived from Google Trends interest_over_time data.",
+                    domain="market_trends",
+                    evidence_ids=[ev_id]
+                ))
+
+                artifacts.append(Artifact(
+                    artifact_type="trend_timeline",
+                    title=f"Search interest — {category} (12 months)",
+                    payload=timeline_data
+                ))
+
+            # 2. Related rising queries
+            params_related = {
+                "engine": "google_trends",
+                "q": category,
+                "date": "today 12-m",
+                "data_type": "RELATED_QUERIES"
+            }
+            related = await loop.run_in_executor(None, self._cached_search, params_related)
+            rising = related.get("related_queries", {}).get("rising", [])[:5]
+
+            if rising:
+                rising_terms = ", ".join([r["query"] for r in rising])
+                findings.append(Finding(
+                    id=str(uuid.uuid4()),
+                    statement=f"Breakout search terms rising in this category: {rising_terms}.",
+                    type="interpretation",
+                    confidence="medium",
+                    rationale="Rising queries indicate emerging buyer language and adjacent product interest.",
+                    domain="market_trends",
+                    evidence_ids=[ev.id] if evidence else []
+                ))
+
+            # 3. Google News Search
+            params_news = {
+                "engine": "google_news",
+                "q": f"{product} {category} launch 2025",
+                "gl": "us",
+                "hl": "en"
+            }
+            news_result = await loop.run_in_executor(None, self._cached_search, params_news)
+            news_articles = news_result.get("news_results", [])[:3]
+
+            for article in news_articles:
+                ev_id = str(uuid.uuid4())
+                evidence.append(Evidence(
+                    id=ev_id,
+                    source_type="google_news",
+                    url=article.get("link"),
+                    title=article.get("title", "News Article"),
+                    snippet=article.get("snippet", ""),
+                    collected_at=datetime.utcnow(),
+                    entity=product,
+                    tags=["news", category]
+                ))
+                
+                findings.append(Finding(
+                    id=str(uuid.uuid4()),
+                    statement=f"Recent news for {product}: {article.get('title')}",
+                    type="fact",
+                    confidence="high",
+                    rationale="Extracted from Google News search results.",
+                    domain="market_trends",
+                    evidence_ids=[ev_id]
+                ))
+
+        except Exception as e:
+            return AgentOutput(
+                agent_name=self.name,
+                status="failed",
+                findings=[],
+                evidence=[],
+                artifacts=[],
+                errors=[str(e)]
             )
-        
-        # 4. Build artifacts
-        artifacts = [
-            Artifact(
-                artifact_type="trend_timeline",
-                title="Market Signal Timeline",
-                payload={"2024-Q1": "Expansion Phase", "2024-Q2": "Growth Tracking"}
-            )
-        ]
-        
+
         return AgentOutput(
             agent_name=self.name,
             status="success",
             findings=findings,
             evidence=evidence,
-            artifacts=artifacts
+            artifacts=artifacts,
+            errors=[]
         )
