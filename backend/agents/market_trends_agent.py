@@ -9,6 +9,7 @@ from backend.schemas.finding_schema import Finding
 from backend.schemas.evidence_schema import Evidence
 from backend.schemas.artifact_schema import Artifact
 from backend.schemas.query_schema import QueryRequest
+import serpapi
 from backend.tools.news_tools import get_funding_news, search_news
 from backend.tools.gdelt_tools import get_trend_timeline, get_market_sentiment
 from backend.config import settings
