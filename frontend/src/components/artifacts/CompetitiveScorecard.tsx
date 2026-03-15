@@ -19,9 +19,9 @@ interface Props {
 }
 
 const threatBadge = {
-  high: "bg-red-500/20 text-red-400 border-red-500/30",
-  medium: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  low: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  high: "bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-300",
+  medium: "bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-300",
+  low: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-300",
 };
 
 export default function CompetitiveScorecard({ payload }: Props) {
@@ -34,32 +34,32 @@ export default function CompetitiveScorecard({ payload }: Props) {
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-indigo-100">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
               <BarChart3 className="h-5 w-5" />
             </div>
             <div>
               <CardTitle>Competitive scorecard</CardTitle>
-              <p className="text-sm text-slate-400">Positioning, strengths, weaknesses, and threat level by competitor.</p>
+              <p className="text-sm text-muted-foreground">Positioning, strengths, weaknesses, and threat level by competitor.</p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="overflow-x-auto rounded-[24px] border border-white/8 bg-black/10">
+          <div className="overflow-x-auto rounded-[24px] border border-border bg-muted/30">
             <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/8">
-              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Competitor</th>
-              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Positioning</th>
-              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Strengths</th>
-              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Weaknesses</th>
-              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Threat</th>
+            <tr className="border-b border-border">
+              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Competitor</th>
+              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Positioning</th>
+              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Strengths</th>
+              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Weaknesses</th>
+              <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Threat</th>
             </tr>
           </thead>
           <tbody>
             {payload.competitors.map((c, i) => (
-              <tr key={c.name} className={`border-b border-white/8 ${i % 2 === 0 ? "bg-white/[0.02]" : ""}`}>
-                <td className="whitespace-nowrap px-4 py-4 font-medium text-slate-100">{c.name}</td>
-                <td className="max-w-[220px] px-4 py-4 text-slate-400">{c.positioning}</td>
+              <tr key={c.name} className={`border-b border-border ${i % 2 === 0 ? "bg-background/40" : ""}`}>
+                <td className="whitespace-nowrap px-4 py-4 font-medium text-foreground">{c.name}</td>
+                <td className="max-w-[220px] px-4 py-4 text-muted-foreground">{c.positioning}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     {c.strengths.map((s) => (

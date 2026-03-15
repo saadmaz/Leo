@@ -79,7 +79,7 @@ export default function ArtifactRenderer({ artifacts }: Props) {
               <Card key={i}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-indigo-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
@@ -89,7 +89,7 @@ export default function ArtifactRenderer({ artifacts }: Props) {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <pre className="overflow-x-auto rounded-2xl border border-white/8 bg-black/10 p-4 text-xs text-slate-400">
+                  <pre className="overflow-x-auto rounded-2xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground">
                     {JSON.stringify(artifact.payload, null, 2)}
                   </pre>
                 </CardContent>

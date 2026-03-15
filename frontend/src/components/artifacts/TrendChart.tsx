@@ -35,19 +35,19 @@ export default function TrendChart({ payload }: Props) {
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-indigo-100">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
                 <TrendingUp className="h-5 w-5" />
               </div>
               <div>
                 <CardTitle>{payload.title}</CardTitle>
-                <p className="text-sm text-slate-400">Based on {payload.sourceCount} sources</p>
+                <p className="text-sm text-muted-foreground">Based on {payload.sourceCount} sources</p>
               </div>
             </div>
             <ConfidenceBadge confidence={payload.confidence as "high" | "medium" | "low"} />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-72 rounded-[24px] border border-white/8 bg-black/10 p-3">
+          <div className="h-72 rounded-[24px] border border-border bg-muted/30 p-3">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={payload.data} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />

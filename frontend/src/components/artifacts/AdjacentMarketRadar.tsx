@@ -45,17 +45,17 @@ export default function AdjacentMarketRadar({ payload }: Props) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-indigo-100">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
               <Radar className="h-5 w-5" />
             </div>
             <div>
               <CardTitle>Adjacent market radar</CardTitle>
-              <p className="text-sm text-slate-400">Markets converging with yours and their threat timeline.</p>
+              <p className="text-sm text-muted-foreground">Markets converging with yours and their threat timeline.</p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex justify-center rounded-[24px] border border-white/8 bg-black/10 p-4">
+          <div className="flex justify-center rounded-[24px] border border-border bg-muted/30 p-4">
         <svg viewBox="0 0 500 400" className="w-full max-w-lg">
           {/* Concentric circles */}
           {radii.map((r, i) => (
@@ -117,14 +117,14 @@ export default function AdjacentMarketRadar({ payload }: Props) {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="rounded-[24px] border border-white/8 bg-black/10 p-4 space-y-1"
+                className="rounded-[24px] border border-border bg-muted/40 p-4 space-y-1"
               >
                 {payload.rings.flatMap((r) => r.nodes).filter((n) => n.name === expandedNode).map((node) => (
                   <div key={node.name}>
-                    <h4 className="text-sm font-medium text-slate-200">{node.name}</h4>
-                    <p className="text-xs text-slate-400">{node.description}</p>
-                    <p className="mt-1 text-xs text-slate-300">{node.relevance}</p>
-                    <span className="mt-2 inline-block rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-xs text-slate-300">
+                    <h4 className="text-sm font-medium text-foreground">{node.name}</h4>
+                    <p className="text-xs text-muted-foreground">{node.description}</p>
+                    <p className="mt-1 text-xs text-foreground">{node.relevance}</p>
+                    <span className="mt-2 inline-block rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground">
                       Threat timeline: {node.threat_timeline}
                     </span>
                   </div>
@@ -137,7 +137,7 @@ export default function AdjacentMarketRadar({ payload }: Props) {
             {payload.rings.map((ring, i) => (
               <div key={ring.label} className="flex items-center gap-1.5">
                 <div className={`h-3 w-3 rounded-full ${ringColors[i].bg} ${ringColors[i].border} border`} />
-                <span className="text-xs text-slate-400">{ring.label}</span>
+                <span className="text-xs text-muted-foreground">{ring.label}</span>
               </div>
             ))}
           </div>

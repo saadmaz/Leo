@@ -62,12 +62,12 @@ export default function SourceTrail({ sources }: Props) {
   }, {});
 
   return (
-    <Card className="bg-white/[0.03]">
+    <Card>
       <CardHeader className="pb-0">
         <button onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between text-left">
           <div>
             <CardTitle>Evidence trail</CardTitle>
-            <p className="mt-1 text-sm text-slate-400">{sources.length} sources grouped by evidence quality.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{sources.length} sources grouped by evidence quality.</p>
           </div>
           <Badge variant="default" className="gap-2 normal-case tracking-normal">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -87,24 +87,24 @@ export default function SourceTrail({ sources }: Props) {
             <CardContent className="space-y-5 pt-6">
               {Object.entries(grouped).map(([category, items]) => (
                 <div key={category}>
-                  <h5 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">{category}</h5>
+                  <h5 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{category}</h5>
                   <div className="space-y-2">
                     {items.map((s, i) => {
                       const conf = getSourceConfidence(s);
                       return (
-                        <div key={i} className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-black/10 p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+                        <div key={i} className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className={`h-2 w-2 rounded-full ${confidenceColors[conf]}`} />
-                              <span className={typeColors[s.source_type] || "text-slate-400"}>{s.title || getDomain(s.url)}</span>
+                              <span className={typeColors[s.source_type] || "text-muted-foreground"}>{s.title || getDomain(s.url)}</span>
                             </div>
-                            <div className="mt-1 flex items-center gap-2 text-slate-500">
+                            <div className="mt-1 flex items-center gap-2 text-muted-foreground">
                               <span>{getDomain(s.url)}</span>
                               <ExternalLink className="h-3 w-3" />
                             </div>
                           </div>
                           {s.collected_at ? (
-                            <span className="text-slate-500">retrieved {new Date(s.collected_at).toLocaleTimeString()}</span>
+                            <span className="text-muted-foreground">retrieved {new Date(s.collected_at).toLocaleTimeString()}</span>
                           ) : null}
                         </div>
                       );
@@ -112,7 +112,7 @@ export default function SourceTrail({ sources }: Props) {
                   </div>
                 </div>
               ))}
-              <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> verified</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> inferred</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> low-signal</span>

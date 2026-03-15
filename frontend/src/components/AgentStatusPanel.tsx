@@ -23,11 +23,11 @@ const statusIcon: Record<AgentStatus, React.ComponentType<{ className?: string }
 };
 
 const statusColor: Record<AgentStatus, string> = {
-  queued: "text-slate-500 border-white/10 bg-white/[0.03]",
-  running: "text-indigo-300 border-primary/20 bg-primary/10",
-  done: "text-emerald-300 border-emerald-400/20 bg-emerald-400/10",
-  failed: "text-rose-300 border-rose-400/20 bg-rose-400/10",
-  partial: "text-amber-300 border-amber-400/20 bg-amber-400/10",
+  queued: "text-muted-foreground border-border bg-muted/40",
+  running: "text-primary border-primary/20 bg-primary/10",
+  done: "text-emerald-700 border-emerald-500/20 bg-emerald-500/10 dark:text-emerald-300",
+  failed: "text-rose-700 border-rose-500/20 bg-rose-500/10 dark:text-rose-300",
+  partial: "text-amber-700 border-amber-500/20 bg-amber-500/10 dark:text-amber-300",
 };
 
 const statusLabel: Record<AgentStatus, string> = {
@@ -47,9 +47,9 @@ export default function AgentStatusPanel({ agents, collapsed, onToggle, totalTim
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         onClick={onToggle}
-        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-white/[0.09]"
+        className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:bg-accent"
       >
-        <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
         <span>
           {agents.length} agents completed in {totalTime?.toFixed(1)}s
           {totalSources ? ` · ${totalSources} sources analysed` : ""}
@@ -68,15 +68,15 @@ export default function AgentStatusPanel({ agents, collapsed, onToggle, totalTim
       >
         <Card className="overflow-hidden">
           <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Agent Pipeline</div>
-                <div className="mt-1 text-sm text-slate-300">Live execution trace across research agents</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Agent Pipeline</div>
+              <div className="mt-1 text-sm text-muted-foreground">Live execution trace across research agents</div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={allDone ? "success" : "info"}>{allDone ? "Complete" : "Running"}</Badge>
                 {allDone && (
-                  <button onClick={onToggle} className="rounded-full border border-white/10 p-2 text-slate-400 transition-colors hover:text-white">
+                  <button onClick={onToggle} className="rounded-full border border-border p-2 text-muted-foreground transition-colors hover:text-foreground">
                     <ChevronUp className="h-4 w-4" />
                   </button>
                 )}
@@ -92,7 +92,7 @@ export default function AgentStatusPanel({ agents, collapsed, onToggle, totalTim
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
-                    className="rounded-2xl border border-white/8 bg-black/10 px-4 py-3"
+                    className="rounded-2xl border border-border bg-muted/40 px-4 py-3"
                   >
                     <div className="flex items-center gap-3">
                       <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${statusColor[agent.status]}`}>
@@ -100,27 +100,27 @@ export default function AgentStatusPanel({ agents, collapsed, onToggle, totalTim
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-medium text-slate-200">{agent.displayName}</span>
-                          <span className="text-xs font-mono text-slate-500">
+                          <span className="text-sm font-medium text-foreground">{agent.displayName}</span>
+                          <span className="text-xs font-mono text-muted-foreground">
                             {agent.status === "running" || agent.status === "done" || agent.status === "partial"
                               ? `${agent.elapsed.toFixed(1)}s`
                               : statusLabel[agent.status]}
                           </span>
                         </div>
-                        <div className="mt-2 h-1.5 rounded-full bg-white/[0.06]">
+                        <div className="mt-2 h-1.5 rounded-full bg-muted">
                           <div
                             className={`h-1.5 rounded-full ${
                               agent.status === "running"
                                 ? "w-3/5 bg-primary"
                                 : agent.status === "done"
-                                ? "w-full bg-emerald-400"
+                                ? "w-full bg-emerald-500"
                                 : agent.status === "failed"
-                                ? "w-full bg-rose-400"
-                                : "w-1/4 bg-slate-600"
+                                ? "w-full bg-rose-500"
+                                : "w-1/4 bg-muted-foreground/50"
                             }`}
                           />
                         </div>
-                        {agent.error ? <div className="mt-2 text-xs text-amber-300">{agent.error}</div> : null}
+                        {agent.error ? <div className="mt-2 text-xs text-amber-600 dark:text-amber-300">{agent.error}</div> : null}
                       </div>
                     </div>
                   </motion.div>

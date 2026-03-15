@@ -19,7 +19,7 @@ export default function FollowupChips({ chips, onSelect, align = "center" }: Fol
             variant="secondary"
             size="sm"
             onClick={() => onSelect(chip)}
-            className="rounded-full border-white/8 bg-white/[0.04] px-4 text-slate-300 hover:border-primary/20 hover:bg-primary/10 hover:text-indigo-100"
+            className="rounded-full px-4"
           >
             {chip}
             <ArrowRight className="h-3.5 w-3.5" />

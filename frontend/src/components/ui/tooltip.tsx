@@ -12,7 +12,7 @@ const TooltipContent = ({ className, sideOffset = 8, ...props }: React.Component
     <TooltipPrimitive.Content
       sideOffset={sideOffset}
       className={cn(
-        "z-50 overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-xs text-slate-200 shadow-2xl shadow-slate-950/40 animate-in fade-in-0 zoom-in-95",
+        "z-50 overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
         className
       )}
       {...props}

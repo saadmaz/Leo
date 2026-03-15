@@ -36,17 +36,17 @@ export default function PositioningMap({ payload }: Props) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-indigo-100">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
               <Crosshair className="h-5 w-5" />
             </div>
             <div>
               <CardTitle>Positioning map</CardTitle>
-              <p className="text-sm text-slate-400">Visualize the target against market competitors across two strategic axes.</p>
+              <p className="text-sm text-muted-foreground">Visualize the target against market competitors across two strategic axes.</p>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-center rounded-[24px] border border-white/8 bg-black/10 p-4">
+          <div className="flex justify-center rounded-[24px] border border-border bg-muted/30 p-4">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full max-w-lg">
           {/* Grid */}
           <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#334155" strokeDasharray="4 4" />
