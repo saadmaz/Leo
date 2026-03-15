@@ -3,6 +3,7 @@ import traceback
 
 from orchestrator.agent_registry import AgentRegistry
 from agents.confidence_agent import ConfidenceAgent
+from agents.confidence_verifier_agent import ConfidenceVerifierAgent
 from agents.synthesizer_agent import SynthesizerAgent
 from memory.memory_manager import MemoryManager
 from schemas.agent_output import AgentOutput
@@ -28,6 +29,7 @@ class Orchestrator:
         self.registry = registry
         self.memory = memory
         self.confidence_agent = ConfidenceAgent()
+        self.confidence_verifier = ConfidenceVerifierAgent()
         self.synthesizer_agent = SynthesizerAgent()
 
     async def run(self, request: QueryRequest) -> OrchestratorResponse:
@@ -63,6 +65,10 @@ class Orchestrator:
 
         # ── 4. Confidence processing ───────────────────────────────
         confidence_overview = self.confidence_agent.score_outputs(successful_outputs)
+
+        # Run the deeper confidence verifier and include its output
+        verifier_output = self.confidence_verifier.verify_outputs(successful_outputs)
+        successful_outputs.append(verifier_output)
 
         # ── 5. Synthesis ───────────────────────────────────────────
         synthesis = self.synthesizer_agent.synthesize(

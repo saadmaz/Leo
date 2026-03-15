@@ -1,67 +1,89 @@
 """
-Web search tool wrapper.
-In production, replace the mock with a real API (Tavily, SerpAPI, Brave Search, etc.).
+Lightweight search tool wrappers.
+Hackathon-grade: uses httpx + fallback to mock data when APIs are unavailable.
 """
 
-import asyncio
-import random
+import os
+import httpx
 from datetime import datetime, timezone
+
+SERP_API_KEY = os.getenv("SERP_API_KEY", "")
+SERP_BASE = "https://serpapi.com/search"
+
+_client: httpx.AsyncClient | None = None
+
+
+async def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=15.0)
+    return _client
 
 
 async def search_web(query: str, num_results: int = 5) -> list[dict]:
-    """
-    Search the web for a query and return structured results.
-    Each result contains: title, url, snippet, source.
-    """
-    await asyncio.sleep(random.uniform(0.2, 0.6))  # simulate API latency
+    """Search the web via SerpAPI (Google). Falls back to empty list."""
+    if not SERP_API_KEY:
+        return _mock_web_results(query, num_results)
+    try:
+        client = await _get_client()
+        resp = await client.get(
+            SERP_BASE,
+            params={"q": query, "api_key": SERP_API_KEY, "num": num_results, "engine": "google"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = []
+        for item in data.get("organic_results", [])[:num_results]:
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("link", ""),
+                "snippet": item.get("snippet", ""),
+                "source_type": "web_search",
+                "collected_at": datetime.now(timezone.utc).isoformat(),
+            })
+        return results
+    except Exception:
+        return []
 
-    # Mock results keyed on common signal keywords
-    mock_db = [
-        {
-            "title": f"Market Analysis: {query}",
-            "url": f"https://techcrunch.com/2026/market-{query.replace(' ', '-').lower()[:30]}",
-            "snippet": f"The market for {query} is projected to grow 35% YoY, driven by enterprise adoption and AI integration.",
-            "source": "techcrunch.com",
-        },
-        {
-            "title": f"{query} - Industry Report 2026",
-            "url": f"https://cbinsights.com/research/{query.replace(' ', '-').lower()[:30]}",
-            "snippet": f"Funding in the {query} space reached $4.2B in Q1 2026, a 60% increase from the prior year.",
-            "source": "cbinsights.com",
-        },
-        {
-            "title": f"Top Companies in {query}",
-            "url": f"https://g2.com/categories/{query.replace(' ', '-').lower()[:30]}",
-            "snippet": f"G2 lists 45 vendors in the {query} category. Leaders include established SaaS players and emerging AI-native startups.",
-            "source": "g2.com",
-        },
-        {
-            "title": f"{query} Hiring Surge",
-            "url": f"https://linkedin.com/pulse/{query.replace(' ', '-').lower()[:30]}-hiring",
-            "snippet": f"Companies in the {query} space posted 12,000+ job openings in the last 90 days, up 40% quarter-over-quarter.",
-            "source": "linkedin.com",
-        },
-        {
-            "title": f"New Product Launches in {query}",
-            "url": f"https://producthunt.com/topics/{query.replace(' ', '-').lower()[:30]}",
-            "snippet": f"Three new {query} products launched this week, focusing on AI-powered automation and developer experience.",
-            "source": "producthunt.com",
-        },
-        {
-            "title": f"{query} Pricing Comparison",
-            "url": f"https://capterra.com/{query.replace(' ', '-').lower()[:30]}/pricing",
-            "snippet": f"Average pricing for {query} tools ranges from $29/mo for startups to $500+/mo for enterprise tiers.",
-            "source": "capterra.com",
-        },
-        {
-            "title": f"{query} Partnership Announcements",
-            "url": f"https://businesswire.com/{query.replace(' ', '-').lower()[:30]}-partnerships",
-            "snippet": f"Two major {query} vendors announced strategic integrations with Salesforce and HubSpot this quarter.",
-            "source": "businesswire.com",
-        },
-    ]
 
-    results = random.sample(mock_db, min(num_results, len(mock_db)))
-    for r in results:
-        r["collected_at"] = datetime.now(timezone.utc).isoformat()
-    return results
+async def search_reddit(query: str, num_results: int = 5) -> list[dict]:
+    """Search Reddit via web search with site filter."""
+    return await search_web(f"site:reddit.com {query}", num_results)
+
+
+async def search_hackernews(query: str, num_results: int = 5) -> list[dict]:
+    """Search Hacker News via the Algolia HN API."""
+    try:
+        client = await _get_client()
+        resp = await client.get(
+            "https://hn.algolia.com/api/v1/search",
+            params={"query": query, "hitsPerPage": num_results},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = []
+        for hit in data.get("hits", [])[:num_results]:
+            results.append({
+                "title": hit.get("title") or hit.get("story_title", ""),
+                "url": hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}",
+                "snippet": (hit.get("comment_text") or hit.get("story_text") or "")[:300],
+                "source_type": "hackernews",
+                "collected_at": datetime.now(timezone.utc).isoformat(),
+            })
+        return results
+    except Exception:
+        return []
+
+
+def _mock_web_results(query: str, num: int) -> list[dict]:
+    """Fallback mock results when no API key is set."""
+    now = datetime.now(timezone.utc).isoformat()
+    return [
+        {
+            "title": f"Result for: {query}",
+            "url": f"https://example.com/search?q={query.replace(' ', '+')}",
+            "snippet": f"Simulated search result snippet for '{query}'. Replace SERP_API_KEY to get live data.",
+            "source_type": "web_search_mock",
+            "collected_at": now,
+        }
+    ][:num]
