@@ -26,15 +26,17 @@ async def main():
     print("✅ Analysis Complete!\n")
     print("--- EXECUTIVE SUMMARY ---")
     print(response.executive_summary)
-    print("\n--- AGENT STATUSES ---")
-    print(json.dumps(response.agent_statuses, indent=2))
+    print("\n--- AGENT OUTPUTS (Statuses) ---")
+    for out in response.agent_outputs:
+        print(f"📡 {out.agent_name}: {out.status}")
+        
     print("\n--- FINDINGS (Sample) ---")
-    for finding in response.findings[:3]:
-        print(f"- [{finding.confidence}] {finding.statement}")
+    for finding in response.key_findings[:5]:
+        print(f"- [{finding.type}] {finding.statement} (Confidence: {finding.confidence})")
     
     print("\n--- RECOMMENDATIONS ---")
     for rec in response.recommendations:
-        print(f"👉 {rec}")
+        print(f"👉 {rec.statement}")
 
 if __name__ == "__main__":
     asyncio.run(main())

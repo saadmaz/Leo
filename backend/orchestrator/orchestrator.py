@@ -29,15 +29,21 @@ class Orchestrator:
         
         # 5. Wrap in FinalResponse schema
         return FinalResponse(
+            session_id=query.session_id,
+            query=query.query,
             executive_summary=synthesis_data.get("executive_summary", ""),
-            findings=[f for out in verified_outputs for f in out.findings],
-            facts=[f for out in verified_outputs for f in out.findings if f.type == "fact"],
-            interpretations=[f for out in verified_outputs for f in out.findings if f.type == "interpretation"],
-            evidence=[e for out in verified_outputs for e in out.evidence],
-            artifacts=[a for out in verified_outputs for a in out.artifacts],
-            confidence_score=synthesis_data.get("confidence_score", 0.0),
-            strategic_pillars=synthesis_data.get("strategic_pillars", []),
-            agent_statuses={out.agent_name: out.status for out in verified_outputs}
+            key_findings=[f for out in verified_outputs for f in (out.findings or []) if f.confidence == "high"],
+            facts=[f for out in verified_outputs for f in (out.findings or []) if f.type == "fact"],
+            interpretations=[f for out in verified_outputs for f in (out.findings or []) if f.type == "interpretation"],
+            recommendations=[f for out in verified_outputs for f in (out.findings or []) if f.type == "recommendation"],
+            confidence_overview={
+                "score": synthesis_data.get("confidence_score", 0.0),
+                "rationale": "Confidence score calculated across all agent signals."
+            },
+            artifacts=[a for out in verified_outputs for a in (out.artifacts or [])],
+            follow_up_questions=synthesis_data.get("follow_up_questions", []),
+            agent_outputs=verified_outputs,
+            errors=[err for out in verified_outputs for err in (out.errors or [])]
         )
 
     async def _safe_run(self, agent, query) -> AgentOutput:
