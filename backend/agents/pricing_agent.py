@@ -6,12 +6,18 @@ from ..schemas.finding_schema import Finding
 from ..schemas.evidence_schema import Evidence
 from ..schemas.artifact_schema import Artifact
 from ..tools.signal_extractors import detect_pricing_signals
+from ..tools.scraper_tools import scrape_page
 
 class PricingAgent(BaseAgent):
     def __init__(self):
         super().__init__("PricingAgent")
 
     async def run(self, query_context) -> AgentOutput:
+        # Use deep scraping for pricing page
+        url = f"https://{query_context.company_name or 'example'}.com/pricing"
+        page_content = await scrape_page(url)
+        pricing_signals = detect_pricing_signals(page_content)
+        
         findings = [
             Finding(
                 id="price-1",

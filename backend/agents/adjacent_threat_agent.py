@@ -6,11 +6,16 @@ from ..schemas.finding_schema import Finding
 from ..schemas.evidence_schema import Evidence
 from ..schemas.artifact_schema import Artifact
 
+from ..tools.patent_tools import search_patents
+
 class AdjacentThreatAgent(BaseAgent):
     def __init__(self):
         super().__init__("AdjacentThreatAgent")
 
     async def run(self, query_context) -> AgentOutput:
+        # Collect Patent data
+        patents = await search_patents(query_context.company_name or query_context.query)
+        
         findings = [
             Finding(
                 id="threat-1",

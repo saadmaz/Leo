@@ -6,13 +6,19 @@ from ..schemas.finding_schema import Finding
 from ..schemas.evidence_schema import Evidence
 from ..schemas.artifact_schema import Artifact
 from ..tools.search_tools import search_web
+from ..tools.crunchbase_tools import get_company_intel
 
 class CompetitiveLandscapeAgent(BaseAgent):
     def __init__(self):
         super().__init__("CompetitiveLandscapeAgent")
 
     async def run(self, query_context) -> AgentOutput:
-        raw_results = await search_web(f"competitors of {query_context.company_name or query_context.query}")
+        # Collect Web + Crunchbase data
+        results = await asyncio.gather(
+            search_web(f"competitors of {query_context.company_name or query_context.query}"),
+            get_company_intel(query_context.company_name or query_context.query)
+        )
+        raw_results, cb_data = results
         
         findings = [
             Finding(

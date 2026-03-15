@@ -6,6 +6,7 @@ from ..agents.adjacent_threat_agent import AdjacentThreatAgent
 from ..agents.win_loss_agent import WinLossAgent
 from ..agents.pricing_agent import PricingAgent
 from ..agents.positioning_agent import PositioningAgent
+from ..agents.hiring_signal_agent import HiringSignalAgent
 
 class AgentRegistry:
     def __init__(self):
@@ -15,7 +16,8 @@ class AgentRegistry:
             "adjacent_threat": AdjacentThreatAgent(),
             "win_loss": WinLossAgent(),
             "pricing": PricingAgent(),
-            "positioning": PositioningAgent()
+            "positioning": PositioningAgent(),
+            "hiring_signal": HiringSignalAgent()
         }
 
     def get_agent(self, name: str) -> BaseAgent:

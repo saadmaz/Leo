@@ -6,14 +6,19 @@ from ..schemas.finding_schema import Finding
 from ..schemas.evidence_schema import Evidence
 from ..schemas.artifact_schema import Artifact
 from ..tools.search_tools import search_web
+from ..tools.news_tools import search_news
 
 class MarketTrendsAgent(BaseAgent):
     def __init__(self):
         super().__init__("MarketTrendsAgent")
 
     async def run(self, query_context) -> AgentOutput:
-        # 1. Collect sources
-        raw_results = await search_web(f"market trends for {query_context.company_name or query_context.query}")
+        # 1. Collect sources (Web + News)
+        search_query = f"market trends for {query_context.company_name or query_context.query}"
+        web_results, news_results = await asyncio.gather(
+            search_web(search_query),
+            search_news(search_query)
+        )
         
         # 2. Extract signals & 3. Generate findings
         findings = [
@@ -32,9 +37,9 @@ class MarketTrendsAgent(BaseAgent):
             Evidence(
                 id="ev-1",
                 source_type="web",
-                url=raw_results[0]["url"],
-                title=raw_results[0]["title"],
-                snippet=raw_results[0]["snippet"],
+                url=web_results[0]["url"],
+                title=web_results[0]["title"],
+                snippet=web_results[0]["snippet"],
                 collected_at=datetime.now(),
                 entity=query_context.company_name or "Market",
                 tags=["growth", "signals"]

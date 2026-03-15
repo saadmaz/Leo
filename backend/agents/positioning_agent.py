@@ -11,6 +11,9 @@ class PositioningAgent(BaseAgent):
         super().__init__("PositioningAgent")
 
     async def run(self, query_context) -> AgentOutput:
+        # Simulate Meta Ad Library / LinkedIn Ads signal detection
+        await asyncio.sleep(0.4)
+        
         findings = [
             Finding(
                 id="pos-1",
