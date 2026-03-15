@@ -114,7 +114,7 @@ class CompetitiveLandscapeAgent(BaseAgent):
             )
             
             # Use search result or placeholder
-            source = raw_results[0] if raw_results else {"url": "#", "title": "Crunchbase Intel", "snippet": str(cb_data)}
+            source = raw_results[0] if raw_results else {"url": "#", "title": "Crunchbase Intel", "snippet": "No web results found."}
             evidence.append(
                 Evidence(
                     id=f"ev-comp-{i}",
@@ -128,13 +128,26 @@ class CompetitiveLandscapeAgent(BaseAgent):
                 )
             )
         
-        artifacts = [
+        # Populate artifact with real and inferred competitors
+        competitors_for_matrix = []
+        for comp in competitors_cb:
+            props = comp.get("properties", {})
+            competitors_for_matrix.append({
+                "name": props.get("identifier", {}).get("value") or "Unknown",
+                "positioning": props.get("short_description", "Data restricted"),
+                "strengths": ["Market Presence"],
+                "weaknesses": [],
+                "threat_level": "medium",
+                "sources": [f"https://www.crunchbase.com/organization/{props.get('identifier', {}).get('value')}"]
+            })
+
+        artifacts.append(
             Artifact(
-                artifact_type="competitor_matrix",
-                title="Feature Comparison Matrix",
-                payload=[{"feature": "AI Strategy", "Status": "Extracted via LLM"}]
+                artifact_type="competitive_scorecard",
+                title="Competitive Intelligence Matrix",
+                payload={"competitors": competitors_for_matrix}
             )
-        ]
+        )
         
         return AgentOutput(
             agent_name=self.name,

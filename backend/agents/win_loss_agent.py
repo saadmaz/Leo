@@ -28,10 +28,6 @@ class WinLossAgent(BaseAgent):
             context_type="Win/Loss Analysis & Customer Sentiment"
         )
         
-        raw_findings = llm_analysis.get("findings", [])
-        findings = []
-        evidence = []
-        
         for i, f in enumerate(raw_findings):
             findings.append(
                 Finding(
@@ -45,7 +41,7 @@ class WinLossAgent(BaseAgent):
                 )
             )
             
-            source = web_results[0] if web_results else reddit_results[0] if reddit_results else {"url": "#", "title": "N/A"}
+            source = web_results[0] if web_results else reddit_results[0] if reddit_results else {"url": "#", "title": "N/A", "snippet": "No data found"}
             evidence.append(
                 Evidence(
                     id=f"ev-wl-{i}",

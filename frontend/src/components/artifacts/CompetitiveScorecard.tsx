@@ -56,13 +56,13 @@ export default function CompetitiveScorecard({ payload }: Props) {
             </tr>
           </thead>
           <tbody>
-            {payload.competitors.map((c, i) => (
+            {(payload?.competitors || []).map((c, i) => (
               <tr key={c.name} className={`border-b border-border ${i % 2 === 0 ? "bg-background/40" : ""}`}>
                 <td className="whitespace-nowrap px-4 py-4 font-medium text-foreground">{c.name}</td>
                 <td className="max-w-[220px] px-4 py-4 text-muted-foreground">{c.positioning}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {c.strengths.map((s) => (
+                    {(c.strengths || []).map((s) => (
                       <span key={s} className="inline-block rounded-full border border-emerald-400/15 bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-300">
                         {s}
                       </span>
@@ -71,7 +71,7 @@ export default function CompetitiveScorecard({ payload }: Props) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {c.weaknesses.map((w) => (
+                    {(c.weaknesses || []).map((w) => (
                       <span key={w} className="inline-block rounded-full border border-rose-400/15 bg-rose-400/10 px-2.5 py-1 text-xs text-rose-300">
                         {w}
                       </span>
@@ -79,8 +79,8 @@ export default function CompetitiveScorecard({ payload }: Props) {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-medium ${threatBadge[c.threat_level]}`}>
-                    {c.threat_level.charAt(0).toUpperCase() + c.threat_level.slice(1)}
+                  <span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-medium ${threatBadge[c.threat_level || 'low']}`}>
+                    {(c.threat_level || 'low').charAt(0).toUpperCase() + (c.threat_level || 'low').slice(1)}
                   </span>
                 </td>
               </tr>
@@ -89,9 +89,9 @@ export default function CompetitiveScorecard({ payload }: Props) {
             </table>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {payload.competitors.map((c) => (
+            {(payload?.competitors || []).map((c) => (
               <Badge key={c.name} variant="default" className="normal-case tracking-normal">
-                {c.name}: {c.sources.length} sources
+                {c.name}: {(c.sources || []).length} sources
               </Badge>
             ))}
           </div>

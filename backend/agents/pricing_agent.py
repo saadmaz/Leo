@@ -27,10 +27,6 @@ class PricingAgent(BaseAgent):
             context_type="Pricing Information"
         )
         
-        raw_findings = llm_analysis.get("findings", [])
-        findings = []
-        evidence = []
-        
         for i, f in enumerate(raw_findings):
             findings.append(
                 Finding(
