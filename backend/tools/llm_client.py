@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Any, Optional
 import httpx
-from .llm_client import Optional # Placeholder for actual client logic
+# from .llm_client import Optional # Placeholder for actual client logic - removed circular import
 
 class LLMClient:
     """
