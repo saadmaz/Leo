@@ -6,12 +6,12 @@ from orchestrator.agent_registry import AgentRegistry
 from memory.memory_manager import MemoryManager
 from agents.specialist_agents import (
     PricingAgent,
-    CompetitiveLandscapeAgent,
-    MarketTrendsAgent,
     PositioningAgent,
     WinLossAgent,
-    AdjacentThreatAgent,
 )
+from agents.market_trends_agent import MarketTrendsAgent
+from agents.competitive_agent import CompetitiveLandscapeAgent
+from agents.adjacent_threat_agent import AdjacentThreatAgent
 
 router = APIRouter()
 
