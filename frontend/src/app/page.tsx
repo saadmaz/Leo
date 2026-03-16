@@ -203,144 +203,73 @@ export default function Home() {
         <QueryCostIndicator queryCost={currentQueryCost} sessionCost={sessionCost} visible={messages.length > 0} />
 
         {!hasResults ? (
-          <div className="space-y-8 py-8">
-            <section className="grid gap-6 lg:grid-cols-[1.15fr,0.85fr]">
-              <Card>
-                <CardContent className="p-8 sm:p-10">
-                  <Badge variant="default" className="normal-case tracking-normal">
-                    Focused AI workspace
-                  </Badge>
-                  <h2 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
-                    One page for market questions, strategic answers, and evidence.
-                  </h2>
-                  <p className="mt-4 max-w-2xl text-base leading-8 text-muted-foreground">
-                    Leo turns a single prompt into summaries, findings, pricing intelligence, competitor views, and follow-up opportunities inline.
-                  </p>
-                  <div className="mt-8">
-                    <QuickPrompts prompts={suggestedChips} onSelect={handleSubmit} align="left" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="grid gap-4 p-6">
-                  <div className="rounded-[24px] border border-border bg-muted/40 p-5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Analysis target</div>
-                        <div className="mt-2 text-lg font-medium">{product.name}</div>
-                      </div>
-                      <CircleDashed className={`h-5 w-5 ${isProcessing ? "animate-spin text-primary" : "text-muted-foreground"}`} />
-                    </div>
-                    <div className="mt-2 text-sm text-muted-foreground">{product.url}</div>
-                  </div>
-                  <div className="grid gap-3">
-                    <div className="rounded-[24px] border border-border bg-muted/40 p-5">
-                      <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Mode</div>
-                      <div className="mt-2 text-sm">Live LEO multi-agent analysis</div>
-                    </div>
-                    <div className="rounded-[24px] border border-border bg-muted/40 p-5">
-                      <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Outputs</div>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Executive summary, findings, charts, scorecards, pricing intelligence, risks, and follow-up prompts.
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-
-            <section className="grid gap-4 md:grid-cols-3">
-              {workspaceHighlights.map((item) => (
-                <Card key={item.title}>
-                  <CardContent className="p-6">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
-                      <item.icon className="h-5 w-5" />
-                    </div>
-                    <h3 className="mt-4 text-lg font-medium">{item.title}</h3>
-                    <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </section>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 animate-in fade-in duration-1000">
+            <div className="text-center space-y-4">
+              <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
+                What can I analyze for you today?
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+                Boardroom-quality growth intelligence in minutes. 
+                Powered by multi-agent live research.
+              </p>
+            </div>
+            
+            <div className="w-full max-w-2xl">
+               <QuickPrompts prompts={suggestedChips} onSelect={handleSubmit} align="center" />
+            </div>
           </div>
         ) : (
-          <div className="space-y-5">
-            <div className="rounded-[24px] border border-border bg-card p-4 transition-all duration-300">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Conversation workspace</div>
-                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                    Results render inline below each prompt with summaries, findings, artifacts, and evidence.
-                  </p>
-                </div>
-                <QuickPrompts prompts={suggestedChips} onSelect={handleSubmit} align="left" />
-              </div>
-            </div>
+          <div className="max-w-3xl mx-auto space-y-8 pt-8">
+            <div className="space-y-12 pb-32">
+              {messages.map((message, index) => (
+                <div key={message.id} className="space-y-6">
+                  <MessageCard
+                    message={message}
+                  />
 
-            <ScrollArea className="h-[calc(100vh-240px)] pr-2 transition-all duration-300">
-              <div className="space-y-6 pb-12">
-                {messages.map((message, index) => (
-                  <div key={message.id} className="space-y-5">
-                    <MessageCard
-                      message={message}
-                      showContextHint={
-                        message.role === "assistant" && messages.filter((entry) => entry.role === "user").length > 1
-                      }
-                    />
-
-                    {message.role === "assistant" && message.response ? (
-                      <>
-                        <FindingsDisplay
-                          findings={message.response.findings}
-                          facts={message.response.facts}
-                          interpretations={message.response.interpretations}
-                          recommendedBets={message.response.recommendedBets}
-                        />
-                        <ArtifactRenderer artifacts={message.response.artifacts} />
-                        <SourceTrail sources={message.response.evidence} />
-                        {message.response.agentStatuses
-                          .filter((output) => output.status === "failed")
-                          .map((output) => (
-                            <div
-                              key={output.name}
-                              className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
-                            >
-                              {output.name} failed to provide results.
-                            </div>
-                          ))}
-                        {index !== messages.length - 1 ? <Separator className="mt-6" /> : null}
-                      </>
-                    ) : null}
-                  </div>
-                ))}
-
-                <AnimatePresence>
-                  {isProcessing && (
-                    <div className="flex justify-center">
-                      <ProcessTrace
-                        agents={agentStatuses}
-                        isProcessing={isProcessing}
+                  {message.role === "assistant" && message.response && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                      <FindingsDisplay
+                        findings={message.response.findings}
+                        facts={message.response.facts}
+                        interpretations={message.response.interpretations}
+                        recommendedBets={message.response.recommendedBets}
                       />
+                      
+                      {message.response.artifacts && message.response.artifacts.length > 0 && (
+                        <ArtifactRenderer artifacts={message.response.artifacts} />
+                      )}
+                      
+                      <SourceTrail sources={message.response.evidence} />
+                      
+                      {message.response.agentStatuses
+                        .filter((output) => output.status === "failed")
+                        .map((output) => (
+                          <div
+                            key={output.name}
+                            className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
+                          >
+                            {output.name} failed to provide results.
+                          </div>
+                        ))}
                     </div>
                   )}
-                </AnimatePresence>
+                </div>
+              ))}
 
-                {!isProcessing && suggestedChips.length > 0 ? (
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="mb-4 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">Suggested next questions</span>
-                      </div>
-                      <QuickPrompts prompts={suggestedChips} onSelect={handleSubmit} align="left" />
-                    </CardContent>
-                  </Card>
-                ) : null}
+              <AnimatePresence>
+                {isProcessing && (
+                  <div className="flex justify-center py-4">
+                    <ProcessTrace
+                      agents={agentStatuses}
+                      isProcessing={isProcessing}
+                    />
+                  </div>
+                )}
+              </AnimatePresence>
 
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
+              <div ref={messagesEndRef} />
+            </div>
           </div>
         )}
       </main>

@@ -11,8 +11,10 @@ import {
   UserSearch, 
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Activity
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface ToolCall {
@@ -44,36 +46,48 @@ export default function ProcessTrace({ agents, isProcessing }: ProcessTraceProps
   return (
     <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className={cn(
-        "rounded-2xl border border-border bg-card/50 backdrop-blur-sm transition-all overflow-hidden",
-        isExpanded ? "shadow-lg" : "shadow-sm"
+        "rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md transition-all overflow-hidden",
+        isExpanded ? "shadow-[0_4px_20px_rgba(0,0,0,0.08)] bg-card/60" : "shadow-sm"
       )}>
         {/* Header Summary */}
         <button 
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-colors"
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-secondary/20 transition-colors group"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                {isProcessing ? <Activity className="h-5 w-5 animate-pulse" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+              </div>
+              {isProcessing && (
+                <div className="absolute -top-1 -right-1 h-3 w-3 border-2 border-background bg-primary rounded-full animate-ping" />
+              )}
             </div>
             <div className="text-left">
-              <span className="text-sm font-medium">
+              <span className="text-[14px] font-semibold tracking-tight block">
                 {isProcessing 
-                  ? `Intelligence gathering... (${completedCount}/${agents.length})` 
-                  : "Analysis complete"}
+                  ? `Collaborative research in progress...` 
+                  : "Intelligence synthesis complete"}
               </span>
-              {!isExpanded && activeAgents.length > 0 && (
-                <p className="text-xs text-muted-foreground truncate max-w-[300px]">
-                  {activeAgents[0].message || `Agent ${activeAgents[0].name} is researching...`}
-                </p>
+              {!isExpanded && (
+                <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                        {completedCount} of {agents.length} agents finished
+                    </span>
+                    {activeAgents.length > 0 && (
+                        <span className="text-[10px] text-primary/40 pl-2 border-l border-border/60 truncate max-w-[200px]">
+                            {activeAgents[0].message ? `Currently ${activeAgents[0].message.toLowerCase()}` : `Agent ${activeAgents[0].name} active`}
+                        </span>
+                    )}
+                </div>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {isExpanded ? "Hide process" : "View process"}
+          <div className="flex items-center gap-2 bg-secondary/40 px-3 py-1.5 rounded-lg group-hover:bg-secondary/60 transition-colors">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+              {isExpanded ? "Hide detail" : "View detail"}
             </span>
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           </div>
         </button>
 
@@ -84,34 +98,39 @@ export default function ProcessTrace({ agents, isProcessing }: ProcessTraceProps
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="border-t border-border"
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="border-t border-border/40"
             >
-              <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto">
+              <div className="p-5 space-y-5 max-h-[450px] overflow-y-auto custom-scrollbar">
                 {agents.map((agent) => (
-                  <div key={agent.name} className="space-y-2">
+                  <div key={agent.name} className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <div className={cn(
                           "h-2 w-2 rounded-full",
-                          agent.status === "running" ? "bg-blue-500 animate-pulse" : 
+                          agent.status === "running" ? "bg-primary animate-pulse" : 
                           ["done", "success", "completed"].includes(agent.status) ? "bg-emerald-500" :
-                          agent.status === "failed" ? "bg-rose-500" : "bg-muted-foreground"
+                          agent.status === "failed" ? "bg-rose-500" : "bg-muted-foreground/30"
                         )} />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          {agent.name.replace("_", " ")}
+                        <span className="text-[12px] font-bold uppercase tracking-[0.1em] text-foreground/70">
+                          {agent.name.replace("_", " ")} agent
                         </span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground italic font-mono">
+                      <Badge variant="default" className="h-5 px-2 text-[9px] font-bold tracking-widest opacity-60">
                          {agent.status}
-                      </span>
+                      </Badge>
                     </div>
 
                     {agent.message && (
-                      <div className="pl-4 border-l border-border/50 ml-1">
-                        <div className="flex items-start gap-2 text-sm text-foreground/80 bg-secondary/20 p-2 rounded-lg">
-                          <Globe className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+                      <div className="pl-5 border-l border-border/60 ml-1 py-1">
+                        <motion.div 
+                          initial={{ x: -10, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          className="flex items-start gap-2.5 text-[13px] text-muted-foreground leading-relaxed bg-secondary/10 p-3 rounded-xl border border-border/20"
+                        >
+                          <Search className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary/40" />
                           <span>{agent.message}</span>
-                        </div>
+                        </motion.div>
                       </div>
                     )}
                   </div>
