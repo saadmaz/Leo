@@ -505,7 +505,3 @@ Tests verify:
 | **Person 3** | Data integrations · Signal tools · API connections |
 
 ---
-
-## 📄 License
-
-MIT — built for hackathon purposes.
