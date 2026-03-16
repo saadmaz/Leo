@@ -54,6 +54,7 @@ export interface FinalResponse {
   followUpQuestions: string[];
   agentStatuses: AgentStatusInfo[];
   queryCostEstimate: string;
+  errors: string[];
 }
 
 export interface ProductContext {

@@ -46,5 +46,5 @@ class BaseAgent(ABC):
             }
         ]
         
-        response = await self.llm.chat(messages, system, tools=tools)
+        response = await self.llm.chat(messages, system, tools=tools, status_callback=status_callback)
         return self.llm.extract_json(response)

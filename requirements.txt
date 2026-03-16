@@ -6,8 +6,6 @@ pydantic-settings
 httpx
 python-multipart
 python-dotenv
-recharts
-framer-motion
-lucide-react
-clsx
-tailwind-merge
+firebase-admin
+numpy
+pandas

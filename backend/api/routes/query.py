@@ -9,7 +9,20 @@ import asyncio
 
 router = APIRouter()
 orchestrator = Orchestrator()
-memory_manager = MemoryManager()
+
+# Use Firebase if initialized, else fallback
+from backend.memory.firebase_manager import firebase_manager
+
+@router.get("/sessions")
+async def list_sessions():
+    return firebase_manager.list_sessions()
+
+@router.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    data = firebase_manager.get_session(session_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return data
 
 @router.post("/query")
 async def handle_query(request: QueryRequest):
@@ -39,11 +52,17 @@ async def handle_query(request: QueryRequest):
         if task.done():
             try:
                 final_response = await task
-                # Save to memory
-                session = memory_manager.get_session(request.session_id)
-                session.past_queries.append(request)
-                session.last_response = final_response
-                memory_manager.update_session(request.session_id, session)
+                
+                # Save to Firebase with metadata
+                from datetime import datetime
+                session_data = {
+                    "session_id": request.session_id,
+                    "title": request.product or "New Analysis",
+                    "past_queries": [request.model_dump()],
+                    "last_response": final_response.model_dump(),
+                    "updated_at": datetime.now().isoformat()
+                }
+                firebase_manager.save_session(request.session_id, session_data)
 
                 yield f"data: {json.dumps({'status': 'final', 'data': final_response.model_dump()})}\n\n"
             except Exception as e:

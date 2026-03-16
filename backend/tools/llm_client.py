@@ -19,9 +19,9 @@ class LLMClient:
             "hiring_search": hiring_search
         }
 
-    async def chat(self, messages: List[Dict[str, str]], system: str, tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    async def chat(self, messages: List[Dict[str, str]], system: str, tools: Optional[List[Dict[str, Any]]] = None, status_callback=None) -> Dict[str, Any]:
         """
-        Generic chat interface for Anthropic with recursive tool execution.
+        Generic chat interface for Anthropic with recursive tool execution and granular status reporting.
         """
         if not self.api_key or "your_" in self.api_key:
             return {"content": [{"type": "text", "text": '{"findings": [], "note": "API Key missing"}'}]}
@@ -68,7 +68,22 @@ class LLMClient:
                         
                         func = self.tool_registry.get(tool_name)
                         if func:
-                            print(f"[LLM] Executing tool: {tool_name} with {tool_input}")
+                            msg = f"Executing tool: {tool_name}"
+                            if tool_name == "web_search":
+                                msg = f"Searching for '{tool_input.get('query', '')}'..."
+                            elif tool_name == "hiring_search":
+                                msg = f"Scanning hiring signals for '{tool_input.get('query', '')}'..."
+                            
+                            if status_callback:
+                                await status_callback({
+                                    "status": "processing",
+                                    "type": "tool_use",
+                                    "tool": tool_name,
+                                    "input": tool_input,
+                                    "message": msg
+                                })
+                            
+                            print(f"[LLM] {msg}")
                             result = await func(**tool_input)
                             tool_results.append({
                                 "type": "tool_result",

@@ -28,3 +28,4 @@ class FinalResponse(BaseModel):
     followUpQuestions: List[str]
     agentStatuses: List[AgentStatus]
     queryCostEstimate: str
+    errors: List[str] = []

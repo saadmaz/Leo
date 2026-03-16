@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import { BarChart3, BrainCircuit, CircleDashed, Compass, Sparkles } from "lucide-react";
-import AgentStatusPanel from "@/components/AgentStatusPanel";
+import ProcessTrace from "@/components/ProcessTrace";
 import ArtifactRenderer from "@/components/ArtifactRenderer";
 import FindingsDisplay from "@/components/FindingsDisplay";
 import SourceTrail from "@/components/SourceTrail";
@@ -12,6 +12,7 @@ import PromptComposer from "@/components/chat/prompt-composer";
 import MessageCard from "@/components/chat/message-card";
 import QuickPrompts from "@/components/chat/quick-prompts";
 import QueryCostIndicator from "@/components/QueryCostIndicator";
+import Sidebar from "@/components/layout/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,8 +54,7 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [agentStatuses, setAgentStatuses] = useState<AgentStatusInfo[]>([]);
-  const [agentPanelCollapsed, setAgentPanelCollapsed] = useState(false);
-  const [sessionId] = useState(() => generateId());
+  const [sessionId, setSessionId] = useState(() => generateId());
   const [sessionCost, setSessionCost] = useState(0);
   const [currentQueryCost, setCurrentQueryCost] = useState(0);
   const [product, setProduct] = useState<ProductContext>({
@@ -63,6 +63,47 @@ export default function Home() {
   });
   const [suggestedChips, setSuggestedChips] = useState<string[]>(STARTER_CHIPS);
   const [useMock, setUseMock] = useState(false);
+
+  const handleSelectSession = async (id: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/sessions/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSessionId(id);
+        setProduct({ name: data.title, url: data.url || "" });
+        
+        // Reconstruct messages from past_queries and last_response
+        const loadedMessages: ChatMessage[] = [];
+        data.past_queries.forEach((q: any) => {
+          loadedMessages.push({
+            id: generateId(),
+            role: "user",
+            content: q.question,
+            timestamp: new Date(),
+          });
+        });
+        if (data.last_response) {
+          loadedMessages.push({
+            id: generateId(),
+            role: "assistant",
+            content: data.last_response.executiveSummary,
+            timestamp: new Date(),
+            response: data.last_response,
+          });
+        }
+        setMessages(loadedMessages);
+      }
+    } catch (err) {
+      console.error("Failed to load session:", err);
+    }
+  };
+
+  const handleNewChat = () => {
+    setSessionId(generateId());
+    setMessages([]);
+    setAgentStatuses([]);
+    setProduct({ name: "Vector Agents", url: "vectoragents.ai" });
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +130,6 @@ export default function Home() {
     setInput("");
     setIsProcessing(true);
     setAgentStatuses([]); // Reset for new run
-    setAgentPanelCollapsed(false);
 
     try {
         await sendQueryStream(
@@ -127,7 +167,6 @@ export default function Home() {
                     setMessages((prev) => [...prev, assistantMessage]);
                     setSuggestedChips(response.followUpQuestions.slice(0, 3));
                     setIsProcessing(false);
-                    setTimeout(() => setAgentPanelCollapsed(true), 1500);
                     
                     // Update cost
                     const costStr = response.queryCostEstimate.replace('$', '');
@@ -146,8 +185,15 @@ export default function Home() {
   const hasResults = messages.length > 0;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <TopHeader product={product} onUpdate={setProduct} isProcessing={isProcessing} useMock={useMock} compact={hasResults} />
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      <Sidebar 
+        currentSessionId={sessionId} 
+        onSelectSession={handleSelectSession} 
+        onNewChat={handleNewChat} 
+      />
+      
+      <div className="flex-1 flex flex-col relative overflow-hidden">
+        <TopHeader product={product} onUpdate={setProduct} isProcessing={isProcessing} useMock={useMock} compact={hasResults} />
       <main
         className={cn(
           "mx-auto w-full max-w-6xl px-4 pb-40 transition-all duration-300 sm:px-6 lg:px-8",
@@ -271,13 +317,10 @@ export default function Home() {
 
                 <AnimatePresence>
                   {isProcessing && (
-                    <div className="flex justify-start">
-                      <AgentStatusPanel
+                    <div className="flex justify-center">
+                      <ProcessTrace
                         agents={agentStatuses}
-                        collapsed={agentPanelCollapsed}
-                        onToggle={() => setAgentPanelCollapsed(!agentPanelCollapsed)}
-                        totalTime={agentStatuses.reduce((sum, agent) => sum + (agent.duration || 0), 0) / 1000}
-                        totalSources={0} // Sources are added at the end
+                        isProcessing={isProcessing}
                       />
                     </div>
                   )}
@@ -312,5 +355,6 @@ export default function Home() {
         compact={hasResults}
       />
     </div>
-  );
+  </div>
+);
 }

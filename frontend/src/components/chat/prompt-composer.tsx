@@ -28,64 +28,86 @@ export default function PromptComposer({
 }: PromptComposerProps) {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    onSubmit(input);
+    if (input.trim() && !isProcessing) {
+      onSubmit(input);
+    }
   };
 
   return (
-    <div
-      className={cn(
-        "fixed bottom-0 left-0 right-0 z-30 border-t border-border/70 bg-background/95 px-4 backdrop-blur transition-all duration-300 sm:px-6 lg:px-8",
-        compact ? "py-3" : "py-4"
-      )}
-    >
-      <div className="mx-auto max-w-6xl">
-        <div className={cn("rounded-[28px] border border-border bg-card shadow-lg transition-all duration-300", compact ? "p-2.5" : "p-3")}>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <div className={cn("flex items-center justify-between gap-3 px-2 transition-all duration-300", compact && "min-h-0")}>
-              <div className="flex items-center gap-2">
-                <Badge variant="default" className="gap-1 normal-case tracking-normal">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Strategic prompt
-                </Badge>
-                <span className={cn("hidden text-xs text-muted-foreground sm:inline", compact && "hidden lg:inline")}>
-                  Ask for competitor moves, pricing pressure, category trends, or next-best bets.
+    <div className={cn(
+      "fixed bottom-0 left-0 right-0 p-4 pb-8 transition-all duration-500 pointer-events-none",
+      compact ? "md:left-64 lg:left-72" : ""
+    )}>
+      <div className="mx-auto max-w-3xl pointer-events-auto">
+        <form 
+          onSubmit={handleSubmit}
+          className="relative group"
+        >
+          <div className={cn(
+            "rounded-2xl border bg-card/80 backdrop-blur-md shadow-2xl transition-all duration-300 ring-primary/5",
+            "focus-within:ring-4 focus-within:border-primary/20",
+            isProcessing ? "opacity-80" : "opacity-100"
+          )}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as any);
+                }
+              }}
+              placeholder="Ask Leo about market trends, competitor risks, or strategic opportunities..."
+              className="w-full bg-transparent p-4 pb-12 text-[16px] resize-none focus:outline-none min-h-[60px] max-h-[200px]"
+              rows={input.split('\n').length || 1}
+              disabled={isProcessing}
+            />
+            
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+              <div className="flex items-center gap-2 pointer-events-auto">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 rounded-lg hover:bg-secondary/50"
+                  onClick={() => setUseMock(!useMock)}
+                >
+                  <Sparkles className={cn("h-4 w-4", useMock ? "text-primary" : "text-muted-foreground")} />
+                </Button>
+                <span className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-medium hidden sm:inline">
+                  {useMock ? "Demo Mode" : "Real Intelligence"}
                 </span>
               </div>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={useMock}
-                  onChange={(e) => setUseMock(e.target.checked)}
-                  className="h-4 w-4 rounded border-input bg-background"
-                />
-                Demo mode
-              </label>
+              
+              <div className="pointer-events-auto">
+                <Button 
+                  type="submit" 
+                  size="sm"
+                  disabled={!input.trim() || isProcessing}
+                  className="h-9 px-4 rounded-xl shadow-sm transition-all active:scale-95"
+                >
+                  {isProcessing ? (
+                    <div className="flex items-center gap-2">
+                       <div className="h-3 w-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                       Analyzing
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      Send
+                      <SendHorizonal className="h-4 w-4" />
+                    </div>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Button type="button" variant="outline" size="icon" className="hidden rounded-2xl sm:flex">
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && input.trim() && !isProcessing) {
-                    e.preventDefault();
-                    onSubmit(input);
-                  }
-                }}
-                placeholder="Ask about your market, competitors, pricing, positioning, or strategic risk..."
-                disabled={isProcessing}
-                autoFocus
-                className={cn("rounded-2xl text-[15px] transition-all duration-300", compact ? "h-12" : "h-14")}
-              />
-              <Button type="submit" size="lg" disabled={!input.trim() || isProcessing} className="min-w-[132px] rounded-2xl">
-                {isProcessing ? "Analysing..." : "Send"}
-                <SendHorizonal className="h-4 w-4" />
-              </Button>
-            </div>
-          </form>
-        </div>
+          </div>
+          
+          <div className="mt-3 text-center">
+            <p className="text-[10px] text-muted-foreground/40 font-medium uppercase tracking-[0.2em]">
+              Leo is an AI analysis engine. Always verify boardroom decisions.
+            </p>
+          </div>
+        </form>
       </div>
     </div>
   );
