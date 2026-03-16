@@ -28,7 +28,7 @@ Your output must match the FinalResponse schema:
 - topRisks: 3-5 strategic threats.
 - recommendedBets: 2-3 specific actions the team should take.
 - artifacts: Summary tables, market maps, or scorecards.
-- confidenceOverview: A breakdown of overall system confidence.
+- confidenceOverview: { "overall": "high|medium|low", "byDomain": { "domain_name": "high|medium|low" } }
 - followUpQuestions: 3 smart questions for the user to ask next.
  
 Return ONLY valid JSON matching FinalResponse.
@@ -45,32 +45,44 @@ Synthesize everything now.
 
         try:
             result = await self.llm.analyze_data(all_data, system_prompt)
-            # The LLM result should match FinalResponse structure
             
-            # Enrich with agent data if missing
-            if "agentStatuses" not in result:
-                result["agentStatuses"] = [
-                    {"name": out.agentId, "status": "success", "duration": 0} 
-                    for out in verified_outputs
-                ]
-            if "queryCostEstimate" not in result:
-                result["queryCostEstimate"] = "$0.42"
+            # Ensure required fields are present and correctly typed
+            result.setdefault("agentStatuses", [
+                {"name": out.agentId, "status": "success", "duration": 0} 
+                for out in verified_outputs
+            ])
+            result.setdefault("queryCostEstimate", "$0.42")
             
-            # Ensure findings and evidence are passed if not already in result
-            if "findings" not in result:
-                result["findings"] = []
-                for out in verified_outputs:
-                    result["findings"].extend(out.model_dump()["findings"])
+            # Consolidate findings, facts, interpretations, and evidence
+            consolidated_findings = []
+            consolidated_facts = []
+            consolidated_interpretations = []
+            consolidated_evidence = []
             
-            if "evidence" not in result:
-                result["evidence"] = []
-                for out in verified_outputs:
-                    result["evidence"].extend(out.model_dump()["sources"])
+            for out in verified_outputs:
+                consolidated_findings.extend(out.findings)
+                consolidated_facts.extend(out.facts)
+                consolidated_interpretations.extend(out.interpretations)
+                consolidated_evidence.extend(out.sources)
+            
+            result["findings"] = result.get("findings", consolidated_findings)
+            result["facts"] = result.get("facts", consolidated_facts)
+            result["interpretations"] = result.get("interpretations", consolidated_interpretations)
+            result["evidence"] = result.get("evidence", consolidated_evidence)
+            
+            # Default artifacts if missing
+            result.setdefault("artifacts", [])
+            
+            # Ensure confidenceOverview is valid
+            if "confidenceOverview" not in result or not isinstance(result["confidenceOverview"], dict):
+                result["confidenceOverview"] = {
+                    "overall": "medium",
+                    "byDomain": {query_context.domain: "medium"}
+                }
 
             return FinalResponse(**result)
         except Exception as e:
             print(f"ERROR: [SynthesizerAgent] {e}")
-            # Fallback
             return FinalResponse(
                 executiveSummary=f"Error in synthesis: {str(e)}",
                 topOpportunities=[],
@@ -81,10 +93,7 @@ Synthesize everything now.
                 interpretations=[],
                 evidence=[],
                 artifacts=[],
-                confidenceOverview={
-                    "overall": "low",
-                    "byDomain": {}
-                },
+                confidenceOverview={"overall": "low", "byDomain": {}},
                 followUpQuestions=["Try again?"],
                 agentStatuses=[],
                 queryCostEstimate="$0.00"

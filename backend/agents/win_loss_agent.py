@@ -5,7 +5,7 @@ from backend.schemas.query_schema import QueryRequest
 
 class WinLossAgent(BaseAgent):
     def __init__(self):
-        super().__init__("WinLossAgent")
+        super().__init__("win_loss")
 
     async def run(self, query_context: QueryRequest) -> AgentOutput:
         product = query_context.product

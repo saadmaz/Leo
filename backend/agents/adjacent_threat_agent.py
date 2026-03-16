@@ -5,7 +5,7 @@ from backend.schemas.query_schema import QueryRequest
 
 class AdjacentMarketAgent(BaseAgent):
     def __init__(self):
-        super().__init__("AdjacentMarketAgent")
+        super().__init__("adjacent_market")
 
     async def run(self, query_context: QueryRequest) -> AgentOutput:
         product = query_context.product
@@ -42,7 +42,7 @@ Run your searches now. Return AgentOutput JSON.
             result = await self.chat_with_llm(system_prompt, user_prompt)
             if "error" in result:
                  return AgentOutput(
-                    agentId="adjacent",
+                    agentId="adjacent_market",
                     confidence="low",
                     findings=[],
                     sources=[],
@@ -53,7 +53,7 @@ Run your searches now. Return AgentOutput JSON.
             return AgentOutput(**result)
         except Exception as e:
             return AgentOutput(
-                agentId="adjacent",
+                agentId="adjacent_market",
                 confidence="low",
                 findings=[],
                 sources=[],

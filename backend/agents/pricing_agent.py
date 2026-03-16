@@ -5,7 +5,7 @@ from backend.schemas.query_schema import QueryRequest
 
 class PricingAgent(BaseAgent):
     def __init__(self):
-        super().__init__("PricingAgent")
+        super().__init__("pricing")
 
     async def run(self, query_context: QueryRequest) -> AgentOutput:
         product = query_context.product

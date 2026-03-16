@@ -5,7 +5,7 @@ from backend.schemas.query_schema import QueryRequest
 
 class MarketTrendsAgent(BaseAgent):
     def __init__(self):
-        super().__init__("MarketTrendsAgent")
+        super().__init__("market_trends")
 
     async def run(self, query_context: QueryRequest) -> AgentOutput:
         product = query_context.product
@@ -42,7 +42,7 @@ Run your searches now. Return AgentOutput JSON.
             result = await self.chat_with_llm(system_prompt, user_prompt)
             if "error" in result:
                  return AgentOutput(
-                    agentId="market",
+                    agentId="market_trends",
                     confidence="low",
                     findings=[],
                     sources=[],

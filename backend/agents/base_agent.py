@@ -25,8 +25,6 @@ class BaseAgent(ABC):
             "name": "web_search"
         }]
         
-        # In a real scenario, we would handle tool_use loops here.
-        # For the hackathon, we assume the LLM uses the tool and then returns the final JSON.
         response = await self.llm.chat(messages, system, tools=tools)
         
         # Extract the JSON from the text blocks
@@ -37,9 +35,31 @@ class BaseAgent(ABC):
                 text = block["text"]
                 break
         
+        if not text:
+            # Fallback to check for tool calls or errors
+            if "error" in response:
+                return {"error": response["error"]}
+            return {"error": "No text content returned from LLM"}
+
         try:
-            # The prompt instructs to return ONLY JSON
+            # Try parsing directly
             return json.loads(text)
-        except Exception as e:
-            print(f"ERROR: [{self.name}] Failed to parse JSON: {e}\nRaw output: {text}")
+        except Exception:
+            # Try to find JSON block in markdown
+            import re
+            json_match = re.search(r'```json\n([\s\S]*?)\n```', text)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(1))
+                except Exception:
+                    pass
+            
+            # Last resort: find anything that looks like { ... }
+            bracket_match = re.search(r'(\{[\s\S]*\})', text)
+            if bracket_match:
+                try:
+                    return json.loads(bracket_match.group(1))
+                except Exception as e:
+                    print(f"ERROR: [{self.name}] Failed to parse any JSON: {e}\nRaw output: {text}")
+            
             return {"error": "Failed to parse JSON response"}
