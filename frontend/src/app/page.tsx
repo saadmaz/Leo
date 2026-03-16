@@ -110,7 +110,7 @@ export default function Home() {
                 } else if (update.agentId) {
                     setAgentStatuses(prev => prev.map(a => 
                         a.name === update.agentId 
-                        ? { ...a, status: update.status } 
+                        ? { ...a, status: update.status, message: update.message } 
                         : a
                     ));
                 } else if (update.status === "final") {

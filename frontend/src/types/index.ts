@@ -30,8 +30,9 @@ export interface Artifact {
 
 export interface AgentStatusInfo {
   name: string;
-  status: "success" | "partial" | "failed" | "running" | "queued";
+  status: "success" | "partial" | "failed" | "running" | "queued" | "completed";
   duration: number;
+  message?: string;
 }
 
 export interface ConfidenceOverview {

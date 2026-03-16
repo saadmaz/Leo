@@ -8,8 +8,12 @@ sys.path.append(root_dir)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import query
+from backend.memory.firebase_manager import firebase_manager
 
 app = FastAPI(title="Growth Intelligence Multi-Agent System")
+
+# Initialize Firebase
+firebase_manager.initialize()
 
 # Configure CORS
 app.add_middleware(

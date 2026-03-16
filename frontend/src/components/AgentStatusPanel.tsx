@@ -102,6 +102,11 @@ export default function AgentStatusPanel({ agents, collapsed, onToggle, totalTim
                             {agent.duration > 0 ? `${(agent.duration / 1000).toFixed(1)}s` : agent.status}
                           </span>
                         </div>
+                        {agent.message && (
+                          <div className="mt-1 text-xs text-muted-foreground line-clamp-1 italic">
+                            {agent.message}
+                          </div>
+                        )}
                         <div className="mt-2 h-1.5 rounded-full bg-muted">
                           <div
                             className={`h-1.5 rounded-full transition-all duration-500 ${

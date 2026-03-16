@@ -13,38 +13,55 @@ class HiringSignalAgent(BaseAgent):
     def __init__(self):
         super().__init__("hiring")
 
-    async def run(self, query_context: QueryRequest) -> AgentOutput:
+    async def run(self, query_context: QueryRequest, status_callback=None) -> AgentOutput:
         product = query_context.product
+        company_name = query_context.metadata.get("company_name", product)
         
-        # 1. Company Specific Velocity
-        # Assuming these tools return compatible data for a hackathon
-        velocity = await get_hiring_velocity(product)
-        
-        findings = []
-        sources = []
-        facts = []
-        interpretations = []
+        system = f"""You are a Hiring Intelligence Agent. 
+Your goal is to find hiring signals for {company_name}.
+Use the search tools to look for job postings, LinkedIn activity, or press releases about talent acquisition.
+Return reasoning and a list of findings in JSON format."""
 
-        if velocity.get("total_open_roles", 0) > 0:
-            finding_id = f"f-hiring-{product}"
+        user_prompt = f"Analyze the hiring trends and current job openings for '{company_name}'. Is there an aggressive expansion in specific departments like R&D, Sales, or Engineering?"
+        
+        if status_callback:
+            await status_callback({
+                "agentId": self.name,
+                "status": "running",
+                "message": f"Searching for hiring signals and job velocity for {company_name}..."
+            })
+
+        # The chat_with_llm handles the tool loop now!
+        llm_response = await self.chat_with_llm(system, user_prompt, status_callback=status_callback)
+        
+        # Parse the structured response from LLM
+        findings = []
+        for f in llm_response.get("findings", []):
             findings.append(Finding(
-                id=finding_id,
-                claim=f"{product} is actively hiring for {velocity['total_open_roles']} roles.",
-                confidence="high",
-                rationale="Direct job postings counts.",
+                id=f.get("id", f"hiring-{datetime.now().timestamp()}"),
+                claim=f.get("claim", ""),
+                confidence=f.get("confidence", "medium"),
+                rationale=f.get("rationale", ""),
                 domain="Hiring",
-                sourceIds=["s1"],
+                sourceIds=f.get("sourceIds", []),
                 isFactual=True
             ))
-            facts.append(f"{product} has {velocity['total_open_roles']} open job listings.")
-            sources.append(Source(id="s1", url="https://adzuna.com", title="Adzuna Job Search", snippet="Market data for hiring patterns."))
+
+        sources = []
+        for s in llm_response.get("sources", []):
+            sources.append(Source(
+                id=s.get("id"),
+                url=s.get("url"),
+                title=s.get("title"),
+                snippet=s.get("snippet")
+            ))
 
         return AgentOutput(
-            agentId="hiring",
-            confidence="high",
+            agentId=self.name,
+            confidence=llm_response.get("confidence", "medium"),
             findings=findings,
             sources=sources,
-            facts=facts,
-            interpretations=interpretations,
+            facts=llm_response.get("facts", []),
+            interpretations=llm_response.get("interpretations", []),
             errors=[]
         )

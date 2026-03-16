@@ -18,7 +18,7 @@ class Orchestrator:
         agents_to_run = self.registry.get_all_agents().values()
         
         if status_callback:
-            await status_callback({"status": "starting", "agents": [a.name for a in agents_to_run]})
+            await status_callback({"status": "starting", "message": f"Orchestrating {len(agents_to_run)} specialized agents..."})
 
         # 2. Run concurrently
         tasks = [self._safe_run(agent, query, status_callback) for agent in agents_to_run]
@@ -26,21 +26,25 @@ class Orchestrator:
         
         # 3. Verify
         if status_callback:
-            await status_callback({"status": "verifying"})
+            await status_callback({"status": "verifying", "message": "Cross-referencing findings for consistency..."})
         verified_outputs = await self.verifier.run(query, agent_outputs)
         
         # 4. Synthesize
         if status_callback:
-            await status_callback({"status": "synthesizing"})
+            await status_callback({"status": "synthesizing", "message": "Synthesizing boardroom-quality brief..."})
         final_brief = await self.synthesizer.run(query, verified_outputs)
         
         return final_brief
 
     async def _safe_run(self, agent, query, status_callback) -> AgentOutput:
         if status_callback:
-             await status_callback({"agentId": agent.name, "status": "running"})
+             await status_callback({
+                 "agentId": agent.name, 
+                 "status": "running", 
+                 "message": f"{agent.name} is initializing analysis..."
+             })
         try:
-            res = await agent.run(query)
+            res = await agent.run(query, status_callback=status_callback)
             if status_callback:
                 await status_callback({"agentId": agent.name, "status": "completed", "confidence": res.confidence})
             return res
