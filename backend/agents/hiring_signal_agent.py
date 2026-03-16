@@ -4,8 +4,6 @@ from typing import List, Dict, Any
 from backend.agents.base_agent import BaseAgent
 from backend.schemas.agent_output import AgentOutput
 from backend.schemas.finding_schema import Finding
-from backend.schemas.evidence_schema import Evidence
-from backend.schemas.artifact_schema import Artifact
 from backend.tools.hiring_tools import search_hiring_signals, get_hiring_velocity
 
 from backend.schemas.query_schema import QueryRequest
@@ -13,7 +11,7 @@ from backend.schemas.source_schema import Source
 
 class HiringSignalAgent(BaseAgent):
     def __init__(self):
-        super().__init__("hiring_signal")
+        super().__init__("hiring")
 
     async def run(self, query_context: QueryRequest) -> AgentOutput:
         product = query_context.product
@@ -42,7 +40,7 @@ class HiringSignalAgent(BaseAgent):
             sources.append(Source(id="s1", url="https://adzuna.com", title="Adzuna Job Search", snippet="Market data for hiring patterns."))
 
         return AgentOutput(
-            agentId="hiring_signal",
+            agentId="hiring",
             confidence="high",
             findings=findings,
             sources=sources,

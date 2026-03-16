@@ -6,7 +6,7 @@ import json
 
 class ConfidenceVerifierAgent(BaseAgent):
     def __init__(self):
-        super().__init__("ConfidenceVerifierAgent")
+        super().__init__("verifier")
 
     async def run(self, query_context: QueryRequest, all_agent_outputs: List[AgentOutput]) -> List[AgentOutput]:
         """

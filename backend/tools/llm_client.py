@@ -44,20 +44,27 @@ class LLMClient:
             except Exception as e:
                 print(f"ERROR: [LLM] Anthropic request failed: {e}")
                 return {"error": str(e)}
+        
+        return {"error": "Failed to reach LLM endpoint"}
 
     async def analyze_data(self, data: Any, prompt: str) -> Dict[str, Any]:
         """
-        Legacy analyzer wrapper, now using Anthropic.
+        Analyze arbitrary data given a prompt.
         """
         system = "You are an expert market analyst. Return ONLY valid JSON."
         user_content = f"{prompt}\n\nRAW DATA:\n{json.dumps(data, indent=2)}"
         messages = [{"role": "user", "content": user_content}]
         
         response = await self.chat(messages, system)
+        return self.extract_json(response)
+
+    def extract_json(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract and parse JSON from an Anthropic message response.
+        """
         if "error" in response:
             return {"error": response["error"]}
-        
-        # Extract text content
+
         content = response.get("content", [])
         text = ""
         for block in content:
@@ -65,8 +72,28 @@ class LLMClient:
                 text = block["text"]
                 break
         
+        if not text:
+            return {"error": "No text content returned from LLM"}
+
         try:
+            # Try parsing directly
             return json.loads(text)
-        except Exception as e:
-            print(f"ERROR: [LLM] Failed to parse JSON: {e}\nRaw output: {text}")
+        except Exception:
+            # Try to find JSON block in markdown
+            import re
+            json_match = re.search(r'```json\n([\s\S]*?)\n```', text)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(1))
+                except Exception:
+                    pass
+            
+            # Last resort: find anything that looks like { ... }
+            bracket_match = re.search(r'(\{[\s\S]*\})', text, re.DOTALL)
+            if bracket_match:
+                try:
+                    return json.loads(bracket_match.group(1))
+                except Exception as e:
+                    print(f"ERROR: [LLM] Failed to parse any JSON: {e}\nRaw output: {text}")
+            
             return {"error": "Failed to parse JSON response"}

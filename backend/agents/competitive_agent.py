@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from backend.agents.base_agent import BaseAgent
+from .base_agent import BaseAgent
 from backend.schemas.agent_output import AgentOutput
 from backend.schemas.query_schema import QueryRequest
 

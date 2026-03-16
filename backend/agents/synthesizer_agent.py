@@ -7,7 +7,7 @@ import json
 
 class SynthesizerAgent(BaseAgent):
     def __init__(self):
-        super().__init__("SynthesizerAgent")
+        super().__init__("synthesizer")
 
     async def run(self, query_context: QueryRequest, verified_outputs: List[AgentOutput]) -> FinalResponse:
         """
