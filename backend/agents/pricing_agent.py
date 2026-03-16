@@ -1,71 +1,63 @@
-import asyncio
-from datetime import datetime
+from typing import Dict, Any
 from backend.agents.base_agent import BaseAgent
 from backend.schemas.agent_output import AgentOutput
-from backend.schemas.finding_schema import Finding
-from backend.schemas.evidence_schema import Evidence
-from backend.schemas.artifact_schema import Artifact
-from backend.tools.signal_extractors import detect_pricing_signals
-from backend.tools.scraper_tools import scrape_page
-from backend.tools.search_tools import search_web
+from backend.schemas.query_schema import QueryRequest
 
 class PricingAgent(BaseAgent):
     def __init__(self):
         super().__init__("PricingAgent")
 
-    async def run(self, query_context) -> AgentOutput:
-        # Collect Pricing data
-        search_query = f"{query_context.company_name or query_context.query} pricing"
-        pages = await search_web(search_query)
-        # In production, we would scrape the first few pages
-        raw_scrapes = [{"url": p["url"], "content": p["snippet"]} for p in pages[:2]]
-        
-        # LLM Analysis
-        llm_analysis = await self.analyze_with_llm(
-            data={"scrapes": raw_scrapes}, 
-            query=search_query, 
-            context_type="Pricing Information"
-        )
-        
-        for i, f in enumerate(raw_findings):
-            findings.append(
-                Finding(
-                    id=f"price-{i}",
-                    statement=f.get("statement", ""),
-                    type=f.get("type", "fact"),
-                    confidence=f.get("confidence", "low"),
-                    rationale=f.get("rationale", ""),
-                    domain="Pricing",
-                    evidence_ids=[f"ev-price-{i}"]
+    async def run(self, query_context: QueryRequest) -> AgentOutput:
+        product = query_context.product
+        domain = query_context.domain
+        question = query_context.question
+
+        system_prompt = """
+You are a specialist PRICING & PACKAGING analyst for a multi-agent growth intelligence system.
+ 
+Your job:
+- Use the web_search tool to find current pricing pages, discount structures, and contract terms for the product and its competitors.
+- Identify "hidden" costs, seat-based vs usage-based models, and public enterprise pricing signals.
+- Separate facts (verifiable, sourced) from interpretations (inferred).
+- Assign a confidence level to every claim: high / medium / low.
+- Cite at least 2-3 source URLs for every major finding.
+- Do not use training data. Everything must come from a live web search.
+ 
+Output contract:
+- Return ONLY valid JSON matching the AgentOutput schema.
+- No preamble. No markdown code fences. No explanation outside the JSON.
+"""
+
+        user_prompt = f"""
+Product: {product}
+Domain: {domain}
+Question: {question}
+ 
+Your specific mission: Extract competitor cost structures, identify discounting patterns, and analyze value-to-price ratios.
+ 
+Run your searches now. Return AgentOutput JSON.
+"""
+
+        try:
+            result = await self.chat_with_llm(system_prompt, user_prompt)
+            if "error" in result:
+                 return AgentOutput(
+                    agentId="pricing",
+                    confidence="low",
+                    findings=[],
+                    sources=[],
+                    facts=[],
+                    interpretations=[],
+                    errors=[result["error"]]
                 )
+            return AgentOutput(**result)
+        except Exception as e:
+            return AgentOutput(
+                agentId="pricing",
+                confidence="low",
+                findings=[],
+                sources=[],
+                facts=[],
+                interpretations=[],
+                errors=[str(e)]
             )
-            
-            source = pages[0] if pages else {"url": "#", "title": "Pricing Search"}
-            evidence.append(
-                Evidence(
-                    id=f"ev-price-{i}",
-                    source_type="web_scrape",
-                    url=source["url"],
-                    title=source["title"],
-                    snippet=source["snippet"],
-                    collected_at=datetime.now(),
-                    entity=query_context.company_name or "Competitor",
-                    tags=["pricing", "packaging"]
-                )
-            )
-        
-        artifacts = [
-            Artifact(
-                artifact_type="pricing_tier",
-                title="Extracted Pricing Tiers",
-                payload={"tiers": [f.get('statement') for f in raw_findings]}
-            )
-        ]
-        
-        return AgentOutput(
-            agent_name=self.name,
-            status="success",
-            findings=findings,
-            evidence=evidence,
-            artifacts=artifacts
-        )

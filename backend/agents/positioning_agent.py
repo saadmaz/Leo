@@ -1,96 +1,64 @@
-import asyncio
-from datetime import datetime
+from typing import Dict, Any
 from backend.agents.base_agent import BaseAgent
 from backend.schemas.agent_output import AgentOutput
-from backend.schemas.finding_schema import Finding
-from backend.schemas.evidence_schema import Evidence
-from backend.schemas.artifact_schema import Artifact
-from backend.tools.search_tools import search_web, search_reddit
-from backend.tools.techstack_tools import analyze_gtm_signals
+from backend.schemas.query_schema import QueryRequest
 
 class PositioningAgent(BaseAgent):
     def __init__(self):
         super().__init__("PositioningAgent")
 
-    async def run(self, query_context) -> AgentOutput:
-        product = query_context.product_name or query_context.company_name or query_context.query
-        domain = query_context.context.get("domain") or f"{product.lower().replace(' ', '')}.com"
+    async def run(self, query_context: QueryRequest) -> AgentOutput:
+        product = query_context.product
+        domain = query_context.domain
+        question = query_context.question
 
-        # 1. Collect Messaging data
-        search_query = f"{product} ads messaging value proposition"
-        
-        # 2. Collect GTM/Tech Stack data
-        results = await asyncio.gather(
-            search_web(search_query),
-            search_reddit(f"{product} reviews"),
-            analyze_gtm_signals(domain)
-        )
-        web_results, reddit_results, gtm_data = results
-        
-        findings = []
-        evidence = []
-        artifacts = []
+        system_prompt = """
+You are a specialist POSITIONING & MESSAGING analyst for a multi-agent growth intelligence system.
+ 
+Your job:
+- Use the web_search tool to "teardown" the landing pages and marketing materials of the product and its competitors.
+- Identify core value propositions, target personas, and key messaging hooks.
+- Compare how different competitors position themselves (e.g., fastest, cheapest, most secure).
+- Separate facts (verifiable, sourced) from interpretations (inferred).
+- Assign a confidence level to every claim: high / medium / low.
+- Cite at least 2-3 source URLs for every major finding.
+- Do not use training data. Everything must come from a live web search.
+ 
+Output contract:
+- Return ONLY valid JSON matching the AgentOutput schema.
+- No preamble. No markdown code fences. No explanation outside the JSON.
+"""
 
-        # Tech Stack Findings
-        if "error" not in gtm_data:
-            ev_id = f"gtm-{domain}"
-            evidence.append(Evidence(
-                id=ev_id,
-                source_type="builtwith/firecrawl",
-                url=f"https://{domain}",
-                title=f"GTM Stack Analysis: {domain}",
-                snippet=f"Detected signals: {', '.join(gtm_data.get('stack_signals', []))}. Raw stack: {gtm_data.get('raw_stack', {}).get('technologies', [])[:10]}",
-                collected_at=datetime.utcnow(),
-                entity=product,
-                tags=["gtm_strategy", "tech_stack"]
-            ))
-            
-            for signal in gtm_data.get("stack_signals", []):
-                findings.append(Finding(
-                    id=f"f-gtm-{signal.lower().replace(' ', '-')}",
-                    statement=f"Inferred GTM Strategy for {product}: {signal}.",
-                    type="interpretation",
-                    confidence="medium",
-                    rationale="GTM strategy inferred from the presence of specific enterprise or mid-market software tools.",
-                    domain="Positioning",
-                    evidence_ids=[ev_id]
-                ))
+        user_prompt = f"""
+Product: {product}
+Domain: {domain}
+Question: {question}
+ 
+Your specific mission: Perform teardowns of landing pages, identify core value props, and analyze target personas & hooks.
+ 
+Run your searches now. Return AgentOutput JSON.
+"""
 
-            artifacts.append(Artifact(
-                artifact_type="tech_stack_detail",
-                title=f"Tech Stack — {domain}",
-                payload=gtm_data
-            ))
-
-        # Web/Reddit analysis (simplified for now)
-        if web_results:
-            ev_id = f"web-pos-{product}"
-            evidence.append(Evidence(
-                id=ev_id,
-                source_type="web",
-                url=web_results[0].get("url", "#"),
-                title=f"Positioning Signal: {web_results[0].get('title')}",
-                snippet=web_results[0].get("snippet", ""),
-                collected_at=datetime.utcnow(),
-                entity=product,
-                tags=["messaging"]
-            ))
-            
-            findings.append(Finding(
-                id=f"f-messaging-{product}",
-                statement=f"Primary messaging angle for {product} revolves around: {web_results[0].get('title')}",
-                type="interpretation",
-                confidence="medium",
-                rationale="Analyzed from search results for company ads and messaging.",
-                domain="Positioning",
-                evidence_ids=[ev_id]
-            ))
-
-        return AgentOutput(
-            agent_name=self.name,
-            status="success",
-            findings=findings,
-            evidence=evidence,
-            artifacts=artifacts,
-            errors=[]
-        )
+        try:
+            result = await self.chat_with_llm(system_prompt, user_prompt)
+            if "error" in result:
+                 return AgentOutput(
+                    agentId="positioning",
+                    confidence="low",
+                    findings=[],
+                    sources=[],
+                    facts=[],
+                    interpretations=[],
+                    errors=[result["error"]]
+                )
+            return AgentOutput(**result)
+        except Exception as e:
+            return AgentOutput(
+                agentId="positioning",
+                confidence="low",
+                findings=[],
+                sources=[],
+                facts=[],
+                interpretations=[],
+                errors=[str(e)]
+            )

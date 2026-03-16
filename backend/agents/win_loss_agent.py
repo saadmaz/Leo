@@ -1,72 +1,64 @@
-import asyncio
-from datetime import datetime
+from typing import Dict, Any
 from backend.agents.base_agent import BaseAgent
 from backend.schemas.agent_output import AgentOutput
-from backend.schemas.finding_schema import Finding
-from backend.schemas.evidence_schema import Evidence
-from backend.schemas.artifact_schema import Artifact
-from backend.tools.search_tools import search_reddit, search_web
+from backend.schemas.query_schema import QueryRequest
 
 class WinLossAgent(BaseAgent):
     def __init__(self):
         super().__init__("WinLossAgent")
 
-    async def run(self, query_context) -> AgentOutput:
-        # Collect Win/Loss data (Reddit + Web)
-        search_query = f"{query_context.company_name or query_context.query} vs competitors reviews"
-        results = await asyncio.gather(
-            search_web(search_query),
-            search_reddit(search_query)
-        )
-        web_results, reddit_results = results
-        
-        # LLM Analysis
-        all_raw_data = {"web": web_results, "reddit": reddit_results}
-        llm_analysis = await self.analyze_with_llm(
-            data=all_raw_data, 
-            query=search_query, 
-            context_type="Win/Loss Analysis & Customer Sentiment"
-        )
-        
-        for i, f in enumerate(raw_findings):
-            findings.append(
-                Finding(
-                    id=f"win-loss-{i}",
-                    statement=f.get("statement", ""),
-                    type=f.get("type", "interpretation"),
-                    confidence=f.get("confidence", "low"),
-                    rationale=f.get("rationale", ""),
-                    domain="Win/Loss",
-                    evidence_ids=[f"ev-wl-{i}"]
+    async def run(self, query_context: QueryRequest) -> AgentOutput:
+        product = query_context.product
+        domain = query_context.domain
+        question = query_context.question
+
+        system_prompt = """
+You are a specialist WIN/LOSS INTELLIGENCE analyst for a multi-agent growth intelligence system.
+ 
+Your job:
+- Use the web_search tool to find real user feedback, Reddit discussions, Twitter threads, and social signals.
+- Identify why users are switching to or away from the product or its competitors.
+- Look for "unmet needs" and "missing features" mentioned in social discourse.
+- Separate facts (verifiable, sourced) from interpretations (inferred).
+- Assign a confidence level to every claim: high / medium / low.
+- Cite at least 2-3 source URLs for every major finding.
+- Do not use training data. Everything must come from a live web search.
+ 
+Output contract:
+- Return ONLY valid JSON matching the AgentOutput schema.
+- No preamble. No markdown code fences. No explanation outside the JSON.
+"""
+
+        user_prompt = f"""
+Product: {product}
+Domain: {domain}
+Question: {question}
+ 
+Your specific mission: Find why users switch (win/loss triggers), identify friction points from Reddit/Twitter, and extract unmet needs.
+ 
+Run your searches now. Return AgentOutput JSON.
+"""
+
+        try:
+            result = await self.chat_with_llm(system_prompt, user_prompt)
+            if "error" in result:
+                 return AgentOutput(
+                    agentId="win_loss",
+                    confidence="low",
+                    findings=[],
+                    sources=[],
+                    facts=[],
+                    interpretations=[],
+                    errors=[result["error"]]
                 )
+            return AgentOutput(**result)
+        except Exception as e:
+            return AgentOutput(
+                agentId="win_loss",
+                confidence="low",
+                findings=[],
+                sources=[],
+                facts=[],
+                interpretations=[],
+                errors=[str(e)]
             )
-            
-            source = web_results[0] if web_results else reddit_results[0] if reddit_results else {"url": "#", "title": "N/A", "snippet": "No data found"}
-            evidence.append(
-                Evidence(
-                    id=f"ev-wl-{i}",
-                    source_type="social/review",
-                    url=source.get("url", "#"),
-                    title=source.get("title", "Review Signal"),
-                    snippet=source.get("snippet", ""),
-                    collected_at=datetime.now(),
-                    entity=query_context.company_name or "Competitor",
-                    tags=["sentiment", "feature_gap"]
-                )
-            )
-        
-        artifacts = [
-            Artifact(
-                artifact_type="win_loss_chart",
-                title="Sentiment Analysis (Win vs Loss)",
-                payload={"positive": 60, "negative": 40}
-            )
-        ]
-        
-        return AgentOutput(
-            agent_name=self.name,
-            status="success",
-            findings=findings,
-            evidence=evidence,
-            artifacts=artifacts
-        )

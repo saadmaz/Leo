@@ -35,6 +35,7 @@ def health_check():
 async def debug_config():
     from backend.config import settings
     return {
+        "ANTHROPIC_API_KEY": "SET" if settings.ANTHROPIC_API_KEY and "your_" not in settings.ANTHROPIC_API_KEY else "MISSING",
         "SERPAPI_API_KEY": "SET" if settings.SERPAPI_API_KEY and "your_" not in settings.SERPAPI_API_KEY else "MISSING",
         "OPENAI_API_KEY": "SET" if settings.OPENAI_API_KEY and "your_" not in settings.OPENAI_API_KEY else "MISSING",
         "CRUNCHBASE_API_KEY": "SET" if settings.CRUNCHBASE_API_KEY and "your_" not in settings.CRUNCHBASE_API_KEY else "MISSING",

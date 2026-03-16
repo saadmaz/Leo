@@ -1,13 +1,13 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Literal
 from .finding_schema import Finding
-from .evidence_schema import Evidence
-from .artifact_schema import Artifact
+from .source_schema import Source
 
 class AgentOutput(BaseModel):
-    agent_name: str
-    status: str  # "success" | "partial" | "failed"
+    agentId: str
+    confidence: Literal["low", "medium", "high"]
     findings: List[Finding]
-    evidence: List[Evidence]
-    artifacts: List[Artifact]
+    sources: List[Source]
+    facts: List[str]  # verifiable, has a source URL
+    interpretations: List[str]  # inferred, labelled as such
     errors: Optional[List[str]] = None

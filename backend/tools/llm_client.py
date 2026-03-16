@@ -1,77 +1,72 @@
 import os
+import json
 from typing import List, Dict, Any, Optional
 import httpx
-# from .llm_client import Optional # Placeholder for actual client logic - removed circular import
+from backend.config import settings
 
 class LLMClient:
     """
-    Primitive LLM client to handle structured extraction.
-    Currently a wrapper for OpenAI, but extensible to Gemini/Claude.
+    Anthropic LLM client with web_search tool capability.
     """
-    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
-        self.api_key = api_key
+    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-5-sonnet-20241022"):
+        self.api_key = api_key or settings.ANTHROPIC_API_KEY
         self.model = model
-        self.base_url = "https://api.openai.com/v1/chat/completions"
+        self.base_url = "https://api.anthropic.com/v1/messages"
 
-    async def analyze_data(self, data: Any, prompt: str) -> Dict[str, Any]:
+    async def chat(self, messages: List[Dict[str, str]], system: str, tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
-        Sends raw data and a prompt to the LLM to get structured JSON analysis.
-        If API key is missing, performs a basic heuristic analysis to keep the system functional.
+        Generic chat interface for Anthropic.
         """
         if not self.api_key or "your_" in self.api_key:
-            print("DEBUG: [LLM] OpenAI API key is missing. Falling back to Heuristic Analysis.")
-            # Heuristic fallback: simple keyword extraction and statement generation
-            heuristic_findings = []
-            if isinstance(data, list):
-                for item in data[:5]:
-                    title = item.get("title") or item.get("name") or "Key Discovery"
-                    snippet = item.get("snippet") or item.get("description") or "Details restricted."
-                    heuristic_findings.append({
-                        "statement": f"Detected signal: {title}. {snippet[:100]}...",
-                        "type": "fact",
-                        "confidence": "low",
-                        "rationale": "Extracted via heuristic fallback because OpenAI key is missing."
-                    })
-            elif isinstance(data, dict):
-                for key, val in data.items():
-                    if isinstance(val, list) and val:
-                        heuristic_findings.append({
-                            "statement": f"Found {len(val)} items for {key}.",
-                            "type": "fact",
-                            "confidence": "low",
-                            "rationale": "Heuristic count"
-                        })
+            # Heuristic fallback if API key is missing
+            return {"content": [{"type": "text", "text": '{"findings": [], "note": "API Key missing"}'}]}
 
-            return {
-                "findings": heuristic_findings,
-                "note": "This analysis was generated via heuristics because no OpenAI API key was provided."
-            }
-            
-        print(f"DEBUG: [LLM] Sending request to OpenAI ({self.model})...")
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
         }
-        
+
         payload = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": "You are an expert market analyst. Return only valid JSON."},
-                {"role": "user", "content": f"{prompt}\n\nRAW DATA:\n{str(data)}"}
-            ],
-            "response_format": {"type": "json_object"}
+            "max_tokens": 4000,
+            "system": system,
+            "messages": messages
         }
+        if tools:
+            payload["tools"] = tools
 
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(self.base_url, headers=headers, json=payload, timeout=60.0)
                 response.raise_for_status()
-                result = response.json()
-                # Parse the content as JSON (assuming the LLM followed instructions)
-                import json
-                return json.loads(result["choices"][0]["message"]["content"])
+                return response.json()
             except Exception as e:
-                print(f"ERROR: [LLM] OpenAI request failed: {e}")
-                return {"error": str(e), "findings": []}
+                print(f"ERROR: [LLM] Anthropic request failed: {e}")
+                return {"error": str(e)}
 
-# Simple factory or global instance could be added here
+    async def analyze_data(self, data: Any, prompt: str) -> Dict[str, Any]:
+        """
+        Legacy analyzer wrapper, now using Anthropic.
+        """
+        system = "You are an expert market analyst. Return ONLY valid JSON."
+        user_content = f"{prompt}\n\nRAW DATA:\n{json.dumps(data, indent=2)}"
+        messages = [{"role": "user", "content": user_content}]
+        
+        response = await self.chat(messages, system)
+        if "error" in response:
+            return {"error": response["error"]}
+        
+        # Extract text content
+        content = response.get("content", [])
+        text = ""
+        for block in content:
+            if block["type"] == "text":
+                text = block["text"]
+                break
+        
+        try:
+            return json.loads(text)
+        except Exception as e:
+            print(f"ERROR: [LLM] Failed to parse JSON: {e}\nRaw output: {text}")
+            return {"error": "Failed to parse JSON response"}

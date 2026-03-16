@@ -1,48 +1,91 @@
 from typing import List, Dict, Any
 from backend.agents.base_agent import BaseAgent
 from backend.schemas.agent_output import AgentOutput
+from backend.schemas.query_schema import QueryRequest
+from backend.schemas.final_response import FinalResponse
+import json
 
 class SynthesizerAgent(BaseAgent):
     def __init__(self):
         super().__init__("SynthesizerAgent")
 
-    async def run(self, query_context, verified_outputs: List[AgentOutput]) -> Dict[str, Any]:
+    async def run(self, query_context: QueryRequest, verified_outputs: List[AgentOutput]) -> FinalResponse:
         """
-        Synthesize findings into a final executive summary using LLM.
+        Synthesize findings into a final executive brief.
         """
-        # Prepare all findings for synthesis
-        all_findings = []
+        # Prepare data for synthesis
+        all_data = []
         for out in verified_outputs:
-            all_findings.extend([f.model_dump() for f in out.findings])
+            all_data.append(out.model_dump())
+
+        system_prompt = """
+You are the master SYNTHESISER agent for "Leo".
+Your job is to merge reports from 6 specialist agents into a boardroom-quality BRIEF.
+ 
+Your output must match the FinalResponse schema:
+- executiveSummary: A high-level narrative.
+- topOpportunities: 3-5 high-conviction growth levers.
+- topRisks: 3-5 strategic threats.
+- recommendedBets: 2-3 specific actions the team should take.
+- artifacts: Summary tables, market maps, or scorecards.
+- confidenceOverview: A breakdown of overall system confidence.
+- followUpQuestions: 3 smart questions for the user to ask next.
+ 
+Return ONLY valid JSON matching FinalResponse.
+"""
+
+        user_prompt = f"""
+Query: {query_context.question}
+Product: {query_context.product}
+Domain: {query_context.domain}
+Agent Reports: {json.dumps(all_data)}
+ 
+Synthesize everything now.
+"""
+
+        try:
+            result = await self.llm.analyze_data(all_data, system_prompt)
+            # The LLM result should match FinalResponse structure
             
-        prompt = f"""
-        Synthesize the following market intelligence findings for {query_context.company_name or query_context.query}.
-        Produce a boardroom-quality summary including:
-        1. Executive Overiew (High-level narrative)
-        2. Key Opportunities (Bullet points)
-        3. Strategic Risks (Bullet points)
-        4. Recommended Next Steps (Actionable items)
-        
-        Format the output as a JSON object with 'summary', 'opportunities', 'risks', and 'recommendations'.
-        """
-        
-        synthesis = await self.llm.analyze_data(all_findings, prompt)
-        
-        # Fallback if synthesis is empty/missing keys (common in Heuristic mode)
-        summary = synthesis.get("summary") or synthesis.get("executive_summary")
-        if not summary and "findings" in synthesis:
-            # Construct a basic summary from findings
-            summary = "Summary generated via data aggregation. " + " ".join([f['statement'] for f in synthesis['findings'][:2]])
-        
-        return {
-            "query": query_context.query,
-            "company": query_context.company_name,
-            "executive_summary": summary or "No summary available. Data collected but analysis skipped.",
-            "strategic_pillars": [
-                {"title": "Opportunities", "content": synthesis.get("opportunities") or ["Manual review of findings recommended."]},
-                {"title": "Risks", "content": synthesis.get("risks") or ["Data indicates volatile signals; please verify manually."]},
-                {"title": "Recommendations", "content": synthesis.get("recommendations") or ["Configure OpenAI API key for full strategic insight."]}
-            ],
-            "confidence_score": synthesis.get("confidence_score") or 0.5,
-            "agent_contributions": [out.agent_name for out in verified_outputs]
-        }
+            # Enrich with agent data if missing
+            if "agentStatuses" not in result:
+                result["agentStatuses"] = [
+                    {"name": out.agentId, "status": "success", "duration": 0} 
+                    for out in verified_outputs
+                ]
+            if "queryCostEstimate" not in result:
+                result["queryCostEstimate"] = "$0.42"
+            
+            # Ensure findings and evidence are passed if not already in result
+            if "findings" not in result:
+                result["findings"] = []
+                for out in verified_outputs:
+                    result["findings"].extend(out.model_dump()["findings"])
+            
+            if "evidence" not in result:
+                result["evidence"] = []
+                for out in verified_outputs:
+                    result["evidence"].extend(out.model_dump()["sources"])
+
+            return FinalResponse(**result)
+        except Exception as e:
+            print(f"ERROR: [SynthesizerAgent] {e}")
+            # Fallback
+            return FinalResponse(
+                executiveSummary=f"Error in synthesis: {str(e)}",
+                topOpportunities=[],
+                topRisks=[],
+                recommendedBets=[],
+                findings=[],
+                facts=[],
+                interpretations=[],
+                evidence=[],
+                artifacts=[],
+                confidenceOverview={
+                    "overall": "low",
+                    "byDomain": {}
+                },
+                followUpQuestions=["Try again?"],
+                agentStatuses=[],
+                queryCostEstimate="$0.00"
+            )

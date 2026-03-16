@@ -20,11 +20,10 @@ import {
   ChatMessage,
   ProductContext,
   AgentStatusInfo,
-  OrchestratorResponse,
-  QueryMetadata,
+  FinalResponse,
 } from "@/types";
-import { sendQuery } from "@/lib/api";
-import { DEMO_AGENTS, STARTER_CHIPS, MOCK_RESPONSE } from "@/lib/mock-data";
+import { sendQueryStream } from "@/lib/api";
+import { STARTER_CHIPS } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 function generateId() {
@@ -75,64 +74,6 @@ export default function Home() {
     scrollToBottom();
   }, [messages, agentStatuses, scrollToBottom]);
 
-  const simulateAgentExecution = useCallback((): Promise<AgentStatusInfo[]> => {
-    return new Promise((resolve) => {
-      const agents = DEMO_AGENTS.map((a) => ({ ...a }));
-      setAgentStatuses([...agents]);
-      setAgentPanelCollapsed(false);
-
-      const schedule = [
-        { time: 100, agent: 0, status: "running" as const },
-        { time: 200, agent: 4, status: "running" as const },
-        { time: 800, agent: 1, status: "running" as const },
-        { time: 1500, agent: 4, status: "done" as const, elapsed: 1.3 },
-        { time: 2000, agent: 0, status: "done" as const, elapsed: 1.9 },
-        { time: 2200, agent: 3, status: "running" as const },
-        { time: 2500, agent: 5, status: "running" as const },
-        { time: 3000, agent: 2, status: "running" as const },
-        { time: 3400, agent: 1, status: "done" as const, elapsed: 2.6 },
-        { time: 4000, agent: 3, status: "done" as const, elapsed: 1.8 },
-        { time: 4500, agent: 5, status: "done" as const, elapsed: 2.0 },
-        { time: 5200, agent: 2, status: "done" as const, elapsed: 2.2 },
-      ];
-
-      const startTimes: Record<number, number> = {};
-
-      schedule.forEach(({ time, agent, status, elapsed: finalElapsed }) => {
-        setTimeout(() => {
-          if (status === "running") {
-            startTimes[agent] = Date.now();
-          }
-          agents[agent].status = status;
-          if (finalElapsed) {
-            agents[agent].elapsed = finalElapsed;
-          } else if (status === "running") {
-            agents[agent].elapsed = 0;
-          }
-          setAgentStatuses([...agents]);
-        }, time);
-      });
-
-      const intervalTimer = setInterval(() => {
-        let updated = false;
-        agents.forEach((agent, index) => {
-          if (agent.status === "running" && startTimes[index]) {
-            agent.elapsed = (Date.now() - startTimes[index]) / 1000;
-            updated = true;
-          }
-        });
-        if (updated) {
-          setAgentStatuses([...agents]);
-        }
-      }, 100);
-
-      setTimeout(() => {
-        clearInterval(intervalTimer);
-        resolve(agents);
-      }, 3500);
-    });
-  }, []);
-
   const handleSubmit = async (query: string) => {
     if (!query.trim() || isProcessing) return;
 
@@ -147,78 +88,65 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsProcessing(true);
+    setAgentStatuses([]); // Reset for new run
+    setAgentPanelCollapsed(false);
 
     try {
-      const queryCost = 0.01 + Math.random() * 0.04;
-      setCurrentQueryCost(queryCost);
-      const startTime = Date.now();
-      const finalAgentStatuses = await simulateAgentExecution();
+        await sendQueryStream(
+            {
+              product: product.name,
+              domain: product.url,
+              question: trimmedQuery,
+              session_id: sessionId,
+            },
+            (update) => {
+                if (update.status === "starting") {
+                    const initialAgents = update.agents.map((name: string) => ({
+                        name,
+                        status: "queued" as const,
+                        duration: 0
+                    }));
+                    setAgentStatuses(initialAgents);
+                } else if (update.agentId) {
+                    setAgentStatuses(prev => prev.map(a => 
+                        a.name === update.agentId 
+                        ? { ...a, status: update.status } 
+                        : a
+                    ));
+                } else if (update.status === "final") {
+                    const response = update.data as FinalResponse;
+                    
+                    const assistantMessage: ChatMessage = {
+                        id: generateId(),
+                        role: "assistant",
+                        content: response.executiveSummary,
+                        timestamp: new Date(),
+                        response,
+                    };
 
-      let response: OrchestratorResponse;
-
-      if (useMock) {
-        response = { ...MOCK_RESPONSE, query: trimmedQuery };
-      } else {
-        try {
-          response = await sendQuery({
-            query: trimmedQuery,
-            company_name: product.name,
-            product_name: product.name,
-            context:
-              messages.length > 0
-                ? `Previous queries: ${messages
-                    .filter((message) => message.role === "user")
-                    .map((message) => message.content)
-                    .join("; ")}`
-                : undefined,
-            session_id: sessionId,
-          });
-        } catch (error) {
-          console.error("Query failed:", error);
-          response = { ...MOCK_RESPONSE, query: trimmedQuery };
-        }
-      }
-
-      const totalLatency = (Date.now() - startTime) / 1000;
-      const totalSources = response.agent_outputs.reduce((sum, output) => sum + output.evidence.length, 0);
-
-      const metadata: QueryMetadata = {
-        timestamp: new Date(),
-        agentsUsed: response.agent_outputs.map((output) => output.agent_name),
-        sourcesHit: totalSources,
-        totalLatency,
-        estimatedCost: queryCost,
-      };
-
-      const assistantMessage: ChatMessage = {
-        id: generateId(),
-        role: "assistant",
-        content: response.executive_summary,
-        timestamp: new Date(),
-        response,
-        agentStatuses: finalAgentStatuses,
-        metadata,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setSessionCost((prev) => prev + queryCost);
-      setSuggestedChips(response.follow_up_questions.slice(0, 3));
-      
-      setTimeout(() => setAgentPanelCollapsed(true), 1500);
+                    setMessages((prev) => [...prev, assistantMessage]);
+                    setSuggestedChips(response.followUpQuestions.slice(0, 3));
+                    setIsProcessing(false);
+                    setTimeout(() => setAgentPanelCollapsed(true), 1500);
+                    
+                    // Update cost
+                    const costStr = response.queryCostEstimate.replace('$', '');
+                    const costValue = parseFloat(costStr);
+                    setCurrentQueryCost(costValue);
+                    setSessionCost(prev => prev + costValue);
+                }
+            }
+        );
     } catch (error) {
       console.error("Submission error:", error);
-    } finally {
       setIsProcessing(false);
     }
   };
 
-  const allSources = messages
-    .filter((message) => message.response)
-    .flatMap((message) => message.response!.agent_outputs.flatMap((output) => output.evidence));
   const hasResults = messages.length > 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <TopHeader product={product} onUpdate={setProduct} isProcessing={isProcessing} useMock={useMock} compact={hasResults} />
       <main
         className={cn(
@@ -263,7 +191,7 @@ export default function Home() {
                   <div className="grid gap-3">
                     <div className="rounded-[24px] border border-border bg-muted/40 p-5">
                       <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Mode</div>
-                      <div className="mt-2 text-sm">{useMock ? "Demo mode" : "Live API-backed analysis"}</div>
+                      <div className="mt-2 text-sm">Live LEO multi-agent analysis</div>
                     </div>
                     <div className="rounded-[24px] border border-border bg-muted/40 p-5">
                       <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Outputs</div>
@@ -318,21 +246,21 @@ export default function Home() {
                     {message.role === "assistant" && message.response ? (
                       <>
                         <FindingsDisplay
+                          findings={message.response.findings}
                           facts={message.response.facts}
                           interpretations={message.response.interpretations}
-                          recommendations={message.response.recommendations}
+                          recommendedBets={message.response.recommendedBets}
                         />
                         <ArtifactRenderer artifacts={message.response.artifacts} />
-                        <SourceTrail sources={message.response.agent_outputs.flatMap((output) => output.evidence)} />
-                        {message.response.agent_outputs
-                          .filter((output) => output.status === "error" || output.status === "timeout")
+                        <SourceTrail sources={message.response.evidence} />
+                        {message.response.agentStatuses
+                          .filter((output) => output.status === "failed")
                           .map((output) => (
                             <div
-                              key={output.agent_name}
+                              key={output.name}
                               className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
                             >
-                              {output.agent_name} returned {output.status}
-                              {output.errors.length > 0 ? `: ${output.errors[0]}` : ""}
+                              {output.name} failed to provide results.
                             </div>
                           ))}
                         {index !== messages.length - 1 ? <Separator className="mt-6" /> : null}
@@ -348,8 +276,8 @@ export default function Home() {
                         agents={agentStatuses}
                         collapsed={agentPanelCollapsed}
                         onToggle={() => setAgentPanelCollapsed(!agentPanelCollapsed)}
-                        totalTime={agentStatuses.reduce((sum, agent) => sum + agent.elapsed, 0)}
-                        totalSources={allSources.length}
+                        totalTime={agentStatuses.reduce((sum, agent) => sum + (agent.duration || 0), 0) / 1000}
+                        totalSources={0} // Sources are added at the end
                       />
                     </div>
                   )}
