@@ -40,29 +40,25 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat }
   return (
     <div
       className={cn(
-        "relative h-screen bg-secondary/30 border-r border-border transition-all duration-300",
-        isOpen ? "w-64" : "w-12"
+        "relative h-screen bg-background border-r border-border/40 transition-all duration-300",
+        isOpen ? "w-60" : "w-0 overflow-hidden"
       )}
     >
-      <div className="flex flex-col h-full p-2">
+      <div className="flex flex-col h-full px-3 py-6">
         <Button
           onClick={onNewChat}
           variant="ghost"
-          className={cn(
-            "w-full flex items-center justify-start gap-2 mb-4 bg-background border border-border hover:bg-secondary",
-            !isOpen && "justify-center p-0"
-          )}
+          className="w-full flex items-center justify-between px-3 py-2 text-[13px] font-semibold hover:bg-secondary/60 rounded-xl mb-8 group"
         >
-          <Plus className="h-4 w-4" />
-          {isOpen && <span>New Analysis</span>}
+          <span>New Chat</span>
+          <Plus className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </Button>
 
-        <div className="flex-1 overflow-y-auto space-y-1">
-          {isOpen && (
-            <div className="px-2 mb-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <History className="h-3 w-3" />
-                History
+        <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+          {sessions.length > 0 && (
+            <div className="px-3 mb-4">
+              <h3 className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em]">
+                Recent activity
               </h3>
             </div>
           )}
@@ -72,15 +68,13 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat }
               key={session.id}
               onClick={() => onSelectSession(session.id)}
               className={cn(
-                "w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2",
+                "w-full text-left px-3 py-2 rounded-xl text-[13px] transition-all truncate",
                 currentSessionId === session.id
-                  ? "bg-secondary text-secondary-foreground"
-                  : "hover:bg-secondary/50 text-muted-foreground",
-                !isOpen && "justify-center"
+                  ? "bg-secondary/80 text-foreground font-medium shadow-sm"
+                  : "hover:bg-secondary/40 text-muted-foreground"
               )}
             >
-              <MessageSquare className="h-4 w-4 flex-shrink-0" />
-              {isOpen && <span className="truncate">{session.title}</span>}
+              {session.title}
             </button>
           ))}
         </div>
@@ -88,9 +82,14 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat }
 
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="absolute -right-3 top-1/2 transform -translate-y-1/2 bg-background border border-border rounded-full p-1 shadow-sm hover:bg-secondary transition-colors"
+        className={cn(
+          "fixed top-1/2 -translate-y-1/2 z-50 transition-all",
+          isOpen ? "left-[230px]" : "left-4"
+        )}
       >
-        {isOpen ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <div className="p-1 hover:bg-secondary rounded-lg border border-border/40 bg-background/80 backdrop-blur shadow-sm">
+          {isOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </div>
       </button>
     </div>
   );

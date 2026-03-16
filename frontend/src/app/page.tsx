@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AnimatePresence } from "framer-motion";
-import { BarChart3, BrainCircuit, CircleDashed, Compass, Sparkles } from "lucide-react";
 import ProcessTrace from "@/components/ProcessTrace";
 import ArtifactRenderer from "@/components/ArtifactRenderer";
 import FindingsDisplay from "@/components/FindingsDisplay";
@@ -11,12 +9,8 @@ import TopHeader from "@/components/layout/top-header";
 import PromptComposer from "@/components/chat/prompt-composer";
 import MessageCard from "@/components/chat/message-card";
 import QuickPrompts from "@/components/chat/quick-prompts";
-import QueryCostIndicator from "@/components/QueryCostIndicator";
 import Sidebar from "@/components/layout/sidebar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   ChatMessage,
   ProductContext,
@@ -25,29 +19,10 @@ import {
 } from "@/types";
 import { sendQueryStream } from "@/lib/api";
 import { STARTER_CHIPS } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
-
-const workspaceHighlights = [
-  {
-    icon: BrainCircuit,
-    title: "Strategic briefs",
-    description: "Executive summary, risks, and recommended bets with clear hierarchy.",
-  },
-  {
-    icon: BarChart3,
-    title: "Inline artifacts",
-    description: "Competitor scorecards, charts, pricing, and maps stay in the same conversation flow.",
-  },
-  {
-    icon: Compass,
-    title: "Focused follow-ups",
-    description: "Prompt suggestions keep the analysis moving without turning the app into a dashboard.",
-  },
-];
 
 export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -55,8 +30,6 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [agentStatuses, setAgentStatuses] = useState<AgentStatusInfo[]>([]);
   const [sessionId, setSessionId] = useState(() => generateId());
-  const [sessionCost, setSessionCost] = useState(0);
-  const [currentQueryCost, setCurrentQueryCost] = useState(0);
   const [product, setProduct] = useState<ProductContext>({
     name: "Vector Agents",
     url: "vectoragents.ai",
@@ -72,7 +45,6 @@ export default function Home() {
         setSessionId(id);
         setProduct({ name: data.title, url: data.url || "" });
         
-        // Reconstruct messages from past_queries and last_response
         const loadedMessages: ChatMessage[] = [];
         data.past_queries.forEach((q: any) => {
           loadedMessages.push({
@@ -129,7 +101,7 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsProcessing(true);
-    setAgentStatuses([]); // Reset for new run
+    setAgentStatuses([]);
 
     try {
         await sendQueryStream(
@@ -167,12 +139,6 @@ export default function Home() {
                     setMessages((prev) => [...prev, assistantMessage]);
                     setSuggestedChips(response.followUpQuestions.slice(0, 3));
                     setIsProcessing(false);
-                    
-                    // Update cost
-                    const costStr = response.queryCostEstimate.replace('$', '');
-                    const costValue = parseFloat(costStr);
-                    setCurrentQueryCost(costValue);
-                    setSessionCost(prev => prev + costValue);
                 }
             }
         );
@@ -185,7 +151,7 @@ export default function Home() {
   const hasResults = messages.length > 0;
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans selection:bg-primary/10">
       <Sidebar 
         currentSessionId={sessionId} 
         onSelectSession={handleSelectSession} 
@@ -194,96 +160,78 @@ export default function Home() {
       
       <div className="flex-1 flex flex-col relative overflow-hidden">
         <TopHeader product={product} onUpdate={setProduct} isProcessing={isProcessing} useMock={useMock} compact={hasResults} />
-      <main
-        className={cn(
-          "mx-auto w-full max-w-6xl px-4 pb-40 transition-all duration-300 sm:px-6 lg:px-8",
-          hasResults ? "pt-4" : "pt-8"
-        )}
-      >
-        <QueryCostIndicator queryCost={currentQueryCost} sessionCost={sessionCost} visible={messages.length > 0} />
-
-        {!hasResults ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 animate-in fade-in duration-1000">
-            <div className="text-center space-y-4">
-              <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
-                What can I analyze for you today?
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                Boardroom-quality growth intelligence in minutes. 
-                Powered by multi-agent live research.
-              </p>
-            </div>
-            
-            <div className="w-full max-w-2xl">
-               <QuickPrompts prompts={suggestedChips} onSelect={handleSubmit} align="center" />
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-3xl mx-auto space-y-8 pt-8">
-            <div className="space-y-12 pb-32">
-              {messages.map((message, index) => (
-                <div key={message.id} className="space-y-6">
-                  <MessageCard
-                    message={message}
-                  />
-
-                  {message.role === "assistant" && message.response && (
-                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                      <FindingsDisplay
-                        findings={message.response.findings}
-                        facts={message.response.facts}
-                        interpretations={message.response.interpretations}
-                        recommendedBets={message.response.recommendedBets}
-                      />
-                      
-                      {message.response.artifacts && message.response.artifacts.length > 0 && (
-                        <ArtifactRenderer artifacts={message.response.artifacts} />
-                      )}
-                      
-                      <SourceTrail sources={message.response.evidence} />
-                      
-                      {message.response.agentStatuses
-                        .filter((output) => output.status === "failed")
-                        .map((output) => (
-                          <div
-                            key={output.name}
-                            className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
-                          >
-                            {output.name} failed to provide results.
-                          </div>
-                        ))}
-                    </div>
-                  )}
+        
+        <ScrollArea className="flex-1">
+          <main className="mx-auto w-full max-w-3xl px-6 pb-48 pt-12">
+            {!hasResults ? (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                <div className="text-center space-y-3">
+                  <h1 className="text-3xl sm:text-4xl font-medium tracking-tight text-foreground/90">
+                    Growth intelligence for {product.name}
+                  </h1>
+                  <p className="text-[15px] text-muted-foreground/60 max-w-md mx-auto leading-relaxed">
+                    Start an analysis to uncover strategic insights, competitive risks, and recommended growth bets.
+                  </p>
                 </div>
-              ))}
+                
+                <div className="w-full max-w-lg pt-4">
+                   <QuickPrompts prompts={suggestedChips} onSelect={handleSubmit} align="center" />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-12 transition-all duration-500">
+                {messages.map((message) => (
+                  <div key={message.id} className="space-y-8">
+                    <MessageCard message={message} />
 
-              <AnimatePresence>
+                    {message.role === "assistant" && message.response && (
+                      <div className="ml-14 space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                        <FindingsDisplay
+                          findings={message.response.findings}
+                          facts={message.response.facts}
+                          interpretations={message.response.interpretations}
+                          recommendedBets={message.response.recommendedBets}
+                        />
+                        
+                        {message.response.artifacts && message.response.artifacts.length > 0 && (
+                          <div className="px-2">
+                             <ArtifactRenderer artifacts={message.response.artifacts} />
+                          </div>
+                        )}
+                        
+                        <div className="border-t border-border/20 pt-8 mt-12">
+                          <SourceTrail sources={message.response.evidence} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
                 {isProcessing && (
-                  <div className="flex justify-center py-4">
+                  <div className="flex justify-start ml-14 py-8 animate-in fade-in duration-500">
                     <ProcessTrace
                       agents={agentStatuses}
                       isProcessing={isProcessing}
                     />
                   </div>
                 )}
-              </AnimatePresence>
 
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-        )}
-      </main>
+                <div ref={messagesEndRef} className="h-4" />
+              </div>
+            )}
+          </main>
+        </ScrollArea>
 
-      <PromptComposer
-        input={input}
-        setInput={setInput}
-        onSubmit={handleSubmit}
-        isProcessing={isProcessing}
-        useMock={useMock}
-        setUseMock={setUseMock}
-        compact={hasResults}
-      />
+        <PromptComposer
+          input={input}
+          setInput={setInput}
+          onSubmit={handleSubmit}
+          isProcessing={isProcessing}
+          useMock={useMock}
+          setUseMock={setUseMock}
+          compact={hasResults}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
 }

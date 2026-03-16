@@ -1,144 +1,92 @@
 "use client";
 
-import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Search, 
-  ChevronDown, 
-  ChevronRight, 
-  Brain, 
-  Globe, 
-  UserSearch, 
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Activity
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { BrainCircuit, Loader2, CheckCircle2, AlertCircle, Search, Cpu, Globe, Database } from "lucide-react";
+import { AgentStatusInfo } from "@/types";
 import { cn } from "@/lib/utils";
 
-interface ToolCall {
-  tool: string;
-  query: string;
-  status: "running" | "completed" | "error";
-}
-
-interface AgentProcess {
-  agentId: string;
-  status: string;
-  message?: string;
-  toolCalls: ToolCall[];
-}
-
 interface ProcessTraceProps {
-  agents: any[]; // AgentStatusInfo[]
+  agents: AgentStatusInfo[];
   isProcessing: boolean;
 }
 
-export default function ProcessTrace({ agents, isProcessing }: ProcessTraceProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+const getAgentIcon = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes("search") || n.includes("growth")) return Search;
+  if (n.includes("competitive")) return Globe;
+  if (n.includes("product") || n.includes("pricing")) return Database;
+  return Cpu;
+};
 
-  const activeAgents = agents.filter(a => a.status === "running");
-  const completedCount = agents.filter(a => ["done", "success", "completed"].includes(a.status)).length;
-  
-  if (agents.length === 0) return null;
+export default function ProcessTrace({ agents, isProcessing }: ProcessTraceProps) {
+  const activeAgent = agents.find((a) => a.status === "running") || agents.find(a => a.status === "queued");
 
   return (
-    <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className={cn(
-        "rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md transition-all overflow-hidden",
-        isExpanded ? "shadow-[0_4px_20px_rgba(0,0,0,0.08)] bg-card/60" : "shadow-sm"
-      )}>
-        {/* Header Summary */}
-        <button 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between px-5 py-4 hover:bg-secondary/20 transition-colors group"
-        >
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
-                {isProcessing ? <Activity className="h-5 w-5 animate-pulse" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-              </div>
-              {isProcessing && (
-                <div className="absolute -top-1 -right-1 h-3 w-3 border-2 border-background bg-primary rounded-full animate-ping" />
-              )}
-            </div>
-            <div className="text-left">
-              <span className="text-[14px] font-semibold tracking-tight block">
-                {isProcessing 
-                  ? `Collaborative research in progress...` 
-                  : "Intelligence synthesis complete"}
-              </span>
-              {!isExpanded && (
-                <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                        {completedCount} of {agents.length} agents finished
-                    </span>
-                    {activeAgents.length > 0 && (
-                        <span className="text-[10px] text-primary/40 pl-2 border-l border-border/60 truncate max-w-[200px]">
-                            {activeAgents[0].message ? `Currently ${activeAgents[0].message.toLowerCase()}` : `Agent ${activeAgents[0].name} active`}
-                        </span>
-                    )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 bg-secondary/40 px-3 py-1.5 rounded-lg group-hover:bg-secondary/60 transition-colors">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
-              {isExpanded ? "Hide detail" : "View detail"}
-            </span>
-            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          </div>
-        </button>
+    <div className="w-full max-w-2xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+      <div className="flex items-center gap-3">
+        <div className="relative flex h-8 w-8 items-center justify-center">
+            <div className="absolute inset-0 rounded-xl bg-primary/10 animate-pulse" />
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[13px] font-semibold text-foreground/80 tracking-tight">
+            {activeAgent ? `Agent ${activeAgent.name} is working...` : "Synthesizing boardroom brief..."}
+          </span>
+          <span className="text-[11px] text-muted-foreground/60 font-medium">
+            Analyzing live web intelligence and competitive signals
+          </span>
+        </div>
+      </div>
 
-        {/* Expanded View */}
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="border-t border-border/40"
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+        {agents.map((agent) => {
+          const Icon = getAgentIcon(agent.name);
+          const isRunning = agent.status === "running";
+          const isDone = agent.status === "success" || agent.status === "completed";
+          const isFailed = agent.status === "failed";
+
+          return (
+            <div
+              key={agent.name}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                isRunning 
+                  ? "bg-primary/[0.03] border-primary/20 shadow-sm" 
+                  : isDone 
+                  ? "bg-secondary/40 border-border/40 opacity-70" 
+                  : "bg-transparent border-transparent opacity-40"
+              )}
             >
-              <div className="p-5 space-y-5 max-h-[450px] overflow-y-auto custom-scrollbar">
-                {agents.map((agent) => (
-                  <div key={agent.name} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "h-2 w-2 rounded-full",
-                          agent.status === "running" ? "bg-primary animate-pulse" : 
-                          ["done", "success", "completed"].includes(agent.status) ? "bg-emerald-500" :
-                          agent.status === "failed" ? "bg-rose-500" : "bg-muted-foreground/30"
-                        )} />
-                        <span className="text-[12px] font-bold uppercase tracking-[0.1em] text-foreground/70">
-                          {agent.name.replace("_", " ")} agent
-                        </span>
-                      </div>
-                      <Badge variant="default" className="h-5 px-2 text-[9px] font-bold tracking-widest opacity-60">
-                         {agent.status}
-                      </Badge>
-                    </div>
-
-                    {agent.message && (
-                      <div className="pl-5 border-l border-border/60 ml-1 py-1">
-                        <motion.div 
-                          initial={{ x: -10, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          className="flex items-start gap-2.5 text-[13px] text-muted-foreground leading-relaxed bg-secondary/10 p-3 rounded-xl border border-border/20"
-                        >
-                          <Search className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary/40" />
-                          <span>{agent.message}</span>
-                        </motion.div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className={cn(
+                "p-1.5 rounded-lg shrink-0",
+                isRunning ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              )}>
+                <Icon className="h-3.5 w-3.5" />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              
+              <div className="flex flex-col min-w-0">
+                <span className="text-[12px] font-bold tracking-tight truncate">
+                  {agent.name}
+                </span>
+                {isRunning && agent.message && (
+                  <span className="text-[10px] text-muted-foreground/80 truncate animate-pulse">
+                    {agent.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="ml-auto">
+                {isDone ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                ) : isFailed ? (
+                  <AlertCircle className="h-3.5 w-3.5 text-rose-500" />
+                ) : isRunning ? (
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
