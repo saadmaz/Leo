@@ -5,5 +5,6 @@ class Source(BaseModel):
     id: str
     url: str
     title: str
-    retrievedAt: str  # ISO timestamp
-    credibilityScore: float  # 0.0 - 1.0
+    snippet: Optional[str] = None
+    retrievedAt: Optional[str] = None  # ISO timestamp
+    credibilityScore: Optional[float] = 0.5  # 0.0 - 1.0

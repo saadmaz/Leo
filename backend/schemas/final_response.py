@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 from typing import List, Dict, Any, Literal
-from .finding_schema import Finding
-from .source_schema import Source
-from .artifact_schema import Artifact
-from .agent_output import AgentOutput
+from backend.schemas.finding_schema import Finding
+from backend.schemas.source_schema import Source
+from backend.schemas.artifact_schema import Artifact
+from backend.schemas.agent_output import AgentOutput
 
 class AgentStatus(BaseModel):
     name: str

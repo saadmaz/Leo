@@ -21,7 +21,9 @@ class ConfidenceVerifierAgent(BaseAgent):
                     "claim": f.claim,
                     "confidence": f.confidence,
                     "isFactual": f.isFactual,
-                    "sourceIds": f.sourceIds
+                    "sourceIds": f.sourceIds,
+                    "rationale": f.rationale,
+                    "domain": f.domain
                 })
 
         system_prompt = """

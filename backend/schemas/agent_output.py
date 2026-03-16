@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional, Literal
-from .finding_schema import Finding
-from .source_schema import Source
+from backend.schemas.finding_schema import Finding
+from backend.schemas.source_schema import Source
 
 class AgentOutput(BaseModel):
     agentId: str

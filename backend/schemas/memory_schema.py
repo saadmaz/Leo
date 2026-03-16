@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from .query_schema import QueryRequest
-from .final_response import FinalResponse
+from backend.schemas.query_schema import QueryRequest
+from backend.schemas.final_response import FinalResponse
 
 class SessionMemory(BaseModel):
     session_id: str

@@ -24,9 +24,8 @@ Your job:
  
 Output contract:
 - Return ONLY valid JSON matching the AgentOutput schema.
-- agentId must be "competitive".
-- findings must be a list of objects with: { "id": "claim-X", "claim": "...", "sourceIds": ["S1"], "isFactual": true/false }
-- sources must be a list of objects with: { "id": "S1", "url": "...", "title": "...", "snippet": "...", "credibilityScore": 0.0-1.0, "retrievedAt": "ISO timestamp" }
+- Finding schema: {id: str, claim: str, confidence: "low"|"medium"|"high", sourceIds: List[str], isFactual: bool, rationale: str, domain: str}
+- Source schema: {id: str, url: str, title: str, snippet: str, retrievedAt: ISO_timestamp}
 - No preamble. No markdown code fences.
 """
 

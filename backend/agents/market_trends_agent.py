@@ -25,6 +25,8 @@ Your job:
  
 Output contract:
 - Return ONLY valid JSON matching the AgentOutput schema.
+- Finding schema: {id: str, claim: str, confidence: "low"|"medium"|"high", sourceIds: List[str], isFactual: bool, rationale: str, domain: str}
+- Source schema: {id: str, url: str, title: str, snippet: str, retrievedAt: ISO_timestamp}
 - No preamble. No markdown code fences. No explanation outside the JSON.
 """
 
@@ -50,10 +52,11 @@ Run your searches now. Return AgentOutput JSON.
                     interpretations=[],
                     errors=[result["error"]]
                 )
+            result["agentId"] = "market_trends"
             return AgentOutput(**result)
         except Exception as e:
             return AgentOutput(
-                agentId="market",
+                agentId="market_trends",
                 confidence="low",
                 findings=[],
                 sources=[],
