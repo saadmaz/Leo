@@ -31,7 +31,9 @@ export default function SignupPage() {
       }
       router.replace('/projects')
     } catch (err: unknown) {
-      setError(friendlyError((err as { code?: string }).code ?? ''))
+      const code = (err as { code?: string }).code ?? ''
+      const msg = (err as { message?: string }).message ?? ''
+      setError(friendlyError(code) + (code ? ` [${code}]` : msg))
     } finally {
       setLoading(false)
     }
