@@ -126,14 +126,17 @@ def get_project(project_id: str) -> Optional[dict]:
 
 def list_projects(uid: str) -> list[dict]:
     db = get_db()
+    # order_by on a different field than the where clause requires a composite
+    # index with a dynamic key (members.{uid}), which can't be pre-created.
+    # Sort in Python instead.
     docs = (
         db.collection("projects")
         .where("members." + uid, "in", ["admin", "editor", "viewer"])
-        .order_by("updatedAt", direction=firestore.Query.DESCENDING)
         .limit(50)
         .stream()
     )
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    return sorted(results, key=lambda p: p.get("updatedAt", ""), reverse=True)
 
 
 def update_project(project_id: str, data: dict) -> None:
@@ -182,11 +185,11 @@ def list_chats(project_id: str) -> list[dict]:
     docs = (
         db.collection("projects").document(project_id)
         .collection("chats")
-        .order_by("updatedAt", direction=firestore.Query.DESCENDING)
         .limit(50)
         .stream()
     )
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    return sorted(results, key=lambda p: p.get("updatedAt", ""), reverse=True)
 
 
 def rename_chat(project_id: str, chat_id: str, name: str) -> None:
@@ -235,8 +238,8 @@ def list_messages(project_id: str, chat_id: str, limit: int = 50) -> list[dict]:
         db.collection("projects").document(project_id)
         .collection("chats").document(chat_id)
         .collection("messages")
-        .order_by("createdAt")
         .limit(limit)
         .stream()
     )
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    return sorted(results, key=lambda m: m.get("createdAt", ""))
