@@ -1,5 +1,5 @@
 import { auth } from './firebase'
-import type { Chat, Message, Project, ProjectCreate, StreamEvent } from '@/types'
+import type { BrandCore, Chat, IngestionEvent, Message, Project, ProjectCreate, StreamEvent } from '@/types'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -135,6 +135,77 @@ export const api = {
       reader.releaseLock()
     }
     callbacks.onDone()
+  },
+
+  brandCore: {
+    get: (projectId: string) =>
+      get<{ brandCore: BrandCore | null; ingestionStatus: string | null }>(
+        `/projects/${projectId}/brand-core`,
+      ),
+    update: (projectId: string, data: Partial<BrandCore>) =>
+      patch<{ brandCore: BrandCore }>(`/projects/${projectId}/brand-core`, data),
+    clear: (projectId: string) =>
+      del(`/projects/${projectId}/brand-core`),
+  },
+
+  async streamIngestion(
+    projectId: string,
+    body: { websiteUrl?: string; instagramHandle?: string },
+    callbacks: {
+      onStep: (step: import('@/types').IngestionStep) => void
+      onProgress: (pct: number) => void
+      onDone: (brandCore: BrandCore) => void
+      onError: (message: string) => void
+    },
+  ): Promise<void> {
+    const user = auth.currentUser
+    if (!user) { callbacks.onError('Not authenticated'); return }
+    const token = await user.getIdToken()
+
+    let res: Response
+    try {
+      res = await fetch(`${API}/projects/${projectId}/ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      })
+    } catch (err) {
+      callbacks.onError(String(err))
+      return
+    }
+
+    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+
+    const reader = res.body?.getReader()
+    if (!reader) { callbacks.onError('No stream'); return }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (raw === '[DONE]') return
+          try {
+            const event = JSON.parse(raw) as IngestionEvent
+            if (event.type === 'step') callbacks.onStep(event)
+            if (event.type === 'progress') callbacks.onProgress(event.pct)
+            if (event.type === 'done') callbacks.onDone(event.brandCore)
+            if (event.type === 'error') callbacks.onError(event.message)
+          } catch { /* skip malformed */ }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
   },
 
   health: () => get<{ status: string }>('/health'),

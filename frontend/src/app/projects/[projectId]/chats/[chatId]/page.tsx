@@ -3,10 +3,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight } from 'lucide-react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
+import { BrandCorePanel } from '@/components/brand-core/brand-core-panel'
+import { IngestionOverlay } from '@/components/brand-core/ingestion-overlay'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
@@ -35,30 +37,23 @@ export default function ChatPage() {
   const {
     user,
     activeProject,
-    messages,
-    setMessages,
-    addMessage,
-    appendDelta,
-    finaliseMessage,
-    isStreaming,
-    setIsStreaming,
+    messages, setMessages, addMessage, appendDelta, finaliseMessage,
+    isStreaming, setIsStreaming,
+    setBrandCorePanelOpen, setIngestionOpen,
   } = useAppStore()
 
   useEffect(() => {
     if (!user) router.replace('/login')
   }, [user, router])
 
-  // Load message history when the chat changes
   useEffect(() => {
     if (!params.projectId || !params.chatId) return
     setMessages([])
     api.chats
       .messages(params.projectId, params.chatId)
-      .then((msgs) => {
-        setMessages(
-          msgs.map((m): OptimisticMessage => ({ id: m.id, role: m.role, content: m.content })),
-        )
-      })
+      .then((msgs) =>
+        setMessages(msgs.map((m): OptimisticMessage => ({ id: m.id, role: m.role, content: m.content })))
+      )
       .catch(console.error)
   }, [params.projectId, params.chatId, setMessages])
 
@@ -70,7 +65,6 @@ export default function ChatPage() {
 
   async function handleSubmit(content: string) {
     if (!content.trim() || isStreaming) return
-
     setInput('')
     addMessage({ id: newId(), role: 'user', content })
 
@@ -93,6 +87,9 @@ export default function ChatPage() {
     })
   }
 
+  const hasBrandCore = Boolean(activeProject?.brandCore)
+  const isProcessing = activeProject?.ingestionStatus === 'processing'
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
@@ -102,8 +99,38 @@ export default function ChatPage() {
         <div className="flex items-center gap-3 px-6 py-3 border-b border-border bg-card shrink-0">
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">{activeProject?.name ?? 'LEO'}</span>
-          {activeProject?.brandCore && (
-            <span className="text-xs text-muted-foreground/60">✦ Brand Core active</span>
+
+          <div className="flex-1" />
+
+          {/* Brand Core pill button */}
+          {activeProject && (
+            isProcessing ? (
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs"
+              >
+                <Zap className="w-3 h-3" />
+                Building Brand Core…
+              </motion.div>
+            ) : hasBrandCore ? (
+              <button
+                onClick={() => setBrandCorePanelOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors"
+              >
+                <Zap className="w-3 h-3" />
+                Brand Core
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setIngestionOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-dashed border-border text-muted-foreground text-xs hover:border-primary hover:text-primary transition-colors"
+              >
+                <Zap className="w-3 h-3" />
+                Build Brand Core
+              </button>
+            )
           )}
         </div>
 
@@ -124,11 +151,13 @@ export default function ChatPage() {
                     {activeProject ? `Chat about ${activeProject.name}` : 'Start a conversation'}
                   </h2>
                   <p className="text-sm text-muted-foreground max-w-xs">
-                    {activeProject?.brandCore
+                    {hasBrandCore
                       ? 'Brand Core is active. Ask for captions, campaign briefs, ad copy, or strategy.'
                       : 'Paste your website or Instagram URL — LEO will build your Brand Core automatically.'}
                   </p>
                 </div>
+
+                {/* Starter prompts */}
                 <div className="flex flex-wrap gap-2 justify-center max-w-sm">
                   {starterPrompts(activeProject?.name).map((p) => (
                     <button
@@ -140,6 +169,17 @@ export default function ChatPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Build Brand Core CTA if none exists */}
+                {!hasBrandCore && !isProcessing && activeProject && (
+                  <button
+                    onClick={() => setIngestionOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/5 border border-primary/20 text-primary text-sm hover:bg-primary/10 transition-colors"
+                  >
+                    <Zap className="w-4 h-4" />
+                    Build my Brand Core
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -167,6 +207,10 @@ export default function ChatPage() {
           disabled={isStreaming}
         />
       </div>
+
+      {/* Panels — rendered outside the scroll container */}
+      <BrandCorePanel />
+      <IngestionOverlay />
     </div>
   )
 }

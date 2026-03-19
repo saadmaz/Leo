@@ -15,7 +15,7 @@ export function Sidebar() {
   const router = useRouter()
   const params = useParams<{ projectId?: string; chatId?: string }>()
 
-  const { user, projects, setProjects, activeProject, setActiveProject, chats, setChats, setActiveChat } = useAppStore()
+  const { user, projects, setProjects, activeProject, setActiveProject, chats, setChats, setActiveChat, setIngestionOpen } = useAppStore()
 
   const [creating, setCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -50,6 +50,8 @@ export function Sidebar() {
       setChats([chat])
       setActiveChat(chat)
       router.push(`/projects/${project.id}/chats/${chat.id}`)
+      // Prompt user to build Brand Core immediately after project creation
+      setIngestionOpen(true)
     } catch (err) {
       console.error(err)
     } finally {

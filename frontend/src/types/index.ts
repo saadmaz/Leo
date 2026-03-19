@@ -42,6 +42,7 @@ export interface BrandCore {
   }
   tagline?: string
   messaging?: BrandMessaging
+  competitors?: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +100,7 @@ export interface OptimisticMessage {
 }
 
 // ---------------------------------------------------------------------------
-// SSE Stream events
+// SSE Stream events (chat)
 // ---------------------------------------------------------------------------
 
 export interface StreamDelta {
@@ -113,3 +114,35 @@ export interface StreamError {
 }
 
 export type StreamEvent = StreamDelta | StreamError
+
+// ---------------------------------------------------------------------------
+// SSE Ingestion events
+// ---------------------------------------------------------------------------
+
+export interface IngestionStep {
+  type: 'step'
+  label: string
+  status: 'running' | 'done' | 'error' | 'skipped'
+  detail?: string
+}
+
+export interface IngestionProgress {
+  type: 'progress'
+  pct: number
+}
+
+export interface IngestionDone {
+  type: 'done'
+  brandCore: BrandCore
+}
+
+export interface IngestionError {
+  type: 'error'
+  message: string
+}
+
+export type IngestionEvent =
+  | IngestionStep
+  | IngestionProgress
+  | IngestionDone
+  | IngestionError

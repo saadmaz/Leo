@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream
+from backend.api.routes import projects, chats, stream, ingestion, brand_core
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -60,6 +60,8 @@ async def on_startup():
 app.include_router(projects.router)
 app.include_router(chats.router)
 app.include_router(stream.router)
+app.include_router(ingestion.router)
+app.include_router(brand_core.router)
 
 # ---------------------------------------------------------------------------
 # Health

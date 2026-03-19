@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppUser, Chat, OptimisticMessage, Project } from '@/types'
+import type { AppUser, BrandCore, Chat, IngestionStep, OptimisticMessage, Project } from '@/types'
 
 interface AppState {
   // Auth
@@ -34,6 +34,23 @@ interface AppState {
   setIsStreaming: (v: boolean) => void
   sidebarOpen: boolean
   setSidebarOpen: (v: boolean) => void
+
+  // Brand Core panel
+  brandCorePanelOpen: boolean
+  setBrandCorePanelOpen: (v: boolean) => void
+
+  // Ingestion
+  ingestionOpen: boolean
+  setIngestionOpen: (v: boolean) => void
+  ingestionSteps: IngestionStep[]
+  ingestionProgress: number
+  ingestionRunning: boolean
+  addIngestionStep: (step: IngestionStep) => void
+  setIngestionProgress: (pct: number) => void
+  setIngestionRunning: (v: boolean) => void
+  resetIngestion: () => void
+  /** Called when ingestion completes — updates the active project's brandCore. */
+  onIngestionDone: (projectId: string, brandCore: BrandCore) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -99,4 +116,34 @@ export const useAppStore = create<AppState>((set) => ({
   setIsStreaming: (isStreaming) => set({ isStreaming }),
   sidebarOpen: true,
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+
+  // Brand Core panel
+  brandCorePanelOpen: false,
+  setBrandCorePanelOpen: (brandCorePanelOpen) => set({ brandCorePanelOpen }),
+
+  // Ingestion
+  ingestionOpen: false,
+  setIngestionOpen: (ingestionOpen) => set({ ingestionOpen }),
+  ingestionSteps: [],
+  ingestionProgress: 0,
+  ingestionRunning: false,
+  addIngestionStep: (step) =>
+    set((s) => ({
+      ingestionSteps: [...s.ingestionSteps.filter((x) => x.label !== step.label), step],
+    })),
+  setIngestionProgress: (ingestionProgress) => set({ ingestionProgress }),
+  setIngestionRunning: (ingestionRunning) => set({ ingestionRunning }),
+  resetIngestion: () =>
+    set({ ingestionSteps: [], ingestionProgress: 0, ingestionRunning: false }),
+  onIngestionDone: (projectId, brandCore) =>
+    set((s) => {
+      const updated = s.projects.map((p) =>
+        p.id === projectId ? { ...p, brandCore, ingestionStatus: 'complete' as const } : p,
+      )
+      const activeProject =
+        s.activeProject?.id === projectId
+          ? { ...s.activeProject, brandCore, ingestionStatus: 'complete' as const }
+          : s.activeProject
+      return { projects: updated, activeProject }
+    }),
 }))
