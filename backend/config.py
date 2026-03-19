@@ -1,5 +1,12 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+# Resolve paths relative to this file's directory (backend/) so they work
+# regardless of the CWD from which the server is launched.
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+_ENV_FILE = os.path.join(_BACKEND_DIR, ".env")
+_DEFAULT_SA_PATH = os.path.join(_BACKEND_DIR, "firebase-service-account.json")
 
 
 class Settings(BaseSettings):
@@ -50,7 +57,8 @@ class Settings(BaseSettings):
 
     # --- Firebase ---
     FIREBASE_PROJECT_ID: Optional[str] = None
-    FIREBASE_SERVICE_ACCOUNT_PATH: str = "./firebase-service-account.json"
+    # Absolute path to the service account JSON — set via env var to override.
+    FIREBASE_SERVICE_ACCOUNT_PATH: str = _DEFAULT_SA_PATH
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
 
@@ -60,7 +68,8 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Absolute path — works regardless of launch CWD.
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )

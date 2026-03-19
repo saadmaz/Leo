@@ -31,7 +31,7 @@ def build_brand_core_context(brand_core: Optional[dict]) -> str:
 
     sections: list[str] = []
 
-    tone = brand_core.get("tone", {})
+    tone = brand_core.get("tone") or {}
     if tone:
         sections.append(
             f"TONE & VOICE: style={tone.get('style','')}, "
@@ -39,7 +39,7 @@ def build_brand_core_context(brand_core: Optional[dict]) -> str:
             f"key phrases={tone.get('keyPhrases',[])}."
         )
 
-    visual = brand_core.get("visual", {})
+    visual = brand_core.get("visual") or {}
     if visual:
         sections.append(
             f"VISUAL IDENTITY: primary colour={visual.get('primaryColour','')}, "
@@ -53,12 +53,80 @@ def build_brand_core_context(brand_core: Optional[dict]) -> str:
     if brand_core.get("tagline"):
         sections.append(f"TAGLINE: {brand_core['tagline']}.")
 
-    messaging = brand_core.get("messaging", {})
+    messaging = brand_core.get("messaging") or {}
     if messaging.get("valueProp"):
         sections.append(f"VALUE PROPOSITION: {messaging['valueProp']}.")
 
-    return "\n".join(sections) if sections else "Brand Core is incomplete."
+    if brand_core.get("competitors"):
+        sections.append(f"COMPETITORS: {', '.join(brand_core['competitors'])}.")
 
+    return "\n".join(sections) if sections else "Brand Core is incomplete — treat as a general brand."
+
+
+# ---------------------------------------------------------------------------
+# Artifact output instructions
+# ---------------------------------------------------------------------------
+
+ARTIFACT_INSTRUCTIONS = """\
+
+STRUCTURED OUTPUT — ARTIFACTS:
+When you produce structured content (captions, ad copy, campaign briefs, colour palettes),
+wrap it in an artifact block so the UI can render it as an interactive card.
+
+Format:
+<artifact type="TYPE">
+{JSON}
+</artifact>
+
+Supported artifact types and their JSON shapes:
+
+type="captions"
+{
+  "platform": "Instagram" | "LinkedIn" | "Twitter" | "TikTok" | "Facebook",
+  "captions": [
+    { "text": "...", "hashtags": ["tag1", "tag2"] }
+  ]
+}
+
+type="ad_copy"
+{
+  "platform": "Meta" | "Google" | "TikTok" | "LinkedIn" | "X",
+  "variants": [
+    { "headline": "...", "body": "...", "cta": "..." }
+  ]
+}
+
+type="campaign_brief"
+{
+  "name": "...",
+  "objective": "...",
+  "audience": "...",
+  "channels": ["..."],
+  "timeline": "...",
+  "kpis": ["..."],
+  "budget_guidance": "...",
+  "key_messages": ["..."]
+}
+
+type="colour_palette"
+{
+  "colours": [
+    { "hex": "#XXXXXX", "name": "...", "usage": "..." }
+  ]
+}
+
+Rules:
+- Always use an artifact for captions (5+ items), ad copy, campaign briefs, and colour palettes.
+- Place the artifact after a short conversational intro — never instead of it.
+- Put ONLY JSON inside the artifact block. No markdown inside the block.
+- You may include multiple artifacts in one response if appropriate.
+- For everything else (strategy, analysis, explanations), use normal markdown.
+"""
+
+
+# ---------------------------------------------------------------------------
+# Streaming chat
+# ---------------------------------------------------------------------------
 
 async def stream_chat(
     project_name: str,
@@ -75,22 +143,22 @@ async def stream_chat(
     system_prompt = (
         f"You are LEO, a brand-aware marketing co-pilot for the brand '{project_name}'. "
         "You help marketers create on-brand campaigns, content, copy, and strategy through natural conversation. "
-        "You surface structured data (colour palettes, campaign briefs, copy variants) as inline cards when relevant. "
         "Always stay on-brand. Be concise, strategic, and actionable.\n\n"
         "BRAND CORE:\n"
         + build_brand_core_context(brand_core)
+        + ARTIFACT_INSTRUCTIONS
     )
 
     messages = [
         {"role": m["role"], "content": m["content"]}
-        for m in history[-20:]  # last 20 messages for context window management
+        for m in history[-20:]
     ]
     messages.append({"role": "user", "content": user_message})
 
     try:
         async with client.messages.stream(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2048,
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
             system=system_prompt,
             messages=messages,
         ) as stream:

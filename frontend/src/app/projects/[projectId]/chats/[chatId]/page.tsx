@@ -40,7 +40,11 @@ export default function ChatPage() {
     messages, setMessages, addMessage, appendDelta, finaliseMessage,
     isStreaming, setIsStreaming,
     setBrandCorePanelOpen, setIngestionOpen,
+    upsertChat,
   } = useAppStore()
+
+  // Track whether this is the first message (so we can refresh the chat name)
+  const isFirstMessage = messages.length === 0
 
   useEffect(() => {
     if (!user) router.replace('/login')
@@ -78,6 +82,12 @@ export default function ChatPage() {
         const current = useAppStore.getState().messages.find((m) => m.id === assistantId)
         finaliseMessage(assistantId, current?.content ?? '')
         setIsStreaming(false)
+        // Refresh chat name if this was the first message (backend auto-names it)
+        if (isFirstMessage) {
+          api.chats.get(params.projectId, params.chatId)
+            .then((chat) => upsertChat(chat))
+            .catch(() => {/* non-critical */})
+        }
       },
       onError: (err) => {
         console.error('Stream error:', err)
