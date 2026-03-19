@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(rm -rf backend/agents backend/orchestrator backend/scripts backend/tests backend/tools backend/memory)",
+      "Bash(rm -f backend/api/routes/query.py)",
+      "Bash(rm -f backend/schemas/agent_output.py backend/schemas/artifact_schema.py backend/schemas/evidence_schema.py backend/schemas/final_response.py backend/schemas/finding_schema.py backend/schemas/memory_schema.py backend/schemas/query_schema.py backend/schemas/source_schema.py)",
+      "Bash(rm -f frontend/src/components/ArtifactRenderer.tsx frontend/src/components/AuditTrail.tsx frontend/src/components/FindingsDisplay.tsx frontend/src/components/ProcessTrace.tsx frontend/src/components/ProductContextBar.tsx frontend/src/components/QueryCostIndicator.tsx frontend/src/components/SourceTrail.tsx frontend/src/components/SuggestedChips.tsx frontend/src/components/AgentStatusPanel.tsx)",
+      "Bash(rm -rf frontend/src/components/artifacts frontend/src/components/analysis)",
+      "Bash(pip install:*)"
     ]
   }
 }

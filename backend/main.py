@@ -1,47 +1,97 @@
+import logging
 import os
 import sys
 
-# Add project root to sys.path to support 'backend.xxx' imports
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(root_dir)
+# Ensure the repo root is on the path so `backend.xxx` imports resolve.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api.routes import query
 
-app = FastAPI(title="Growth Intelligence Multi-Agent System")
+from backend.config import settings
+from backend.services import firebase_service
+from backend.api.routes import projects, chats, stream
 
-# Configure CORS
+logging.basicConfig(level=settings.LOG_LEVEL)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
+app = FastAPI(
+    title="LEO — Brand Marketing Co-pilot",
+    description="API for LEO: brand ingestion, chat, campaign generation.",
+    version="0.1.0",
+)
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
+origins = [settings.FRONTEND_URL]
+if settings.ENVIRONMENT == "development":
+    origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For hackathon/development. Restrict in production.
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routes - Removed /api prefix to match frontend's fetch("/query")
-app.include_router(query.router)
+# ---------------------------------------------------------------------------
+# Startup
+# ---------------------------------------------------------------------------
 
-@app.get("/")
-def read_root():
-    return {"status": "online", "system": "Multi-Agent growth intelligence"}
+@app.on_event("startup")
+async def on_startup():
+    firebase_service.initialize()
+    if not settings.ANTHROPIC_API_KEY:
+        logger.warning("ANTHROPIC_API_KEY is not set — chat will not work.")
+    else:
+        logger.info("Anthropic API key loaded.")
 
-@app.get("/health")
-def health_check():
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+app.include_router(projects.router)
+app.include_router(chats.router)
+app.include_router(stream.router)
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+@app.get("/", tags=["health"])
+def root():
+    return {"status": "online", "service": "LEO API", "version": "0.1.0"}
+
+
+@app.get("/health", tags=["health"])
+def health():
     return {"status": "ok"}
 
-@app.get("/debug/config")
-async def debug_config():
-    from backend.config import settings
+
+@app.get("/debug/config", tags=["health"])
+def debug_config():
+    """Shows which API keys are loaded (values never exposed)."""
+    def is_set(val):
+        return "SET" if val else "MISSING"
+
     return {
-        "SERPAPI_API_KEY": "SET" if settings.SERPAPI_API_KEY and "your_" not in settings.SERPAPI_API_KEY else "MISSING",
-        "OPENAI_API_KEY": "SET" if settings.OPENAI_API_KEY and "your_" not in settings.OPENAI_API_KEY else "MISSING",
-        "CRUNCHBASE_API_KEY": "SET" if settings.CRUNCHBASE_API_KEY and "your_" not in settings.CRUNCHBASE_API_KEY else "MISSING",
-        "ADZUNA_APP_ID": "SET" if settings.ADZUNA_APP_ID and "your_" not in settings.ADZUNA_APP_ID else "MISSING",
-        "NEWSAPI_KEY": "SET" if settings.NEWSAPI_KEY and "your_" not in settings.NEWSAPI_KEY else "MISSING",
+        "ANTHROPIC_API_KEY": is_set(settings.ANTHROPIC_API_KEY),
+        "FIREBASE_PROJECT_ID": is_set(settings.FIREBASE_PROJECT_ID),
+        "FIRECRAWL_API_KEY": is_set(settings.FIRECRAWL_API_KEY),
+        "APIFY_API_KEY": is_set(settings.APIFY_API_KEY),
+        "YOUTUBE_API_KEY": is_set(settings.YOUTUBE_API_KEY),
+        "RESEND_API_KEY": is_set(settings.RESEND_API_KEY),
+        "STRIPE_SECRET_KEY": is_set(settings.STRIPE_SECRET_KEY),
     }
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

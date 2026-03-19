@@ -1,89 +1,115 @@
-// ── Types matching backend Pydantic schemas ──
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 
-export interface QueryRequest {
-  query: string;
-  company_name: string;
-  product_name: string;
-  context?: string;
-  session_id: string;
+export interface AppUser {
+  uid: string
+  email: string | null
+  displayName: string | null
+  photoURL: string | null
 }
 
-export interface Finding {
-  statement: string;
-  type: "fact" | "interpretation" | "recommendation";
-  confidence: "low" | "medium" | "high";
-  rationale: string;
+// ---------------------------------------------------------------------------
+// Brand Core
+// ---------------------------------------------------------------------------
+
+export interface BrandTone {
+  style?: string
+  formality?: string
+  keyPhrases?: string[]
+  avoidedLanguage?: string[]
 }
 
-export interface Evidence {
-  source_type: string;
-  url: string;
-  title: string;
-  snippet: string;
-  collected_at: string;
-  entity: string;
+export interface BrandVisual {
+  primaryColour?: string
+  secondaryColours?: string[]
+  fonts?: string[]
+  imageStyle?: string
 }
 
-export interface Artifact {
-  artifact_type: string;
-  payload: Record<string, unknown>;
+export interface BrandMessaging {
+  valueProp?: string
+  keyClaims?: string[]
 }
 
-export interface AgentOutput {
-  agent_name: string;
-  status: "success" | "error" | "timeout";
-  findings: Finding[];
-  evidence: Evidence[];
-  artifacts: Artifact[];
-  errors: string[];
+export interface BrandCore {
+  tone?: BrandTone
+  visual?: BrandVisual
+  themes?: string[]
+  audience?: {
+    demographics?: string
+    interests?: string[]
+  }
+  tagline?: string
+  messaging?: BrandMessaging
 }
 
-export interface OrchestratorResponse {
-  session_id: string;
-  query: string;
-  executive_summary: string;
-  key_findings: Finding[];
-  facts: Finding[];
-  interpretations: Finding[];
-  recommendations: Finding[];
-  confidence_overview: Record<string, unknown>;
-  artifacts: Artifact[];
-  follow_up_questions: string[];
-  agent_outputs: AgentOutput[];
-  errors: string[];
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+export interface Project {
+  id: string
+  name: string
+  description?: string
+  ownerId: string
+  brandCore?: BrandCore | null
+  ingestionStatus?: 'pending' | 'processing' | 'complete' | 'error' | null
+  createdAt: string
+  updatedAt: string
 }
 
-// ── Frontend-specific types ──
-
-export type AgentStatus = "queued" | "running" | "done" | "failed" | "partial";
-
-export interface AgentStatusInfo {
-  name: string;
-  displayName: string;
-  status: AgentStatus;
-  elapsed: number;
-  error?: string;
+export interface ProjectCreate {
+  name: string
+  description?: string
 }
 
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  response?: OrchestratorResponse;
-  agentStatuses?: AgentStatusInfo[];
-  metadata?: QueryMetadata;
+// ---------------------------------------------------------------------------
+// Chats
+// ---------------------------------------------------------------------------
+
+export interface Chat {
+  id: string
+  projectId: string
+  name: string
+  createdAt: string
+  updatedAt: string
 }
 
-export interface QueryMetadata {
-  timestamp: Date;
-  agentsUsed: string[];
-  sourcesHit: number;
-  totalLatency: number;
-  estimatedCost: number;
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+export type MessageRole = 'user' | 'assistant'
+
+export interface Message {
+  id: string
+  chatId: string
+  projectId: string
+  role: MessageRole
+  content: string
+  createdAt: string
 }
 
-export interface ProductContext {
-  name: string;
-  url: string;
+export interface OptimisticMessage {
+  id: string
+  role: MessageRole
+  content: string
+  pending?: boolean
 }
+
+// ---------------------------------------------------------------------------
+// SSE Stream events
+// ---------------------------------------------------------------------------
+
+export interface StreamDelta {
+  type: 'delta'
+  content: string
+}
+
+export interface StreamError {
+  type: 'error'
+  error: string
+}
+
+export type StreamEvent = StreamDelta | StreamError

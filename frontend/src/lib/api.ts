@@ -1,26 +1,141 @@
-import { QueryRequest, OrchestratorResponse } from "@/types";
+import { auth } from './firebase'
+import type { Chat, Message, Project, ProjectCreate, StreamEvent } from '@/types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
-export async function sendQuery(request: QueryRequest): Promise<OrchestratorResponse> {
-  const res = await fetch(`${API_BASE}/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+async function authHeaders(): Promise<HeadersInit> {
+  const user = auth.currentUser
+  const token = user ? await user.getIdToken() : null
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
-
-  return res.json();
 }
 
-export async function healthCheck(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/health`);
-    return res.ok;
-  } catch {
-    return false;
-  }
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${API}${path}`, { headers: await authHeaders() })
+  if (!res.ok) throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`)
+  return res.json()
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`POST ${path} → ${res.status}: ${await res.text()}`)
+  return res.json()
+}
+
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`PATCH ${path} → ${res.status}: ${await res.text()}`)
+  return res.json()
+}
+
+async function del(path: string): Promise<void> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  })
+  if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}: ${await res.text()}`)
+}
+
+// ---------------------------------------------------------------------------
+// API surface
+// ---------------------------------------------------------------------------
+
+export const api = {
+  projects: {
+    list: () => get<Project[]>('/projects'),
+    get: (id: string) => get<Project>(`/projects/${id}`),
+    create: (body: ProjectCreate) => post<Project>('/projects', body),
+    update: (id: string, body: Partial<ProjectCreate>) => patch<Project>(`/projects/${id}`, body),
+    delete: (id: string) => del(`/projects/${id}`),
+  },
+
+  chats: {
+    list: (projectId: string) => get<Chat[]>(`/projects/${projectId}/chats`),
+    get: (projectId: string, chatId: string) =>
+      get<Chat>(`/projects/${projectId}/chats/${chatId}`),
+    create: (projectId: string, name?: string) =>
+      post<Chat>(`/projects/${projectId}/chats`, { name: name ?? 'New Chat' }),
+    rename: (projectId: string, chatId: string, name: string) =>
+      patch<Chat>(`/projects/${projectId}/chats/${chatId}`, { name }),
+    delete: (projectId: string, chatId: string) =>
+      del(`/projects/${projectId}/chats/${chatId}`),
+    messages: (projectId: string, chatId: string) =>
+      get<Message[]>(`/projects/${projectId}/chats/${chatId}/messages`),
+  },
+
+  async streamMessage(
+    projectId: string,
+    chatId: string,
+    content: string,
+    callbacks: {
+      onDelta: (text: string) => void
+      onDone: () => void
+      onError: (err: string) => void
+    },
+  ): Promise<void> {
+    const user = auth.currentUser
+    if (!user) { callbacks.onError('Not authenticated'); return }
+
+    const token = await user.getIdToken()
+
+    let res: Response
+    try {
+      res = await fetch(`${API}/projects/${projectId}/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content }),
+      })
+    } catch (err) {
+      callbacks.onError(String(err))
+      return
+    }
+
+    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+
+    const reader = res.body?.getReader()
+    if (!reader) { callbacks.onError('No readable stream in response'); return }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (raw === '[DONE]') { callbacks.onDone(); return }
+          try {
+            const event = JSON.parse(raw) as StreamEvent
+            if (event.type === 'delta') callbacks.onDelta(event.content)
+            if (event.type === 'error') callbacks.onError(event.error)
+          } catch { /* skip malformed */ }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+    callbacks.onDone()
+  },
+
+  health: () => get<{ status: string }>('/health'),
 }
