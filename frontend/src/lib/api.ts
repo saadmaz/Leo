@@ -1,7 +1,7 @@
 import { auth } from './firebase'
 import type { BrandCore, Chat, IngestionEvent, Message, Project, ProjectCreate, StreamEvent } from '@/types'
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const API = '/api/backend'
 
 // ---------------------------------------------------------------------------
 // Helpers
