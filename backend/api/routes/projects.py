@@ -1,5 +1,13 @@
-from fastapi import APIRouter, HTTPException, status
+"""
+Project CRUD routes.
 
+All project-level auth checks (existence + role) go through backend.api.deps
+so the logic lives in exactly one place.
+"""
+
+from fastapi import APIRouter, status
+
+from backend.api.deps import assert_admin, assert_editor, assert_member, get_project_or_404
 from backend.middleware.auth import CurrentUser
 from backend.schemas.project import Project, ProjectCreate, ProjectUpdate
 from backend.services import firebase_service
@@ -7,24 +15,15 @@ from backend.services import firebase_service
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-def _assert_member(project: dict, uid: str, required_role: str = "viewer") -> None:
-    roles = {"viewer": 0, "editor": 1, "admin": 2}
-    members: dict = project.get("members", {})
-    user_role = members.get(uid)
-    if user_role is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
-    if roles.get(user_role, -1) < roles.get(required_role, 0):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
-
-
 @router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)
 async def create_project(body: ProjectCreate, user: CurrentUser):
+    """Create a new project. The requesting user becomes its admin."""
     project = firebase_service.create_project(
         owner_uid=user["uid"],
         name=body.name,
         description=body.description or "",
     )
-    # Ensure the user doc exists in Firestore
+    # Ensure the user document exists in Firestore (idempotent).
     firebase_service.upsert_user(
         uid=user["uid"],
         email=user.get("email", ""),
@@ -35,24 +34,23 @@ async def create_project(body: ProjectCreate, user: CurrentUser):
 
 @router.get("", response_model=list[Project])
 async def list_projects(user: CurrentUser):
+    """Return all projects the requesting user is a member of."""
     return firebase_service.list_projects(user["uid"])
 
 
 @router.get("/{project_id}", response_model=Project)
 async def get_project(project_id: str, user: CurrentUser):
-    project = firebase_service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
-    _assert_member(project, user["uid"])
+    """Return a single project. Requires at least viewer membership."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
     return project
 
 
 @router.patch("/{project_id}", response_model=Project)
 async def update_project(project_id: str, body: ProjectUpdate, user: CurrentUser):
-    project = firebase_service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
-    _assert_member(project, user["uid"], required_role="editor")
+    """Update name/description. Requires editor or admin role."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
 
     updates = body.model_dump(exclude_none=True)
     if updates:
@@ -63,8 +61,12 @@ async def update_project(project_id: str, body: ProjectUpdate, user: CurrentUser
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: str, user: CurrentUser):
-    project = firebase_service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
-    _assert_member(project, user["uid"], required_role="admin")
-    firebase_service.delete_project(project_id)
+    """
+    Delete a project and all its chats/messages. Requires admin role.
+
+    Uses delete_project_deep() to cascade into subcollections so no
+    orphaned chat or message documents are left in Firestore.
+    """
+    project = get_project_or_404(project_id)
+    assert_admin(project, user["uid"])
+    firebase_service.delete_project_deep(project_id)

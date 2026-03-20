@@ -23,8 +23,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 
+from backend.api.deps import get_project_or_404, assert_editor
 from backend.middleware.auth import CurrentUser
-from backend.services import firebase_service
 from backend.services.ingestion import pipeline
 
 logger = logging.getLogger(__name__)
@@ -36,18 +36,13 @@ router = APIRouter(prefix="/projects", tags=["ingestion"])
 # ---------------------------------------------------------------------------
 
 class IngestRequest(BaseModel):
-    """
-    At least one of websiteUrl or instagramHandle must be provided.
-    Validation is enforced in the route handler rather than here so we can
-    return a meaningful HTTP 422 with a clear message.
-    """
     websiteUrl: Optional[str] = None
     instagramHandle: Optional[str] = None
 
     @field_validator("websiteUrl")
     @classmethod
     def normalise_url(cls, v: Optional[str]) -> Optional[str]:
-        """Strip whitespace; add https:// if the user omits the scheme."""
+        """Strip whitespace; prepend https:// if the user omits the scheme."""
         if v is None:
             return v
         v = v.strip()
@@ -69,7 +64,6 @@ class IngestRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _sse(data: dict) -> str:
-    """Format a dict as a single SSE data line."""
     return f"data: {json.dumps(data)}\n\n"
 
 
@@ -81,29 +75,20 @@ def _sse(data: dict) -> str:
 async def ingest_brand(
     project_id: str,
     body: IngestRequest,
-    user: CurrentUser,  # Uses the CurrentUser type alias (already has Depends baked in)
+    user: CurrentUser,
 ) -> StreamingResponse:
     """
     Start brand ingestion for a project. Returns an SSE stream.
-
-    Requires editor or admin role. The SSE stream ends with either a
-    'done' event (success) or an 'error' event (failure), followed by
-    the sentinel line `data: [DONE]`.
+    Requires editor or admin role.
     """
-    # Validate that at least one source was provided.
     if not body.websiteUrl and not body.instagramHandle:
         raise HTTPException(
             status_code=422,
             detail="Provide at least one of: websiteUrl or instagramHandle.",
         )
 
-    project = firebase_service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found.")
-
-    role = project.get("members", {}).get(user["uid"])
-    if role not in ("admin", "editor"):
-        raise HTTPException(status_code=403, detail="Editor or Admin role required.")
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
 
     async def event_stream() -> AsyncIterator[str]:
         try:
@@ -117,7 +102,6 @@ async def ingest_brand(
             logger.exception("Ingestion stream error for project %s: %s", project_id, exc)
             yield _sse({"type": "error", "message": str(exc)})
         finally:
-            # Always send the SSE sentinel so the client knows the stream ended.
             yield "data: [DONE]\n\n"
 
     return StreamingResponse(

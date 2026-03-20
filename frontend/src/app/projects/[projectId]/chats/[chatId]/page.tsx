@@ -14,6 +14,7 @@ import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { OptimisticMessage } from '@/types'
 
+/** Generate a unique ephemeral id for optimistic messages. */
 function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
@@ -39,27 +40,45 @@ export default function ChatPage() {
     activeProject,
     messages, setMessages, addMessage, appendDelta, finaliseMessage,
     isStreaming, setIsStreaming,
+    streamController, setStreamController,
     setBrandCorePanelOpen, setIngestionOpen,
     upsertChat,
   } = useAppStore()
 
-  // Track whether this is the first message (so we can refresh the chat name)
+  // Whether this is the first message in the chat (used to refresh the chat name).
   const isFirstMessage = messages.length === 0
 
+  // Redirect to login if unauthenticated.
   useEffect(() => {
     if (!user) router.replace('/login')
   }, [user, router])
 
+  // Load message history whenever the chat changes.
   useEffect(() => {
     if (!params.projectId || !params.chatId) return
     setMessages([])
     api.chats
       .messages(params.projectId, params.chatId)
       .then((msgs) =>
-        setMessages(msgs.map((m): OptimisticMessage => ({ id: m.id, role: m.role, content: m.content })))
+        setMessages(
+          msgs.map((m): OptimisticMessage => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+          }))
+        )
       )
       .catch(console.error)
   }, [params.projectId, params.chatId, setMessages])
+
+  // Abort any in-flight stream when navigating away from this chat.
+  useEffect(() => {
+    return () => {
+      streamController?.abort()
+      setStreamController(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.chatId])
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -70,31 +89,62 @@ export default function ChatPage() {
   async function handleSubmit(content: string) {
     if (!content.trim() || isStreaming) return
     setInput('')
+
+    // Add optimistic user message immediately so the UI feels responsive.
     addMessage({ id: newId(), role: 'user', content })
 
     const assistantId = newId()
     addMessage({ id: assistantId, role: 'assistant', content: '', pending: true })
     setIsStreaming(true)
 
-    await api.streamMessage(params.projectId, params.chatId, content, {
-      onDelta: (text) => appendDelta(assistantId, text),
-      onDone: () => {
-        const current = useAppStore.getState().messages.find((m) => m.id === assistantId)
-        finaliseMessage(assistantId, current?.content ?? '')
-        setIsStreaming(false)
-        // Refresh chat name if this was the first message (backend auto-names it)
-        if (isFirstMessage) {
-          api.chats.get(params.projectId, params.chatId)
-            .then((chat) => upsertChat(chat))
-            .catch(() => {/* non-critical */})
-        }
+    // Create a new AbortController for this stream so we can cancel it.
+    const controller = new AbortController()
+    setStreamController(controller)
+
+    await api.streamMessage(
+      params.projectId,
+      params.chatId,
+      content,
+      {
+        onDelta: (text) => appendDelta(assistantId, text),
+
+        onDone: () => {
+          // Read the final accumulated content from the store.
+          const current = useAppStore.getState().messages.find((m) => m.id === assistantId)
+          finaliseMessage(assistantId, current?.content ?? '')
+          setIsStreaming(false)
+          setStreamController(null)
+
+          // Refresh chat name if this was the first message (backend auto-names it).
+          if (isFirstMessage) {
+            api.chats
+              .get(params.projectId, params.chatId)
+              .then((chat) => upsertChat(chat))
+              .catch(() => {/* non-critical — the chat just keeps its old name */})
+          }
+        },
+
+        onError: (err) => {
+          console.error('Stream error:', err)
+          finaliseMessage(assistantId, 'Something went wrong — please try again.')
+          setIsStreaming(false)
+          setStreamController(null)
+        },
       },
-      onError: (err) => {
-        console.error('Stream error:', err)
-        finaliseMessage(assistantId, 'Something went wrong — please try again.')
-        setIsStreaming(false)
-      },
-    })
+      controller.signal,
+    )
+  }
+
+  /** Cancel the active SSE stream. The onDone/onError callbacks clean up state. */
+  function handleStop() {
+    streamController?.abort()
+    // Optimistically finalise the partial message so the UI doesn't hang.
+    const current = useAppStore.getState().messages.findLast((m) => m.pending)
+    if (current) {
+      finaliseMessage(current.id, current.content || '_(generation stopped)_')
+    }
+    setIsStreaming(false)
+    setStreamController(null)
   }
 
   const hasBrandCore = Boolean(activeProject?.brandCore)
@@ -180,7 +230,6 @@ export default function ChatPage() {
                   ))}
                 </div>
 
-                {/* Build Brand Core CTA if none exists */}
                 {!hasBrandCore && !isProcessing && activeProject && (
                   <button
                     onClick={() => setIngestionOpen(true)}
@@ -215,6 +264,7 @@ export default function ChatPage() {
           onChange={setInput}
           onSubmit={handleSubmit}
           disabled={isStreaming}
+          onStop={handleStop}
         />
       </div>
 
