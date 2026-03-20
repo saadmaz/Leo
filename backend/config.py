@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     # Model used for the conversational chat stream (streamed responses).
     LLM_CHAT_MODEL: str = "claude-sonnet-4-6"
     # Model used for one-shot brand extraction (non-streamed, cheaper is fine).
-    LLM_EXTRACTION_MODEL: str = "claude-3-5-sonnet-20241022"
+    LLM_EXTRACTION_MODEL: str = "claude-haiku-4-5-20251001"
     # Maximum tokens the LLM may generate in a single chat response.
     LLM_MAX_TOKENS: int = 4096
     # How many prior messages are included as context for each chat request.
