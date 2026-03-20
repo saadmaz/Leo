@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Zap, ChevronRight } from 'lucide-react'
-import { Sidebar } from '@/components/layout/sidebar'
+import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
 import { BrandCorePanel } from '@/components/brand-core/brand-core-panel'
@@ -160,6 +160,7 @@ export default function ChatPage() {
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Top bar */}
         <div className="flex items-center gap-3 px-6 py-3 border-b border-border bg-card shrink-0">
+          <SidebarToggle />
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">{activeProject?.name ?? 'LEO'}</span>
 

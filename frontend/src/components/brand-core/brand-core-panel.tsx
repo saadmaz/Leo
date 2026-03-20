@@ -6,6 +6,7 @@ import {
   X, Palette, Type, Hash, Users, Target, Zap,
   ChevronDown, ChevronUp, Edit2, Check, Plus,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { BrandCore, BrandTone, BrandVisual } from '@/types'
@@ -20,7 +21,11 @@ export function BrandCorePanel() {
     try {
       const res = await api.brandCore.update(activeProject.id, updates)
       upsertProject({ ...activeProject, brandCore: res.brandCore })
-    } catch (err) { console.error('Brand Core save failed:', err) }
+      toast.success('Brand Core updated')
+    } catch (err) {
+      console.error('Brand Core save failed:', err)
+      toast.error('Failed to save — please try again')
+    }
   }
 
   return (

@@ -5,9 +5,11 @@ import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
-  CreditCard, Pencil, Trash2, Check, X,
+  CreditCard, Pencil, Trash2, Check, X, Moon, Sun, Settings, Menu,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTheme } from 'next-themes'
+import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -21,12 +23,14 @@ import type { Project, Chat } from '@/types'
 export function Sidebar() {
   const router = useRouter()
   const params = useParams<{ projectId?: string; chatId?: string }>()
+  const { resolvedTheme, setTheme } = useTheme()
 
   const {
     user, projects, setProjects, activeProject, setActiveProject,
     chats, setChats, setActiveChat, setIngestionOpen,
     billingStatus, openUpgradeModal,
     upsertProject, removeProject, upsertChat, removeChat,
+    sidebarOpen, setSidebarOpen,
   } = useAppStore()
 
   const [creating, setCreating] = useState(false)
@@ -65,6 +69,7 @@ export function Sidebar() {
       setActiveChat(chat)
       router.push(`/projects/${project.id}/chats/${chat.id}`)
       setIngestionOpen(true)
+      toast.success(`Brand "${project.name}" created`)
     } catch (err) {
       const msg = String(err)
       if (msg.includes('402')) {
@@ -72,6 +77,7 @@ export function Sidebar() {
         openUpgradeModal("You've reached your project limit. Upgrade to create more brands.")
       } else {
         setCreateError(msg)
+        toast.error('Failed to create project')
       }
     } finally {
       setCreating(false)
@@ -82,6 +88,8 @@ export function Sidebar() {
     setActiveProject(project)
     setActiveChat(chat)
     router.push(`/projects/${project.id}/chats/${chat.id}`)
+    // Close sidebar on mobile after navigation
+    setSidebarOpen(false)
   }
 
   async function newChat(project: Project) {
@@ -89,24 +97,35 @@ export function Sidebar() {
       const chat = await api.chats.create(project.id)
       setChats([chat, ...chats])
       openChat(project, chat)
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to create chat')
+    }
   }
 
   async function handleRenameProject(project: Project, name: string) {
     try {
       await api.projects.update(project.id, { name })
       upsertProject({ ...project, name })
-    } catch (err) { console.error(err) }
+      toast.success('Project renamed')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to rename project')
+    }
   }
 
   async function handleDeleteProject(project: Project) {
     try {
       await api.projects.delete(project.id)
       removeProject(project.id)
+      toast.success(`"${project.name}" deleted`)
       if (activeProject?.id === project.id) {
         router.push('/')
       }
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete project')
+    }
   }
 
   async function handleRenameChat(chat: Chat, name: string) {
@@ -114,7 +133,11 @@ export function Sidebar() {
     try {
       await api.chats.rename(activeProject.id, chat.id, name)
       upsertChat({ ...chat, name })
-    } catch (err) { console.error(err) }
+      toast.success('Chat renamed')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to rename chat')
+    }
   }
 
   async function handleDeleteChat(chat: Chat) {
@@ -122,6 +145,7 @@ export function Sidebar() {
     try {
       await api.chats.delete(activeProject.id, chat.id)
       removeChat(chat.id)
+      toast.success('Chat deleted')
       if (params.chatId === chat.id) {
         const remaining = chats.filter((c) => c.id !== chat.id)
         if (remaining.length > 0) {
@@ -130,7 +154,10 @@ export function Sidebar() {
           router.push('/')
         }
       }
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete chat')
+    }
   }
 
   async function handleSignOut() {
@@ -138,141 +165,226 @@ export function Sidebar() {
     router.replace('/login')
   }
 
+  // Close on Escape key (mobile UX)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setSidebarOpen])
+
+  const isDark = resolvedTheme === 'dark'
+
   return (
-    <aside className="flex flex-col w-60 shrink-0 border-r border-border bg-card h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-border">
-        <span className="text-base font-bold tracking-tight">LEO</span>
-        <button
-          onClick={() => setShowNewProject(true)}
-          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="New project"
-        >
-          <PlusIcon className="w-4 h-4" />
-        </button>
-      </div>
+    <>
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* New project input */}
-      <AnimatePresence>
-        {showNewProject && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-b border-border"
-          >
-            <div className="p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">New project</p>
-              <input
-                autoFocus
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Brand name…"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') createProject()
-                  if (e.key === 'Escape') setShowNewProject(false)
-                }}
-              />
-              {createError && <p className="text-xs text-red-500 break-all">{createError}</p>}
-              <div className="flex gap-2">
-                <button
-                  onClick={createProject}
-                  disabled={creating || !newProjectName.trim()}
-                  className="flex-1 rounded-md bg-primary text-primary-foreground py-1 text-xs font-medium disabled:opacity-50"
-                >
-                  {creating ? 'Creating…' : 'Create'}
-                </button>
-                <button
-                  onClick={() => { setShowNewProject(false); setCreateError('') }}
-                  className="flex-1 rounded-md border border-border py-1 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </motion.div>
+      <aside
+        className={cn(
+          // Base layout
+          'flex flex-col w-60 shrink-0 border-r border-border bg-card h-screen z-50',
+          // Desktop: always in-flow
+          'md:relative md:translate-x-0 md:flex',
+          // Mobile: fixed overlay, slide in/out
+          'fixed inset-y-0 left-0 transition-transform duration-200',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
-      </AnimatePresence>
-
-      {/* Project list */}
-      <div className="flex-1 overflow-y-auto py-2">
-        {projects.length === 0 && (
-          <div className="px-4 py-8 text-center">
-            <Layers className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-xs text-muted-foreground">No projects yet.</p>
-            <button onClick={() => setShowNewProject(true)} className="mt-2 text-xs text-primary underline underline-offset-2">
-              Create your first brand
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border">
+          <span className="text-base font-bold tracking-tight">LEO</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowNewProject(true)}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="New project"
+            >
+              <PlusIcon className="w-4 h-4" />
+            </button>
+            {/* Close button — mobile only */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors md:hidden"
+              title="Close sidebar"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
-        )}
+        </div>
 
-        {projects.map((project) => (
-          <ProjectRow
-            key={project.id}
-            project={project}
-            isActive={activeProject?.id === project.id}
-            activeChatId={params.chatId}
-            chats={activeProject?.id === project.id ? chats : []}
-            onOpenChat={(chat) => openChat(project, chat)}
-            onNewChat={() => newChat(project)}
-            onRename={(name) => handleRenameProject(project, name)}
-            onDelete={() => handleDeleteProject(project)}
-            onRenameChat={handleRenameChat}
-            onDeleteChat={handleDeleteChat}
-            onSelect={() => {
-              setActiveProject(project)
-              if (activeProject?.id !== project.id) {
-                api.chats.list(project.id).then((c) => {
-                  setChats(c)
-                  if (c.length > 0) openChat(project, c[0])
-                })
-              }
-            }}
-          />
-        ))}
-      </div>
+        {/* New project input */}
+        <AnimatePresence>
+          {showNewProject && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden border-b border-border"
+            >
+              <div className="p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">New project</p>
+                <input
+                  autoFocus
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="Brand name…"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') createProject()
+                    if (e.key === 'Escape') setShowNewProject(false)
+                  }}
+                />
+                {createError && <p className="text-xs text-red-500 break-all">{createError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={createProject}
+                    disabled={creating || !newProjectName.trim()}
+                    className="flex-1 rounded-md bg-primary text-primary-foreground py-1 text-xs font-medium disabled:opacity-50"
+                  >
+                    {creating ? 'Creating…' : 'Create'}
+                  </button>
+                  <button
+                    onClick={() => { setShowNewProject(false); setCreateError('') }}
+                    className="flex-1 rounded-md border border-border py-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Footer */}
-      <div className="border-t border-border p-3 space-y-2">
-        {billingStatus && (
-          <div className="px-1 space-y-1">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span className="capitalize">{billingStatus.plan} plan</span>
-              <span>{billingStatus.messages.used}/{billingStatus.messages.limit >= 999 ? '∞' : billingStatus.messages.limit} msgs</span>
+        {/* Project list */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {projects.length === 0 && (
+            <div className="px-4 py-8 text-center">
+              <Layers className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
+              <p className="text-xs text-muted-foreground">No projects yet.</p>
+              <button onClick={() => setShowNewProject(true)} className="mt-2 text-xs text-primary underline underline-offset-2">
+                Create your first brand
+              </button>
             </div>
-            <div className="h-1 rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  billingStatus.messages.used / billingStatus.messages.limit >= 0.9 ? 'bg-red-500'
-                  : billingStatus.messages.used / billingStatus.messages.limit >= 0.7 ? 'bg-amber-500'
-                  : 'bg-primary'
-                }`}
-                style={{
-                  width: billingStatus.messages.limit >= 999
-                    ? '5%'
-                    : `${Math.min((billingStatus.messages.used / billingStatus.messages.limit) * 100, 100)}%`,
-                }}
-              />
+          )}
+
+          {projects.map((project) => (
+            <ProjectRow
+              key={project.id}
+              project={project}
+              isActive={activeProject?.id === project.id}
+              activeChatId={params.chatId}
+              chats={activeProject?.id === project.id ? chats : []}
+              onOpenChat={(chat) => openChat(project, chat)}
+              onNewChat={() => newChat(project)}
+              onRename={(name) => handleRenameProject(project, name)}
+              onDelete={() => handleDeleteProject(project)}
+              onRenameChat={handleRenameChat}
+              onDeleteChat={handleDeleteChat}
+              onSelect={() => {
+                setActiveProject(project)
+                if (activeProject?.id !== project.id) {
+                  api.chats.list(project.id).then((c) => {
+                    setChats(c)
+                    if (c.length > 0) openChat(project, c[0])
+                  })
+                }
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border p-3 space-y-1">
+          {/* Usage bar */}
+          {billingStatus && (
+            <div className="px-1 mb-2 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span className="capitalize">{billingStatus.plan} plan</span>
+                <span>{billingStatus.messages.used}/{billingStatus.messages.limit >= 999 ? '∞' : billingStatus.messages.limit} msgs</span>
+              </div>
+              <div className="h-1 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    billingStatus.messages.used / billingStatus.messages.limit >= 0.9 ? 'bg-red-500'
+                    : billingStatus.messages.used / billingStatus.messages.limit >= 0.7 ? 'bg-amber-500'
+                    : 'bg-primary',
+                  )}
+                  style={{
+                    width: billingStatus.messages.limit >= 999
+                      ? '5%'
+                      : `${Math.min((billingStatus.messages.used / billingStatus.messages.limit) * 100, 100)}%`,
+                  }}
+                />
+              </div>
             </div>
-          </div>
-        )}
-        <button
-          onClick={() => router.push('/billing')}
-          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          <CreditCard className="w-3.5 h-3.5" />
-          <span>Plans & Billing</span>
-        </button>
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span className="truncate text-xs">{user?.email ?? 'Sign out'}</span>
-        </button>
-      </div>
-    </aside>
+          )}
+
+          {/* Theme toggle */}
+          <button
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
+          </button>
+
+          {/* Settings */}
+          <button
+            onClick={() => router.push('/settings')}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Settings</span>
+          </button>
+
+          {/* Billing */}
+          <button
+            onClick={() => router.push('/billing')}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Plans & Billing</span>
+          </button>
+
+          {/* Sign out */}
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="truncate text-xs">{user?.email ?? 'Sign out'}</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Hamburger toggle — render this in any page header for mobile
+// ---------------------------------------------------------------------------
+
+export function SidebarToggle({ className }: { className?: string }) {
+  const { setSidebarOpen } = useAppStore()
+  return (
+    <button
+      onClick={() => setSidebarOpen(true)}
+      className={cn(
+        'md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors',
+        className,
+      )}
+      title="Open sidebar"
+    >
+      <Menu className="w-4 h-4" />
+    </button>
   )
 }
 
@@ -324,80 +436,100 @@ function ProjectRow({
   return (
     <div>
       {/* Project header row */}
-      <div className={cn(
-        'group flex items-center gap-1 w-full px-3 py-2 transition-colors',
-        isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-      )}>
+      <div
+        className={cn(
+          'group flex items-center gap-1 w-full px-3 py-2 transition-colors',
+          isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+        )}
+      >
         {editing ? (
-          <>
-            <input
-              ref={inputRef}
-              autoFocus
-              className="flex-1 min-w-0 rounded border border-input bg-background px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
-              onBlur={saveEdit}
-            />
-            <button onClick={() => setEditing(false)} className="shrink-0 p-0.5 text-muted-foreground hover:text-foreground">
-              <X className="w-3 h-3" />
-            </button>
-          </>
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveEdit()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            className="flex-1 min-w-0 text-xs bg-transparent border-b border-primary focus:outline-none py-0.5"
+            onClick={(e) => e.stopPropagation()}
+          />
         ) : confirmDelete ? (
-          <div className="flex-1 flex items-center gap-1.5">
-            <span className="text-xs text-destructive flex-1 truncate">Delete {project.name}?</span>
-            <button onClick={() => { onDelete(); setConfirmDelete(false) }} className="text-xs text-destructive hover:underline shrink-0">Yes</button>
-            <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground hover:underline shrink-0">No</button>
-          </div>
+          <span className="flex-1 min-w-0 text-xs truncate text-destructive">Delete "{project.name}"?</span>
         ) : (
-          <>
-            <button onClick={onSelect} className="flex items-center gap-2 flex-1 min-w-0 text-left text-sm font-medium">
-              <ChevronDown className={cn('w-3 h-3 shrink-0 transition-transform', isActive ? '' : '-rotate-90')} />
-              <span className="truncate">{project.name}</span>
+          <button
+            onClick={onSelect}
+            className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
+          >
+            <ChevronDown
+              className={cn(
+                'w-3 h-3 shrink-0 transition-transform',
+                isActive ? 'rotate-0' : '-rotate-90',
+              )}
+            />
+            <span className="text-xs font-medium truncate">{project.name}</span>
+          </button>
+        )}
+
+        {confirmDelete ? (
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); setConfirmDelete(false) }}
+              className="text-[10px] text-destructive hover:underline"
+            >
+              Yes
             </button>
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button onClick={startEdit} className="p-0.5 rounded hover:bg-muted" title="Rename">
-                <Pencil className="w-3 h-3" />
-              </button>
-              <button onClick={startDelete} className="p-0.5 rounded hover:bg-muted text-destructive/70 hover:text-destructive" title="Delete">
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          </>
+            <span className="text-muted-foreground/40 text-[10px]">/</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              No
+            </button>
+          </div>
+        ) : !editing && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button
+              onClick={startEdit}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="Rename"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+            <button
+              onClick={startDelete}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+              title="Delete"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onNewChat() }}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="New chat"
+            >
+              <PlusIcon className="w-3 h-3" />
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Chat list (expanded when active) */}
-      <AnimatePresence>
-        {isActive && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="ml-6 border-l border-border pl-2 py-1 space-y-0.5">
-              {chats.map((chat) => (
-                <ChatRow
-                  key={chat.id}
-                  chat={chat}
-                  isActive={activeChatId === chat.id}
-                  onOpen={() => onOpenChat(chat)}
-                  onRename={(name) => onRenameChat(chat, name)}
-                  onDelete={() => onDeleteChat(chat)}
-                />
-              ))}
-              <button
-                onClick={onNewChat}
-                className="flex items-center gap-1.5 w-full px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              >
-                <PlusIcon className="w-3 h-3 shrink-0" />
-                <span>New chat</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Chat list — only shown when project is active */}
+      {isActive && (
+        <div className="pb-1">
+          {chats.map((chat) => (
+            <ChatRow
+              key={chat.id}
+              chat={chat}
+              isActive={chat.id === activeChatId}
+              onOpen={() => onOpenChat(chat)}
+              onRename={(name) => onRenameChat(chat, name)}
+              onDelete={() => onDeleteChat(chat)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -406,15 +538,15 @@ function ProjectRow({
 // ChatRow
 // ---------------------------------------------------------------------------
 
-function ChatRow({
-  chat, isActive, onOpen, onRename, onDelete,
-}: {
+interface ChatRowProps {
   chat: Chat
   isActive: boolean
   onOpen: () => void
   onRename: (name: string) => void
   onDelete: () => void
-}) {
+}
+
+function ChatRow({ chat, isActive, onOpen, onRename, onDelete }: ChatRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(chat.name)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -432,54 +564,72 @@ function ChatRow({
     setEditing(false)
   }
 
-  if (confirmDelete) {
-    return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/5">
-        <span className="text-xs text-destructive flex-1 truncate">Delete?</span>
-        <button onClick={() => { onDelete(); setConfirmDelete(false) }} className="text-xs text-destructive hover:underline shrink-0">Yes</button>
-        <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground hover:underline shrink-0">No</button>
-      </div>
-    )
-  }
+  return (
+    <div
+      className={cn(
+        'group flex items-center gap-1 pl-6 pr-2 py-1.5 mx-1 rounded-md transition-colors',
+        isActive
+          ? 'bg-muted text-foreground'
+          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+      )}
+    >
+      <MessageSquare className="w-3 h-3 shrink-0" />
 
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1 px-1 py-0.5">
+      {editing ? (
         <input
           ref={inputRef}
-          autoFocus
-          className="flex-1 min-w-0 rounded border border-input bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
           onBlur={saveEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') saveEdit()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="flex-1 min-w-0 text-xs bg-transparent border-b border-primary focus:outline-none py-0.5"
+          onClick={(e) => e.stopPropagation()}
         />
-        <button onClick={saveEdit} className="shrink-0 p-0.5 text-primary"><Check className="w-3 h-3" /></button>
-        <button onClick={() => setEditing(false)} className="shrink-0 p-0.5 text-muted-foreground"><X className="w-3 h-3" /></button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="group flex items-center gap-0.5">
-      <button
-        onClick={onOpen}
-        className={cn(
-          'flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-md text-left text-xs transition-colors',
-          isActive ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-        )}
-      >
-        <MessageSquare className="w-3 h-3 shrink-0" />
-        <span className="truncate">{chat.name}</span>
-      </button>
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pr-1">
-        <button onClick={startEdit} className="p-0.5 rounded hover:bg-muted text-muted-foreground" title="Rename">
-          <Pencil className="w-2.5 h-2.5" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }} className="p-0.5 rounded hover:bg-muted text-destructive/60 hover:text-destructive" title="Delete">
-          <Trash2 className="w-2.5 h-2.5" />
-        </button>
-      </div>
+      ) : confirmDelete ? (
+        <>
+          <span className="flex-1 min-w-0 text-xs truncate text-destructive">Delete?</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); setConfirmDelete(false) }}
+              className="text-[10px] text-destructive hover:underline"
+            >
+              Yes
+            </button>
+            <span className="text-muted-foreground/40 text-[10px]">/</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              No
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <button onClick={onOpen} className="flex-1 min-w-0 text-left">
+            <span className="text-xs truncate block">{chat.name}</span>
+          </button>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button
+              onClick={startEdit}
+              className="p-0.5 rounded hover:bg-background text-muted-foreground hover:text-foreground"
+              title="Rename"
+            >
+              <Pencil className="w-2.5 h-2.5" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+              className="p-0.5 rounded hover:bg-background text-muted-foreground hover:text-destructive"
+              title="Delete"
+            >
+              <Trash2 className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
