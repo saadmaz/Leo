@@ -19,7 +19,6 @@ export function IngestionOverlay() {
     addIngestionStep, setIngestionProgress, setIngestionRunning,
     resetIngestion, onIngestionDone,
     activeProject, setBrandCorePanelOpen,
-    upsertProject,
   } = useAppStore()
 
   const [websiteUrl, setWebsiteUrl] = useState('')
@@ -123,7 +122,7 @@ export function IngestionOverlay() {
                     className="space-y-4"
                   >
                     <p className="text-sm text-muted-foreground">
-                      Give LEO your brand's digital presence. It'll crawl the content
+                      Give LEO your brand&apos;s digital presence. It&apos;ll crawl the content
                       and extract your Brand Core automatically.
                     </p>
 

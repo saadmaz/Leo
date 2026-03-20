@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
-  CreditCard, Pencil, Trash2, Check, X, Moon, Sun, Settings, Menu,
+  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from 'next-themes'
@@ -471,7 +471,7 @@ function ProjectRow({
             onClick={(e) => e.stopPropagation()}
           />
         ) : confirmDelete ? (
-          <span className="flex-1 min-w-0 text-xs truncate text-destructive">Delete "{project.name}"?</span>
+          <span className="flex-1 min-w-0 text-xs truncate text-destructive">Delete &quot;{project.name}&quot;?</span>
         ) : (
           <button
             onClick={onSelect}

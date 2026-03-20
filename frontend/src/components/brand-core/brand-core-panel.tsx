@@ -124,7 +124,7 @@ function TaglineSection({ value, onSave }: { value?: string; onSave: (v: string)
         ? <input autoFocus className="w-full rounded-lg border border-input bg-background px-3 py-1.5 text-sm italic focus:outline-none focus:ring-1 focus:ring-ring"
             value={draft} onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }} />
-        : <p className="text-sm italic text-muted-foreground">"{value || 'No tagline set'}"</p>}
+        : <p className="text-sm italic text-muted-foreground">&quot;{value || 'No tagline set'}&quot;</p>}
     </Section>
   )
 }

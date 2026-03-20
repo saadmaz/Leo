@@ -166,7 +166,7 @@ export default function BillingPage() {
         {status && (
           <div className="mb-8 rounded-xl border border-border bg-card p-5 space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              This month's usage
+              This month&apos;s usage
             </h2>
             <UsageBar
               label="Projects"
