@@ -39,6 +39,9 @@ export function Sidebar() {
   const [showNewProject, setShowNewProject] = useState(false)
   const [createError, setCreateError] = useState('')
   const [projectsLoading, setProjectsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     if (!user) return
@@ -180,7 +183,7 @@ export function Sidebar() {
     return () => window.removeEventListener('keydown', onKey)
   }, [setSidebarOpen])
 
-  const isDark = resolvedTheme === 'dark'
+  const isDark = mounted && resolvedTheme === 'dark'
 
   return (
     <>
