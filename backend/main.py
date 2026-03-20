@@ -37,7 +37,12 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup ---
-    firebase_service.initialize()
+    try:
+        firebase_service.initialize()
+    except Exception as exc:
+        # Log but don't crash — the /health endpoint must stay reachable
+        # even if Firebase credentials are missing or misconfigured.
+        logger.error("Firebase initialisation failed: %s", exc, exc_info=True)
 
     if not settings.ANTHROPIC_API_KEY:
         logger.warning("ANTHROPIC_API_KEY is not set — chat and ingestion will not work.")

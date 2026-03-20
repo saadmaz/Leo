@@ -29,4 +29,4 @@ EXPOSE 8000
 # Start the server.
 # Railway (and Cloud Run) inject a PORT env var — we must bind to it.
 # Shell form is required to expand $PORT at runtime.
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --timeout-keep-alive 65"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --timeout-keep-alive 65"]
