@@ -13,8 +13,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.services import firebase_service
 from backend.api.routes import projects, chats, stream, ingestion, brand_core
+from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
-logging.basicConfig(level=settings.LOG_LEVEL)
+# ---------------------------------------------------------------------------
+# Logging — include request ID in every log line.
+# Format: "2024-01-01 12:00:00 [req_id=abc123] INFO backend.foo — message"
+# Outside a request context, req_id shows as '-'.
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format="%(asctime)s [req_id=%(request_id)s] %(levelname)s %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logging.getLogger().addFilter(RequestIdFilter())
 logger = logging.getLogger(__name__)
 
 
@@ -67,6 +78,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Stamp every request with a unique ID for log correlation.
+# Must be added AFTER CORSMiddleware so it runs on the inner request.
+app.add_middleware(RequestIdMiddleware)
 
 # ---------------------------------------------------------------------------
 # Routes — each router is scoped to its own prefix/tag set
