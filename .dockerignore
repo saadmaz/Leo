@@ -1,0 +1,11 @@
+.git
+.pytest_cache
+**/__pycache__
+**/*.pyc
+**/*.pyo
+frontend/node_modules
+frontend/.next
+frontend/.env.local
+backend/.env
+backend/firebase-service-account.json
+*.md
