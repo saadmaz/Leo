@@ -112,7 +112,11 @@ def health():
 
 @app.get("/debug/config", tags=["health"])
 def debug_config():
-    """Shows which API keys are present. Values are NEVER exposed — only SET/MISSING."""
+    """Shows which API keys are present (dev only). Values are NEVER exposed."""
+    if settings.ENVIRONMENT == "production":
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=404, detail="Not found")
+
     def _status(val: str | None) -> str:
         return "SET" if val else "MISSING"
 
@@ -124,7 +128,6 @@ def debug_config():
         "YOUTUBE_API_KEY": _status(settings.YOUTUBE_API_KEY),
         "RESEND_API_KEY": _status(settings.RESEND_API_KEY),
         "STRIPE_SECRET_KEY": _status(settings.STRIPE_SECRET_KEY),
-        # Runtime config (not secrets — safe to expose)
         "LLM_CHAT_MODEL": settings.LLM_CHAT_MODEL,
         "LLM_EXTRACTION_MODEL": settings.LLM_EXTRACTION_MODEL,
         "ENVIRONMENT": settings.ENVIRONMENT,
