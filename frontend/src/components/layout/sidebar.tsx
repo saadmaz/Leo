@@ -14,6 +14,7 @@ import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Project, Chat } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -37,10 +38,15 @@ export function Sidebar() {
   const [newProjectName, setNewProjectName] = useState('')
   const [showNewProject, setShowNewProject] = useState(false)
   const [createError, setCreateError] = useState('')
+  const [projectsLoading, setProjectsLoading] = useState(true)
 
   useEffect(() => {
     if (!user) return
-    api.projects.list().then(setProjects).catch(console.error)
+    setProjectsLoading(true)
+    api.projects.list()
+      .then(setProjects)
+      .catch(console.error)
+      .finally(() => setProjectsLoading(false))
   }, [user, setProjects])
 
   useEffect(() => {
@@ -264,7 +270,16 @@ export function Sidebar() {
 
         {/* Project list */}
         <div className="flex-1 overflow-y-auto py-2">
-          {projects.length === 0 && (
+          {projectsLoading ? (
+            <div className="px-3 py-2 space-y-1">
+              {[80, 65, 72].map((w) => (
+                <div key={w} className="flex items-center gap-2 px-2 py-2">
+                  <Skeleton className="h-3 w-3 rounded shrink-0" />
+                  <Skeleton className={`h-3 rounded`} style={{ width: `${w}%` }} />
+                </div>
+              ))}
+            </div>
+          ) : projects.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <Layers className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
               <p className="text-xs text-muted-foreground">No projects yet.</p>
@@ -272,9 +287,9 @@ export function Sidebar() {
                 Create your first brand
               </button>
             </div>
-          )}
+          ) : null}
 
-          {projects.map((project) => (
+          {!projectsLoading && projects.map((project) => (
             <ProjectRow
               key={project.id}
               project={project}

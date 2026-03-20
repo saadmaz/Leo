@@ -20,6 +20,13 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'LEO — Your Brand. One Chat. Every Channel.',
   description: 'Brand-aware AI marketing co-pilot. Build your Brand Core and create on-brand campaigns, content, and copy — all in one chat.',
+  manifest: '/manifest.json',
+  themeColor: '#7c3aed',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LEO',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

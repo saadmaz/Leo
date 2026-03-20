@@ -1,19 +1,26 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
-import { Layers, ArrowRight } from 'lucide-react'
+import { OnboardingCard } from '@/components/onboarding/onboarding-card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ArrowRight } from 'lucide-react'
 
 export default function ProjectsPage() {
   const router = useRouter()
   const { user, projects, setProjects, setChats, setActiveChat } = useAppStore()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return }
-    api.projects.list().then(setProjects).catch(console.error)
+    setLoading(true)
+    api.projects.list()
+      .then(setProjects)
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [user, router, setProjects])
 
   async function openProject(projectId: string) {
@@ -41,16 +48,22 @@ export default function ProjectsPage() {
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center p-8">
-          {projects.length === 0 ? (
-            <div className="text-center space-y-4 max-w-sm">
-              <Layers className="w-12 h-12 mx-auto text-muted-foreground/40" />
-              <h2 className="text-xl font-semibold">No brands yet</h2>
-              <p className="text-sm text-muted-foreground">
-                Create your first brand project using the <strong>+</strong> button in the sidebar.
-                LEO will build your Brand Core and help you create on-brand content.
-              </p>
+          {loading ? (
+            /* Skeleton state */
+            <div className="w-full max-w-xl space-y-3">
+              <Skeleton className="h-6 w-32 mb-6" />
+              {[1, 2].map((i) => (
+                <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              ))}
             </div>
+          ) : projects.length === 0 ? (
+            /* First-run onboarding */
+            <OnboardingCard />
           ) : (
+            /* Project list */
             <div className="w-full max-w-xl space-y-3">
               <h2 className="text-lg font-semibold mb-6">Your brands</h2>
               {projects.map((project) => (

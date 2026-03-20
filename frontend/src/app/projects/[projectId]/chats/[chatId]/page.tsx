@@ -10,6 +10,7 @@ import { PromptComposer } from '@/components/chat/prompt-composer'
 import { BrandCorePanel } from '@/components/brand-core/brand-core-panel'
 import { IngestionOverlay } from '@/components/brand-core/ingestion-overlay'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { ImageAttachment, OptimisticMessage } from '@/types'
@@ -25,6 +26,7 @@ export default function ChatPage() {
   const router = useRouter()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
+  const [messagesLoading, setMessagesLoading] = useState(false)
 
   const {
     user,
@@ -49,6 +51,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!params.projectId || !params.chatId) return
     setMessages([])
+    setMessagesLoading(true)
     api.chats
       .messages(params.projectId, params.chatId)
       .then((msgs) =>
@@ -61,6 +64,7 @@ export default function ChatPage() {
         )
       )
       .catch(console.error)
+      .finally(() => setMessagesLoading(false))
   }, [params.projectId, params.chatId, setMessages])
 
   // Abort any in-flight stream when navigating away from this chat.
@@ -201,7 +205,28 @@ export default function ChatPage() {
         {/* Messages */}
         <ScrollArea className="flex-1">
           <div className="mx-auto max-w-3xl px-4 py-8 space-y-1">
-            {messages.length === 0 && !isStreaming && (
+            {/* Skeleton loaders while history is fetching */}
+            {messagesLoading && (
+              <div className="space-y-6 py-4">
+                {[
+                  { role: 'user', lines: [60] },
+                  { role: 'assistant', lines: [100, 85, 70] },
+                  { role: 'user', lines: [45] },
+                  { role: 'assistant', lines: [100, 90] },
+                ].map((item, i) => (
+                  <div key={i} className={`flex gap-4 px-4 ${item.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <Skeleton className="w-8 h-8 shrink-0 rounded-lg" />
+                    <div className={`flex flex-col gap-2 ${item.role === 'user' ? 'items-end' : ''}`} style={{ maxWidth: '65%' }}>
+                      {item.lines.map((w, j) => (
+                        <Skeleton key={j} className="h-4 rounded" style={{ width: `${w}%` }} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!messagesLoading && messages.length === 0 && !isStreaming && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -233,18 +258,20 @@ export default function ChatPage() {
               </motion.div>
             )}
 
-            <AnimatePresence initial={false}>
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <MessageCard message={msg} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+            {!messagesLoading && (
+              <AnimatePresence initial={false}>
+                {messages.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <MessageCard message={msg} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            )}
 
             <div ref={bottomRef} />
           </div>
