@@ -146,3 +146,27 @@ export type IngestionEvent =
   | IngestionProgress
   | IngestionDone
   | IngestionError
+
+// ---------------------------------------------------------------------------
+// Billing
+// ---------------------------------------------------------------------------
+
+export type PlanTier = 'free' | 'pro' | 'agency'
+
+export interface UsageCounter {
+  used: number
+  limit: number
+  resetAt?: string | null
+}
+
+export interface BillingStatus {
+  plan: PlanTier
+  planLabel: string
+  priceMonthly: number
+  projects: UsageCounter
+  messages: UsageCounter
+  ingestions: UsageCounter
+  stripeCustomerId?: string | null
+  subscriptionStatus?: string | null
+  currentPeriodEnd?: number | null
+}

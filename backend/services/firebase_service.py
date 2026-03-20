@@ -132,8 +132,54 @@ def upsert_user(uid: str, email: str, display_name: str = "") -> None:
             "email": email,
             "displayName": display_name,
             "tier": "free",
+            "billing": {
+                "messagesUsed": 0,
+                "ingestionsUsed": 0,
+                "messagesResetAt": _utcnow(),
+            },
             "createdAt": _utcnow(),
         })
+
+
+def set_user_tier(uid: str, tier: str) -> None:
+    """Update the user's subscription tier ('free', 'pro', 'agency')."""
+    db = get_db()
+    db.collection("users").document(uid).update({"tier": tier})
+
+
+def update_user_billing(uid: str, data: dict) -> None:
+    """
+    Merge billing metadata into the user's `billing` sub-map.
+    Accepts keys like stripeCustomerId, subscriptionStatus, currentPeriodEnd.
+    """
+    db = get_db()
+    updates = {f"billing.{k}": v for k, v in data.items()}
+    db.collection("users").document(uid).update(updates)
+
+
+def increment_messages_used(uid: str) -> None:
+    """Atomically increment the user's monthly message counter."""
+    db = get_db()
+    db.collection("users").document(uid).update(
+        {"billing.messagesUsed": firestore.Increment(1)}
+    )
+
+
+def increment_ingestions_used(uid: str) -> None:
+    """Atomically increment the user's ingestion counter."""
+    db = get_db()
+    db.collection("users").document(uid).update(
+        {"billing.ingestionsUsed": firestore.Increment(1)}
+    )
+
+
+def reset_monthly_usage(uid: str) -> None:
+    """Reset message counter at the start of a new billing period."""
+    db = get_db()
+    db.collection("users").document(uid).update({
+        "billing.messagesUsed": 0,
+        "billing.messagesResetAt": _utcnow(),
+    })
 
 
 def get_user(uid: str) -> Optional[dict]:

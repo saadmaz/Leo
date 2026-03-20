@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
-import { PlusIcon, MessageSquare, ChevronDown, LogOut, Layers } from 'lucide-react'
+import { PlusIcon, MessageSquare, ChevronDown, LogOut, Layers, CreditCard } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
@@ -15,7 +15,7 @@ export function Sidebar() {
   const router = useRouter()
   const params = useParams<{ projectId?: string; chatId?: string }>()
 
-  const { user, projects, setProjects, activeProject, setActiveProject, chats, setChats, setActiveChat, setIngestionOpen } = useAppStore()
+  const { user, projects, setProjects, activeProject, setActiveProject, chats, setChats, setActiveChat, setIngestionOpen, billingStatus, openUpgradeModal } = useAppStore()
 
   const [creating, setCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -55,7 +55,13 @@ export function Sidebar() {
       setIngestionOpen(true)
     } catch (err) {
       console.error(err)
-      setCreateError(String(err))
+      const msg = String(err)
+      if (msg.includes('402')) {
+        setShowNewProject(false)
+        openUpgradeModal("You've reached your project limit. Upgrade to create more brands.")
+      } else {
+        setCreateError(msg)
+      }
     } finally {
       setCreating(false)
     }
@@ -179,7 +185,42 @@ export function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border p-3 space-y-2">
+        {/* Usage bar (messages) */}
+        {billingStatus && (
+          <div className="px-1 space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span className="capitalize">{billingStatus.plan} plan</span>
+              <span>{billingStatus.messages.used}/{billingStatus.messages.limit >= 999 ? '∞' : billingStatus.messages.limit} msgs</span>
+            </div>
+            <div className="h-1 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  billingStatus.messages.used / billingStatus.messages.limit >= 0.9
+                    ? 'bg-red-500'
+                    : billingStatus.messages.used / billingStatus.messages.limit >= 0.7
+                    ? 'bg-amber-500'
+                    : 'bg-primary'
+                }`}
+                style={{
+                  width: billingStatus.messages.limit >= 999
+                    ? '5%'
+                    : `${Math.min((billingStatus.messages.used / billingStatus.messages.limit) * 100, 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Billing link */}
+        <button
+          onClick={() => router.push('/billing')}
+          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <CreditCard className="w-3.5 h-3.5" />
+          <span>Plans & Billing</span>
+        </button>
+
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

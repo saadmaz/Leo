@@ -22,6 +22,7 @@
 import { create } from 'zustand'
 import type {
   AppUser,
+  BillingStatus,
   BrandCore,
   Chat,
   IngestionStep,
@@ -113,6 +114,16 @@ interface AppState {
    * Updates the brand core on both the project list and the active project.
    */
   onIngestionDone: (projectId: string, brandCore: BrandCore) => void
+
+  // ---------------------------------------------------------------------------
+  // Billing
+  // ---------------------------------------------------------------------------
+  billingStatus: BillingStatus | null
+  setBillingStatus: (status: BillingStatus | null) => void
+  upgradeModalOpen: boolean
+  upgradeModalReason: string
+  openUpgradeModal: (reason?: string) => void
+  closeUpgradeModal: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -232,4 +243,14 @@ export const useAppStore = create<AppState>((set) => ({
           : s.activeProject
       return { projects: updated, activeProject }
     }),
+
+  // ---------------------------------------------------------------------------
+  // Billing
+  // ---------------------------------------------------------------------------
+  billingStatus: null,
+  setBillingStatus: (billingStatus) => set({ billingStatus }),
+  upgradeModalOpen: false,
+  upgradeModalReason: '',
+  openUpgradeModal: (reason = '') => set({ upgradeModalOpen: true, upgradeModalReason: reason }),
+  closeUpgradeModal: () => set({ upgradeModalOpen: false, upgradeModalReason: '' }),
 }))

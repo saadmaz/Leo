@@ -12,6 +12,7 @@
 
 import { auth } from './firebase'
 import type {
+  BillingStatus,
   BrandCore,
   Chat,
   IngestionEvent,
@@ -306,6 +307,17 @@ export const api = {
       },
       () => {/* ingestion done is signalled via the 'done' event type, not [DONE] sentinel */},
     )
+  },
+
+  // -------------------------------------------------------------------------
+  // Billing
+  // -------------------------------------------------------------------------
+  billing: {
+    status: (signal?: AbortSignal) => get<BillingStatus>('/billing/status', signal),
+    checkout: (plan: 'pro' | 'agency', signal?: AbortSignal) =>
+      post<{ url: string }>('/billing/checkout', { plan }, signal),
+    portal: (signal?: AbortSignal) =>
+      post<{ url: string }>('/billing/portal', {}, signal),
   },
 
   // -------------------------------------------------------------------------

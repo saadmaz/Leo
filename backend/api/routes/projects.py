@@ -7,10 +7,12 @@ so the logic lives in exactly one place.
 
 from fastapi import APIRouter, status
 
+import asyncio
+
 from backend.api.deps import assert_admin, assert_editor, assert_member, get_project_or_404
 from backend.middleware.auth import CurrentUser
 from backend.schemas.project import Project, ProjectCreate, ProjectUpdate
-from backend.services import firebase_service
+from backend.services import billing_service, firebase_service
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -18,16 +20,21 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)
 async def create_project(body: ProjectCreate, user: CurrentUser):
     """Create a new project. The requesting user becomes its admin."""
-    project = firebase_service.create_project(
-        owner_uid=user["uid"],
-        name=body.name,
-        description=body.description or "",
-    )
-    # Ensure the user document exists in Firestore (idempotent).
-    firebase_service.upsert_user(
+    # Ensure user document exists first (needed for plan lookup).
+    await asyncio.to_thread(
+        firebase_service.upsert_user,
         uid=user["uid"],
         email=user.get("email", ""),
         display_name=user.get("name", ""),
+    )
+    # Check plan limits before creating.
+    await asyncio.to_thread(billing_service.assert_can_create_project, user["uid"])
+
+    project = await asyncio.to_thread(
+        firebase_service.create_project,
+        owner_uid=user["uid"],
+        name=body.name,
+        description=body.description or "",
     )
     return project
 

@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
 from backend.schemas.message import MessageCreate
-from backend.services import firebase_service, llm_service
+from backend.services import billing_service, firebase_service, llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,10 @@ async def send_message(
     """
     # Verify project membership (raises 404/403 via deps).
     project = get_project_as_member(project_id, user["uid"])
+
+    # Check message quota before doing anything else.
+    import asyncio
+    await asyncio.to_thread(billing_service.assert_can_send_message, user["uid"])
 
     chat = firebase_service.get_chat(project_id, chat_id)
     if not chat:
@@ -99,10 +103,11 @@ async def send_message(
             yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
             return
 
-        # Persist the complete assistant response.
+        # Persist the complete assistant response and count the message.
         full_response = "".join(assembled_parts)
         if full_response:
             firebase_service.save_message(project_id, chat_id, "assistant", full_response)
+            billing_service.increment_message_count(user["uid"])
         else:
             logger.warning(
                 "Stream completed for chat %s but no assistant content was collected.", chat_id

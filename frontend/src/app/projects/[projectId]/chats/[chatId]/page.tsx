@@ -42,7 +42,7 @@ export default function ChatPage() {
     isStreaming, setIsStreaming,
     streamController, setStreamController,
     setBrandCorePanelOpen, setIngestionOpen,
-    upsertChat,
+    upsertChat, openUpgradeModal,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -126,9 +126,15 @@ export default function ChatPage() {
 
         onError: (err) => {
           console.error('Stream error:', err)
-          finaliseMessage(assistantId, 'Something went wrong — please try again.')
           setIsStreaming(false)
           setStreamController(null)
+          if (err.includes('402')) {
+            // Remove the pending assistant bubble
+            finaliseMessage(assistantId, '')
+            openUpgradeModal("You've used all your messages for this month. Upgrade to keep chatting.")
+          } else {
+            finaliseMessage(assistantId, 'Something went wrong — please try again.')
+          }
         },
       },
       controller.signal,

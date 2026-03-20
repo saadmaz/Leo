@@ -3,10 +3,16 @@
 import { useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
+import { UpgradeModal } from '@/components/billing/upgrade-modal'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAppStore((s) => s.setUser)
+  const setBillingStatus = useAppStore((s) => s.setBillingStatus)
+  const upgradeModalOpen = useAppStore((s) => s.upgradeModalOpen)
+  const upgradeModalReason = useAppStore((s) => s.upgradeModalReason)
+  const closeUpgradeModal = useAppStore((s) => s.closeUpgradeModal)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -17,12 +23,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         })
+        // Load billing status once on sign-in
+        api.billing.status().then(setBillingStatus).catch(() => {})
       } else {
         setUser(null)
+        setBillingStatus(null)
       }
     })
     return unsubscribe
-  }, [setUser])
+  }, [setUser, setBillingStatus])
 
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onClose={closeUpgradeModal}
+        reason={upgradeModalReason}
+      />
+    </>
+  )
 }
