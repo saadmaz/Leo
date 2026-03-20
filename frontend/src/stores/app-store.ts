@@ -29,6 +29,7 @@ import type {
   OptimisticMessage,
   Project,
 } from '@/types'
+import type { ChannelKey } from '@/components/chat/channel-selector'
 
 interface AppState {
   // ---------------------------------------------------------------------------
@@ -114,6 +115,12 @@ interface AppState {
    * Updates the brand core on both the project list and the active project.
    */
   onIngestionDone: (projectId: string, brandCore: BrandCore) => void
+
+  // ---------------------------------------------------------------------------
+  // Channel
+  // ---------------------------------------------------------------------------
+  activeChannel: ChannelKey | null
+  setActiveChannel: (channel: ChannelKey | null) => void
 
   // ---------------------------------------------------------------------------
   // Billing
@@ -243,6 +250,12 @@ export const useAppStore = create<AppState>((set) => ({
           : s.activeProject
       return { projects: updated, activeProject }
     }),
+
+  // ---------------------------------------------------------------------------
+  // Channel
+  // ---------------------------------------------------------------------------
+  activeChannel: null,
+  setActiveChannel: (activeChannel) => set({ activeChannel }),
 
   // ---------------------------------------------------------------------------
   // Billing

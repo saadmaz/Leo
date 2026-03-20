@@ -19,15 +19,6 @@ function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-function starterPrompts(brandName?: string): string[] {
-  const brand = brandName ?? 'my brand'
-  return [
-    `Write 5 Instagram captions for ${brand}`,
-    `Generate a campaign brief for ${brand}`,
-    `Write Meta ad copy for ${brand}`,
-    `What content themes should ${brand} focus on?`,
-  ]
-}
 
 export default function ChatPage() {
   const params = useParams<{ projectId: string; chatId: string }>()
@@ -43,6 +34,7 @@ export default function ChatPage() {
     streamController, setStreamController,
     setBrandCorePanelOpen, setIngestionOpen,
     upsertChat, openUpgradeModal,
+    activeChannel, setActiveChannel,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -138,6 +130,7 @@ export default function ChatPage() {
         },
       },
       controller.signal,
+      activeChannel,
     )
   }
 
@@ -223,19 +216,6 @@ export default function ChatPage() {
                   </p>
                 </div>
 
-                {/* Starter prompts */}
-                <div className="flex flex-wrap gap-2 justify-center max-w-sm">
-                  {starterPrompts(activeProject?.name).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => handleSubmit(p)}
-                      className="px-3 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-
                 {!hasBrandCore && !isProcessing && activeProject && (
                   <button
                     onClick={() => setIngestionOpen(true)}
@@ -271,6 +251,9 @@ export default function ChatPage() {
           onSubmit={handleSubmit}
           disabled={isStreaming}
           onStop={handleStop}
+          activeChannel={activeChannel}
+          onChannelChange={setActiveChannel}
+          brandName={activeProject?.name}
         />
       </div>
 

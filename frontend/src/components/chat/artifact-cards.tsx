@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Copy, Check, Instagram, Megaphone, FileText, Palette } from 'lucide-react'
+import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ArtifactType = 'captions' | 'ad_copy' | 'campaign_brief' | 'colour_palette'
+export type ArtifactType = 'captions' | 'ad_copy' | 'campaign_brief' | 'colour_palette' | 'content_calendar'
 
 export interface CaptionsArtifact {
   type: 'captions'
@@ -40,11 +40,26 @@ export interface ColourPaletteArtifact {
   colours: { hex: string; name: string; usage: string }[]
 }
 
+export interface ContentCalendarEntry {
+  day: string
+  platform: string
+  content: string
+  time?: string
+  hashtags?: string[]
+}
+
+export interface ContentCalendarArtifact {
+  type: 'content_calendar'
+  period: string
+  entries: ContentCalendarEntry[]
+}
+
 export type Artifact =
   | CaptionsArtifact
   | AdCopyArtifact
   | CampaignBriefArtifact
   | ColourPaletteArtifact
+  | ContentCalendarArtifact
 
 // ---------------------------------------------------------------------------
 // Parser
@@ -83,6 +98,7 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
       {artifact.type === 'ad_copy' && <AdCopyCard artifact={artifact} />}
       {artifact.type === 'campaign_brief' && <CampaignBriefCard artifact={artifact} />}
       {artifact.type === 'colour_palette' && <ColourPaletteCard artifact={artifact} />}
+      {artifact.type === 'content_calendar' && <ContentCalendarCard artifact={artifact} />}
     </motion.div>
   )
 }
@@ -244,6 +260,45 @@ function SwatchItem({ colour }: { colour: { hex: string; name: string; usage: st
       {colour.name && <p className="text-[11px] text-muted-foreground font-medium">{colour.name}</p>}
       {colour.usage && <p className="text-[10px] text-muted-foreground/60">{colour.usage}</p>}
     </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Content calendar card
+// ---------------------------------------------------------------------------
+
+const PLATFORM_ICONS: Record<string, string> = {
+  Instagram: '📸', LinkedIn: '💼', X: '𝕏', Twitter: '𝕏',
+  TikTok: '🎵', Facebook: '📘', Email: '✉️', YouTube: '▶️',
+}
+
+function ContentCalendarCard({ artifact }: { artifact: ContentCalendarArtifact }) {
+  const copyText = artifact.entries
+    .map((e) => `${e.day} — ${e.platform}${e.time ? ` (${e.time})` : ''}\n${e.content}${e.hashtags?.length ? '\n' + e.hashtags.map((h) => `#${h}`).join(' ') : ''}`)
+    .join('\n\n')
+
+  return (
+    <Card icon={<CalendarDays className="w-3.5 h-3.5" />} title={artifact.period || 'Content Calendar'} copyText={copyText}>
+      <div className="space-y-2">
+        {artifact.entries.map((entry, i) => (
+          <div key={i} className="group relative rounded-lg border border-border bg-background p-3">
+            <div className="flex items-center gap-2 mb-1.5 pr-8">
+              <span className="text-sm">{PLATFORM_ICONS[entry.platform] ?? '📄'}</span>
+              <span className="text-xs font-semibold">{entry.day}</span>
+              <span className="text-xs text-muted-foreground">{entry.platform}</span>
+              {entry.time && <span className="ml-auto text-xs text-muted-foreground">{entry.time}</span>}
+            </div>
+            <p className="text-sm leading-relaxed">{entry.content}</p>
+            {entry.hashtags && entry.hashtags.length > 0 && (
+              <p className="mt-1 text-xs text-primary/70">
+                {entry.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
+              </p>
+            )}
+            <CopyButton text={entry.content + (entry.hashtags?.length ? '\n\n' + entry.hashtags.map((h) => `#${h}`).join(' ') : '')} />
+          </div>
+        ))}
+      </div>
+    </Card>
   )
 }
 

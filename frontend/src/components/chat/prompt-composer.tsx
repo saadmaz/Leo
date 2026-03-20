@@ -1,21 +1,20 @@
 'use client'
 
-import { useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, Loader2, Square } from 'lucide-react'
+import { useRef, useEffect, useCallback, useState } from 'react'
+import { ArrowUp, Loader2, Square, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ChannelSelector, type ChannelKey } from './channel-selector'
+import { TemplateBar } from './template-bar'
 
 interface PromptComposerProps {
   value: string
   onChange: (v: string) => void
   onSubmit: (value: string) => void
-  /** True while the assistant is streaming a response. */
   disabled?: boolean
-  /**
-   * Called when the user clicks the Stop button during a stream.
-   * If provided, the button is shown (as a square icon) while disabled=true.
-   * If omitted, the composer shows a spinner and no stop affordance.
-   */
   onStop?: () => void
+  activeChannel: ChannelKey | null
+  onChannelChange: (channel: ChannelKey | null) => void
+  brandName?: string
 }
 
 export function PromptComposer({
@@ -24,10 +23,13 @@ export function PromptComposer({
   onSubmit,
   disabled,
   onStop,
+  activeChannel,
+  onChannelChange,
+  brandName,
 }: PromptComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showChannels, setShowChannels] = useState(false)
 
-  /** Grow the textarea up to 200px then scroll internally. */
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -44,18 +46,34 @@ export function PromptComposer({
     }
   }
 
-  // Determine the action button state:
-  //  - streaming + onStop available → red Stop button
-  //  - streaming + no onStop        → grey spinner (no action)
-  //  - idle + text present          → blue Send button
-  //  - idle + empty                 → disabled Send button
+  function handleTemplateSelect(prompt: string) {
+    onChange(prompt)
+    textareaRef.current?.focus()
+  }
+
   const isStreaming = disabled
   const canStop = isStreaming && !!onStop
   const canSend = !isStreaming && !!value.trim()
+  const channelLabel = activeChannel
+    ? activeChannel.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    : null
 
   return (
-    <div className="border-t border-border bg-background px-4 py-3">
-      <div className="mx-auto max-w-3xl">
+    <div className="border-t border-border bg-background px-4 py-3 space-y-2">
+      <div className="mx-auto max-w-3xl space-y-2">
+        {/* Template bar — always visible */}
+        <TemplateBar
+          channel={activeChannel}
+          brandName={brandName}
+          onSelect={handleTemplateSelect}
+        />
+
+        {/* Channel selector — collapsible */}
+        {showChannels && (
+          <ChannelSelector value={activeChannel} onChange={(ch) => { onChannelChange(ch); setShowChannels(false) }} />
+        )}
+
+        {/* Composer input */}
         <div className="relative rounded-xl border border-border/60 bg-card shadow-sm focus-within:border-ring focus-within:ring-1 focus-within:ring-ring transition-all">
           <textarea
             ref={textareaRef}
@@ -64,14 +82,25 @@ export function PromptComposer({
             onKeyDown={handleKeyDown}
             placeholder="Message LEO…"
             rows={1}
-            // Keep the textarea interactive during streaming so the user can
-            // type their next message while waiting for the response to finish.
             disabled={false}
-            className="w-full resize-none bg-transparent px-4 py-3 pr-12 text-sm focus:outline-none placeholder:text-muted-foreground/50 leading-relaxed"
+            className="w-full resize-none bg-transparent px-4 py-3 pr-24 text-sm focus:outline-none placeholder:text-muted-foreground/50 leading-relaxed"
           />
 
+          {/* Channel pill inside composer */}
+          <button
+            onClick={() => setShowChannels((v) => !v)}
+            className={cn(
+              'absolute left-3 bottom-2.5 flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors',
+              activeChannel
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'bg-muted text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {channelLabel ?? 'Channel'}
+            <ChevronDown className="w-2.5 h-2.5" />
+          </button>
+
           {canStop ? (
-            // Stop button — shown during streaming when a cancellation handler is provided.
             <button
               onClick={onStop}
               title="Stop generating"
@@ -80,12 +109,10 @@ export function PromptComposer({
               <Square className="h-3.5 w-3.5 fill-current" />
             </button>
           ) : isStreaming ? (
-            // Spinner — shown during streaming when no stop handler is provided.
             <div className="absolute right-2.5 bottom-2.5 flex h-7 w-7 items-center justify-center">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/40" />
             </div>
           ) : (
-            // Send button — normal idle state.
             <button
               onClick={() => { if (canSend) onSubmit(value) }}
               disabled={!canSend}
@@ -102,7 +129,7 @@ export function PromptComposer({
           )}
         </div>
 
-        <p className="mt-2 text-center text-[11px] text-muted-foreground/40">
+        <p className="text-center text-[11px] text-muted-foreground/40">
           LEO can make mistakes. Always verify important brand decisions.
         </p>
       </div>

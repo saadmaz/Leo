@@ -203,6 +203,7 @@ export const api = {
       onError: (err: string) => void
     },
     signal?: AbortSignal,
+    channel?: string | null,
   ): Promise<void> {
     const user = auth.currentUser
     if (!user) { callbacks.onError('Not authenticated'); return }
@@ -214,7 +215,7 @@ export const api = {
       res = await fetch(`${API}/projects/${projectId}/chats/${chatId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, ...(channel ? { channel } : {}) }),
         signal,
       })
     } catch (err) {

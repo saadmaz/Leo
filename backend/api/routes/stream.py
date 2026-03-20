@@ -82,6 +82,7 @@ async def send_message(
                 brand_core=project.get("brandCore"),
                 history=history,
                 user_message=body.content,
+                channel=body.channel,
             ):
                 yield chunk
 

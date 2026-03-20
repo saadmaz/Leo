@@ -22,6 +22,86 @@ from backend.config import settings
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Channel presets — platform-specific constraints injected into system prompt
+# ---------------------------------------------------------------------------
+
+CHANNEL_PRESETS: dict[str, dict] = {
+    "instagram": {
+        "label": "Instagram",
+        "constraints": (
+            "CHANNEL: Instagram.\n"
+            "- Captions: ideally under 150 chars for feed; up to 2,200 for carousel/educational posts.\n"
+            "- Use 5–10 focused hashtags. Place them after two blank lines or in the first comment.\n"
+            "- Lead with a strong hook in the first line (shown before 'more').\n"
+            "- Tone: warm, aspirational, story-driven. Emojis used sparingly.\n"
+            "- Reels scripts: hook (0–3 s), value (3–45 s), CTA.\n"
+            "- Output captions using the 'captions' artifact type."
+        ),
+    },
+    "linkedin": {
+        "label": "LinkedIn",
+        "constraints": (
+            "CHANNEL: LinkedIn.\n"
+            "- Posts: 150–300 words; first 3 lines shown before 'see more' — hook immediately.\n"
+            "- Tone: professional, insightful, thought-leadership. First-person works well.\n"
+            "- Structure: hook → insight → evidence → CTA.\n"
+            "- Limit hashtags to 3–5 relevant ones.\n"
+            "- Output posts using the 'captions' artifact type with platform='LinkedIn'."
+        ),
+    },
+    "twitter": {
+        "label": "X / Twitter",
+        "constraints": (
+            "CHANNEL: X (Twitter).\n"
+            "- Single tweets: 280 chars max. Be punchy and direct.\n"
+            "- Threads: number each tweet (1/, 2/, …). Ideal length: 5–10 tweets.\n"
+            "- Tone: conversational, confident. First tweet must stand alone.\n"
+            "- Hashtags: 1–2 max.\n"
+            "- Output tweets using the 'captions' artifact type with platform='X'."
+        ),
+    },
+    "tiktok": {
+        "label": "TikTok",
+        "constraints": (
+            "CHANNEL: TikTok.\n"
+            "- Scripts: hook (0–3 s), content (3–45 s), CTA.\n"
+            "- Tone: authentic, energetic, trend-aware. Speak directly to camera.\n"
+            "- Captions: short (1–3 lines), 3–5 hashtags.\n"
+            "- Output scripts using the 'captions' artifact type with platform='TikTok'."
+        ),
+    },
+    "meta_ads": {
+        "label": "Meta Ads",
+        "constraints": (
+            "CHANNEL: Meta Ads (Facebook + Instagram).\n"
+            "- Primary text: ≤125 chars without truncation.\n"
+            "- Headline: ≤27 chars. Description: ≤27 chars.\n"
+            "- Always produce 3+ variants for A/B testing.\n"
+            "- Output using the 'ad_copy' artifact type with platform='Meta'."
+        ),
+    },
+    "google_ads": {
+        "label": "Google Ads",
+        "constraints": (
+            "CHANNEL: Google Ads (Search).\n"
+            "- RSA: up to 15 headlines (30 chars), 4 descriptions (90 chars).\n"
+            "- Headlines must be keyword-relevant. Descriptions highlight USP + CTA.\n"
+            "- Output using the 'ad_copy' artifact type with platform='Google'."
+        ),
+    },
+    "email": {
+        "label": "Email",
+        "constraints": (
+            "CHANNEL: Email marketing.\n"
+            "- Subject line: 30–50 chars. Preview text: 40–130 chars.\n"
+            "- Structure: hook → value → proof → CTA.\n"
+            "- One clear primary CTA per email.\n"
+            "- Output the full email body using the 'captions' artifact type with platform='Email'."
+        ),
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Client singleton
 # ---------------------------------------------------------------------------
 
@@ -160,8 +240,22 @@ type="colour_palette"
   ]
 }
 
+type="content_calendar"
+{
+  "period": "Week of March 24" | "April 2026" | "...",
+  "entries": [
+    {
+      "day": "Monday",
+      "platform": "Instagram" | "LinkedIn" | "X" | "TikTok" | "Facebook" | "Email",
+      "content": "...",
+      "time": "9:00 AM",
+      "hashtags": ["tag1", "tag2"]
+    }
+  ]
+}
+
 Rules:
-- Always use an artifact for captions (5+ items), ad copy, campaign briefs, and colour palettes.
+- Always use an artifact for captions (5+ items), ad copy, campaign briefs, colour palettes, and content calendars.
 - Place the artifact after a short conversational intro — never instead of it.
 - Put ONLY JSON inside the artifact block. No markdown inside the block.
 - You may include multiple artifacts in one response if appropriate.
@@ -178,6 +272,7 @@ async def stream_chat(
     brand_core: Optional[dict],
     history: list[dict],
     user_message: str,
+    channel: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream a Claude response as SSE-formatted text chunks.
@@ -201,6 +296,11 @@ async def stream_chat(
     """
     client = get_client()
 
+    channel_section = ""
+    if channel and channel in CHANNEL_PRESETS:
+        preset = CHANNEL_PRESETS[channel]
+        channel_section = f"\n\nCHANNEL CONSTRAINTS:\n{preset['constraints']}"
+
     system_prompt = (
         f"You are LEO, a brand-aware marketing co-pilot for the brand '{project_name}'. "
         "You help marketers create on-brand campaigns, content, copy, and strategy "
@@ -208,6 +308,7 @@ async def stream_chat(
         "and actionable.\n\n"
         "BRAND CORE:\n"
         + build_brand_core_context(brand_core)
+        + channel_section
         + ARTIFACT_INSTRUCTIONS
     )
 
