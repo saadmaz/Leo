@@ -15,6 +15,7 @@ import type {
   BillingStatus,
   BrandCore,
   Chat,
+  ImageAttachment,
   IngestionEvent,
   Message,
   Project,
@@ -204,6 +205,7 @@ export const api = {
     },
     signal?: AbortSignal,
     channel?: string | null,
+    images?: Pick<ImageAttachment, 'base64' | 'mediaType'>[],
   ): Promise<void> {
     const user = auth.currentUser
     if (!user) { callbacks.onError('Not authenticated'); return }
@@ -215,7 +217,11 @@ export const api = {
       res = await fetch(`${API}/projects/${projectId}/chats/${chatId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ content, ...(channel ? { channel } : {}) }),
+        body: JSON.stringify({
+          content,
+          ...(channel ? { channel } : {}),
+          ...(images && images.length > 0 ? { images } : {}),
+        }),
         signal,
       })
     } catch (err) {

@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
-import { PlusIcon, MessageSquare, ChevronDown, LogOut, Layers, CreditCard } from 'lucide-react'
+import {
+  PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
+  CreditCard, Pencil, Trash2, Check, X,
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
@@ -11,11 +14,20 @@ import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import type { Project, Chat } from '@/types'
 
+// ---------------------------------------------------------------------------
+// Sidebar shell
+// ---------------------------------------------------------------------------
+
 export function Sidebar() {
   const router = useRouter()
   const params = useParams<{ projectId?: string; chatId?: string }>()
 
-  const { user, projects, setProjects, activeProject, setActiveProject, chats, setChats, setActiveChat, setIngestionOpen, billingStatus, openUpgradeModal } = useAppStore()
+  const {
+    user, projects, setProjects, activeProject, setActiveProject,
+    chats, setChats, setActiveChat, setIngestionOpen,
+    billingStatus, openUpgradeModal,
+    upsertProject, removeProject, upsertChat, removeChat,
+  } = useAppStore()
 
   const [creating, setCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -54,7 +66,6 @@ export function Sidebar() {
       router.push(`/projects/${project.id}/chats/${chat.id}`)
       setIngestionOpen(true)
     } catch (err) {
-      console.error(err)
       const msg = String(err)
       if (msg.includes('402')) {
         setShowNewProject(false)
@@ -78,9 +89,48 @@ export function Sidebar() {
       const chat = await api.chats.create(project.id)
       setChats([chat, ...chats])
       openChat(project, chat)
-    } catch (err) {
-      console.error(err)
-    }
+    } catch (err) { console.error(err) }
+  }
+
+  async function handleRenameProject(project: Project, name: string) {
+    try {
+      await api.projects.update(project.id, { name })
+      upsertProject({ ...project, name })
+    } catch (err) { console.error(err) }
+  }
+
+  async function handleDeleteProject(project: Project) {
+    try {
+      await api.projects.delete(project.id)
+      removeProject(project.id)
+      if (activeProject?.id === project.id) {
+        router.push('/')
+      }
+    } catch (err) { console.error(err) }
+  }
+
+  async function handleRenameChat(chat: Chat, name: string) {
+    if (!activeProject) return
+    try {
+      await api.chats.rename(activeProject.id, chat.id, name)
+      upsertChat({ ...chat, name })
+    } catch (err) { console.error(err) }
+  }
+
+  async function handleDeleteChat(chat: Chat) {
+    if (!activeProject) return
+    try {
+      await api.chats.delete(activeProject.id, chat.id)
+      removeChat(chat.id)
+      if (params.chatId === chat.id) {
+        const remaining = chats.filter((c) => c.id !== chat.id)
+        if (remaining.length > 0) {
+          openChat(activeProject, remaining[0])
+        } else {
+          router.push('/')
+        }
+      }
+    } catch (err) { console.error(err) }
   }
 
   async function handleSignOut() {
@@ -124,9 +174,7 @@ export function Sidebar() {
                   if (e.key === 'Escape') setShowNewProject(false)
                 }}
               />
-              {createError && (
-                <p className="text-xs text-red-500 break-all">{createError}</p>
-              )}
+              {createError && <p className="text-xs text-red-500 break-all">{createError}</p>}
               <div className="flex gap-2">
                 <button
                   onClick={createProject}
@@ -153,10 +201,7 @@ export function Sidebar() {
           <div className="px-4 py-8 text-center">
             <Layers className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
             <p className="text-xs text-muted-foreground">No projects yet.</p>
-            <button
-              onClick={() => setShowNewProject(true)}
-              className="mt-2 text-xs text-primary underline underline-offset-2"
-            >
+            <button onClick={() => setShowNewProject(true)} className="mt-2 text-xs text-primary underline underline-offset-2">
               Create your first brand
             </button>
           </div>
@@ -171,6 +216,10 @@ export function Sidebar() {
             chats={activeProject?.id === project.id ? chats : []}
             onOpenChat={(chat) => openChat(project, chat)}
             onNewChat={() => newChat(project)}
+            onRename={(name) => handleRenameProject(project, name)}
+            onDelete={() => handleDeleteProject(project)}
+            onRenameChat={handleRenameChat}
+            onDeleteChat={handleDeleteChat}
             onSelect={() => {
               setActiveProject(project)
               if (activeProject?.id !== project.id) {
@@ -186,7 +235,6 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-border p-3 space-y-2">
-        {/* Usage bar (messages) */}
         {billingStatus && (
           <div className="px-1 space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
@@ -196,11 +244,9 @@ export function Sidebar() {
             <div className="h-1 rounded-full bg-muted overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  billingStatus.messages.used / billingStatus.messages.limit >= 0.9
-                    ? 'bg-red-500'
-                    : billingStatus.messages.used / billingStatus.messages.limit >= 0.7
-                    ? 'bg-amber-500'
-                    : 'bg-primary'
+                  billingStatus.messages.used / billingStatus.messages.limit >= 0.9 ? 'bg-red-500'
+                  : billingStatus.messages.used / billingStatus.messages.limit >= 0.7 ? 'bg-amber-500'
+                  : 'bg-primary'
                 }`}
                 style={{
                   width: billingStatus.messages.limit >= 999
@@ -211,8 +257,6 @@ export function Sidebar() {
             </div>
           </div>
         )}
-
-        {/* Billing link */}
         <button
           onClick={() => router.push('/billing')}
           className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -220,10 +264,9 @@ export function Sidebar() {
           <CreditCard className="w-3.5 h-3.5" />
           <span>Plans & Billing</span>
         </button>
-
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" />
           <span className="truncate text-xs">{user?.email ?? 'Sign out'}</span>
@@ -234,6 +277,8 @@ export function Sidebar() {
 }
 
 // ---------------------------------------------------------------------------
+// ProjectRow
+// ---------------------------------------------------------------------------
 
 interface ProjectRowProps {
   project: Project
@@ -243,22 +288,86 @@ interface ProjectRowProps {
   onSelect: () => void
   onOpenChat: (chat: Chat) => void
   onNewChat: () => void
+  onRename: (name: string) => void
+  onDelete: () => void
+  onRenameChat: (chat: Chat, name: string) => void
+  onDeleteChat: (chat: Chat) => void
 }
 
-function ProjectRow({ project, isActive, activeChatId, chats, onSelect, onOpenChat, onNewChat }: ProjectRowProps) {
+function ProjectRow({
+  project, isActive, activeChatId, chats,
+  onSelect, onOpenChat, onNewChat,
+  onRename, onDelete, onRenameChat, onDeleteChat,
+}: ProjectRowProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(project.name)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation()
+    setDraft(project.name)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  function saveEdit() {
+    if (draft.trim() && draft !== project.name) onRename(draft.trim())
+    setEditing(false)
+  }
+
+  function startDelete(e: React.MouseEvent) {
+    e.stopPropagation()
+    setConfirmDelete(true)
+  }
+
   return (
     <div>
-      <button
-        onClick={onSelect}
-        className={cn(
-          'flex items-center gap-2 w-full px-3 py-2 text-left text-sm font-medium transition-colors',
-          isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+      {/* Project header row */}
+      <div className={cn(
+        'group flex items-center gap-1 w-full px-3 py-2 transition-colors',
+        isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+      )}>
+        {editing ? (
+          <>
+            <input
+              ref={inputRef}
+              autoFocus
+              className="flex-1 min-w-0 rounded border border-input bg-background px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
+              onBlur={saveEdit}
+            />
+            <button onClick={() => setEditing(false)} className="shrink-0 p-0.5 text-muted-foreground hover:text-foreground">
+              <X className="w-3 h-3" />
+            </button>
+          </>
+        ) : confirmDelete ? (
+          <div className="flex-1 flex items-center gap-1.5">
+            <span className="text-xs text-destructive flex-1 truncate">Delete {project.name}?</span>
+            <button onClick={() => { onDelete(); setConfirmDelete(false) }} className="text-xs text-destructive hover:underline shrink-0">Yes</button>
+            <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground hover:underline shrink-0">No</button>
+          </div>
+        ) : (
+          <>
+            <button onClick={onSelect} className="flex items-center gap-2 flex-1 min-w-0 text-left text-sm font-medium">
+              <ChevronDown className={cn('w-3 h-3 shrink-0 transition-transform', isActive ? '' : '-rotate-90')} />
+              <span className="truncate">{project.name}</span>
+            </button>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={startEdit} className="p-0.5 rounded hover:bg-muted" title="Rename">
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button onClick={startDelete} className="p-0.5 rounded hover:bg-muted text-destructive/70 hover:text-destructive" title="Delete">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </>
         )}
-      >
-        <ChevronDown className={cn('w-3 h-3 shrink-0 transition-transform', isActive ? '' : '-rotate-90')} />
-        <span className="truncate">{project.name}</span>
-      </button>
+      </div>
 
+      {/* Chat list (expanded when active) */}
       <AnimatePresence>
         {isActive && (
           <motion.div
@@ -269,19 +378,14 @@ function ProjectRow({ project, isActive, activeChatId, chats, onSelect, onOpenCh
           >
             <div className="ml-6 border-l border-border pl-2 py-1 space-y-0.5">
               {chats.map((chat) => (
-                <button
+                <ChatRow
                   key={chat.id}
-                  onClick={() => onOpenChat(chat)}
-                  className={cn(
-                    'flex items-center gap-1.5 w-full px-2 py-1 rounded-md text-left text-xs transition-colors',
-                    activeChatId === chat.id
-                      ? 'bg-muted text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                  )}
-                >
-                  <MessageSquare className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{chat.name}</span>
-                </button>
+                  chat={chat}
+                  isActive={activeChatId === chat.id}
+                  onOpen={() => onOpenChat(chat)}
+                  onRename={(name) => onRenameChat(chat, name)}
+                  onDelete={() => onDeleteChat(chat)}
+                />
               ))}
               <button
                 onClick={onNewChat}
@@ -294,6 +398,88 @@ function ProjectRow({ project, isActive, activeChatId, chats, onSelect, onOpenCh
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ChatRow
+// ---------------------------------------------------------------------------
+
+function ChatRow({
+  chat, isActive, onOpen, onRename, onDelete,
+}: {
+  chat: Chat
+  isActive: boolean
+  onOpen: () => void
+  onRename: (name: string) => void
+  onDelete: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(chat.name)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation()
+    setDraft(chat.name)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  function saveEdit() {
+    if (draft.trim() && draft !== chat.name) onRename(draft.trim())
+    setEditing(false)
+  }
+
+  if (confirmDelete) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/5">
+        <span className="text-xs text-destructive flex-1 truncate">Delete?</span>
+        <button onClick={() => { onDelete(); setConfirmDelete(false) }} className="text-xs text-destructive hover:underline shrink-0">Yes</button>
+        <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground hover:underline shrink-0">No</button>
+      </div>
+    )
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 px-1 py-0.5">
+        <input
+          ref={inputRef}
+          autoFocus
+          className="flex-1 min-w-0 rounded border border-input bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
+          onBlur={saveEdit}
+        />
+        <button onClick={saveEdit} className="shrink-0 p-0.5 text-primary"><Check className="w-3 h-3" /></button>
+        <button onClick={() => setEditing(false)} className="shrink-0 p-0.5 text-muted-foreground"><X className="w-3 h-3" /></button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group flex items-center gap-0.5">
+      <button
+        onClick={onOpen}
+        className={cn(
+          'flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-md text-left text-xs transition-colors',
+          isActive ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+        )}
+      >
+        <MessageSquare className="w-3 h-3 shrink-0" />
+        <span className="truncate">{chat.name}</span>
+      </button>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pr-1">
+        <button onClick={startEdit} className="p-0.5 rounded hover:bg-muted text-muted-foreground" title="Rename">
+          <Pencil className="w-2.5 h-2.5" />
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }} className="p-0.5 rounded hover:bg-muted text-destructive/60 hover:text-destructive" title="Delete">
+          <Trash2 className="w-2.5 h-2.5" />
+        </button>
+      </div>
     </div>
   )
 }

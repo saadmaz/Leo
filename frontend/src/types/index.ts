@@ -148,6 +148,22 @@ export type IngestionEvent =
   | IngestionError
 
 // ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+export interface ImageAttachment {
+  /** Client-side ephemeral id for list keys / removal. */
+  id: string
+  name: string
+  /** Raw base64 string (no data-URL prefix). */
+  base64: string
+  /** MIME type: image/jpeg | image/png | image/gif | image/webp */
+  mediaType: string
+  /** Object URL for thumbnail preview (created with URL.createObjectURL). */
+  previewUrl: string
+}
+
+// ---------------------------------------------------------------------------
 // Billing
 // ---------------------------------------------------------------------------
 

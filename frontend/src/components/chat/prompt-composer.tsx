@@ -1,20 +1,38 @@
 'use client'
 
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Square, ChevronDown } from 'lucide-react'
+import { ArrowUp, Loader2, Square, ChevronDown, Paperclip, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChannelSelector, type ChannelKey } from './channel-selector'
 import { TemplateBar } from './template-bar'
+import type { ImageAttachment } from '@/types'
 
 interface PromptComposerProps {
   value: string
   onChange: (v: string) => void
-  onSubmit: (value: string) => void
+  onSubmit: (value: string, attachments: ImageAttachment[]) => void
   disabled?: boolean
   onStop?: () => void
   activeChannel: ChannelKey | null
   onChannelChange: (channel: ChannelKey | null) => void
   brandName?: string
+}
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const MAX_SIZE_MB = 5
+
+/** Convert a File to a base64 string (no data-URL prefix). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      // Strip the "data:image/...;base64," prefix
+      resolve(result.split(',')[1])
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 export function PromptComposer({
@@ -28,7 +46,10 @@ export function PromptComposer({
   brandName,
 }: PromptComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [showChannels, setShowChannels] = useState(false)
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([])
+  const [attachError, setAttachError] = useState<string | null>(null)
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
@@ -42,7 +63,9 @@ export function PromptComposer({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !disabled) onSubmit(value)
+      if ((value.trim() || attachments.length > 0) && !disabled) {
+        handleSend()
+      }
     }
   }
 
@@ -51,9 +74,52 @@ export function PromptComposer({
     textareaRef.current?.focus()
   }
 
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setAttachError(null)
+
+    const newAttachments: ImageAttachment[] = []
+    for (const file of Array.from(files)) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setAttachError(`${file.name}: unsupported type. Use JPEG, PNG, GIF, or WebP.`)
+        continue
+      }
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        setAttachError(`${file.name}: exceeds ${MAX_SIZE_MB} MB limit.`)
+        continue
+      }
+      const base64 = await fileToBase64(file)
+      newAttachments.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+        name: file.name,
+        base64,
+        mediaType: file.type,
+        previewUrl: URL.createObjectURL(file),
+      })
+    }
+
+    setAttachments((prev) => [...prev, ...newAttachments])
+    // Reset input so the same file can be re-attached if removed
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => {
+      const removed = prev.find((a) => a.id === id)
+      if (removed) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((a) => a.id !== id)
+    })
+  }
+
+  function handleSend() {
+    onSubmit(value, attachments)
+    setAttachments([])
+    setAttachError(null)
+  }
+
   const isStreaming = disabled
   const canStop = isStreaming && !!onStop
-  const canSend = !isStreaming && !!value.trim()
+  const canSend = !isStreaming && (!!value.trim() || attachments.length > 0)
   const channelLabel = activeChannel
     ? activeChannel.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : null
@@ -71,6 +137,34 @@ export function PromptComposer({
         {/* Channel selector — collapsible */}
         {showChannels && (
           <ChannelSelector value={activeChannel} onChange={(ch) => { onChannelChange(ch); setShowChannels(false) }} />
+        )}
+
+        {/* Image attachment previews */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-1">
+            {attachments.map((att) => (
+              <div key={att.id} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={att.previewUrl}
+                  alt={att.name}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Attachment error */}
+        {attachError && (
+          <p className="text-xs text-destructive px-1">{attachError}</p>
         )}
 
         {/* Composer input */}
@@ -100,6 +194,31 @@ export function PromptComposer({
             <ChevronDown className="w-2.5 h-2.5" />
           </button>
 
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ALLOWED_TYPES.join(',')}
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+
+          {/* Paperclip button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming}
+            title="Attach image"
+            className={cn(
+              'absolute right-10 bottom-2.5 flex h-7 w-7 items-center justify-center rounded-lg transition-colors',
+              isStreaming
+                ? 'text-muted-foreground/30 cursor-not-allowed'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
+
           {canStop ? (
             <button
               onClick={onStop}
@@ -114,7 +233,7 @@ export function PromptComposer({
             </div>
           ) : (
             <button
-              onClick={() => { if (canSend) onSubmit(value) }}
+              onClick={() => { if (canSend) handleSend() }}
               disabled={!canSend}
               title="Send message"
               className={cn(

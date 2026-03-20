@@ -76,6 +76,13 @@ async def send_message(
     async def event_stream():
         assembled_parts: list[str] = []
 
+        # Convert Pydantic ImageAttachment objects to plain dicts for llm_service.
+        images = (
+            [{"base64": img.base64, "mediaType": img.mediaType} for img in body.images]
+            if body.images
+            else None
+        )
+
         try:
             async for chunk in llm_service.stream_chat(
                 project_name=project.get("name", ""),
@@ -83,6 +90,7 @@ async def send_message(
                 history=history,
                 user_message=body.content,
                 channel=body.channel,
+                images=images,
             ):
                 yield chunk
 

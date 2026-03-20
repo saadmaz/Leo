@@ -273,6 +273,7 @@ async def stream_chat(
     history: list[dict],
     user_message: str,
     channel: Optional[str] = None,
+    images: Optional[list] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream a Claude response as SSE-formatted text chunks.
@@ -320,7 +321,26 @@ async def stream_chat(
         {"role": m["role"], "content": m["content"]}
         for m in context_window
     ]
-    messages.append({"role": "user", "content": user_message})
+
+    # Build the final user turn — plain text, or a multi-part content block
+    # when image attachments are present (Anthropic vision API).
+    if images:
+        user_content: list[dict] = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": img["mediaType"],
+                    "data": img["base64"],
+                },
+            }
+            for img in images
+        ]
+        user_content.append({"type": "text", "text": user_message})
+    else:
+        user_content = user_message  # type: ignore[assignment]
+
+    messages.append({"role": "user", "content": user_content})
 
     try:
         async with client.messages.stream(

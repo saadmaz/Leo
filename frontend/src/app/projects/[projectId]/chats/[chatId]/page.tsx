@@ -12,7 +12,7 @@ import { IngestionOverlay } from '@/components/brand-core/ingestion-overlay'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
-import type { OptimisticMessage } from '@/types'
+import type { ImageAttachment, OptimisticMessage } from '@/types'
 
 /** Generate a unique ephemeral id for optimistic messages. */
 function newId() {
@@ -78,8 +78,8 @@ export default function ChatPage() {
 
   useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
-  async function handleSubmit(content: string) {
-    if (!content.trim() || isStreaming) return
+  async function handleSubmit(content: string, attachments: ImageAttachment[] = []) {
+    if ((!content.trim() && attachments.length === 0) || isStreaming) return
     setInput('')
 
     // Add optimistic user message immediately so the UI feels responsive.
@@ -92,6 +92,9 @@ export default function ChatPage() {
     // Create a new AbortController for this stream so we can cancel it.
     const controller = new AbortController()
     setStreamController(controller)
+
+    // Strip previewUrl (blob URL) before sending to the backend — only base64+mediaType needed.
+    const imagePayload = attachments.map(({ base64, mediaType }) => ({ base64, mediaType }))
 
     await api.streamMessage(
       params.projectId,
@@ -131,6 +134,7 @@ export default function ChatPage() {
       },
       controller.signal,
       activeChannel,
+      imagePayload.length > 0 ? imagePayload : undefined,
     )
   }
 
