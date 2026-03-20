@@ -30,8 +30,4 @@ EXPOSE 8000
 # - host 0.0.0.0    → bind to all interfaces (required inside a container)
 # - workers 2       → two worker processes; tune to (2 × CPU cores + 1) in prod
 # - timeout-keep-alive 65 → slightly above the Railway/ALB 60s idle timeout
-CMD ["uvicorn", "backend.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "2", \
-     "--timeout-keep-alive", "65"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --timeout-keep-alive 65"]

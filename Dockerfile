@@ -23,15 +23,10 @@ COPY . .
 # Set Python path so `backend.xxx` module imports resolve
 ENV PYTHONPATH=/app
 
-# Expose the port uvicorn listens on
+# Expose the default port (Railway overrides via PORT env var at runtime)
 EXPOSE 8000
 
 # Start the server.
-# - host 0.0.0.0    → bind to all interfaces (required inside a container)
-# - workers 2       → two worker processes; tune to (2 × CPU cores + 1) in prod
-# - timeout-keep-alive 65 → slightly above the Cloud Run 60s idle timeout
-CMD ["uvicorn", "backend.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "2", \
-     "--timeout-keep-alive", "65"]
+# Railway (and Cloud Run) inject a PORT env var — we must bind to it.
+# Shell form is required to expand $PORT at runtime.
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --timeout-keep-alive 65"]
