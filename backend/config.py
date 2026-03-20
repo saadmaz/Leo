@@ -62,6 +62,25 @@ class Settings(BaseSettings):
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
 
+    # --- LLM Runtime Config ---
+    # Model used for the conversational chat stream (streamed responses).
+    LLM_CHAT_MODEL: str = "claude-sonnet-4-6"
+    # Model used for one-shot brand extraction (non-streamed, cheaper is fine).
+    LLM_EXTRACTION_MODEL: str = "claude-3-5-sonnet-20241022"
+    # Maximum tokens the LLM may generate in a single chat response.
+    LLM_MAX_TOKENS: int = 4096
+    # How many prior messages are included as context for each chat request.
+    # Higher values improve coherence but increase cost. Cap at 40 for safety.
+    LLM_CONTEXT_MESSAGES: int = 20
+
+    # --- Pagination Limits ---
+    # Hard caps on Firestore list queries. Raise these as the product scales
+    # and after proper composite indexes are added.
+    PROJECTS_LIMIT: int = 50
+    CHATS_LIMIT: int = 50
+    # How many messages are fetched when rendering a chat history page.
+    MESSAGES_LOAD_LIMIT: int = 50
+
     # --- App Config ---
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"

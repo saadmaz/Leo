@@ -1,10 +1,32 @@
-import { auth } from './firebase'
-import type { BrandCore, Chat, IngestionEvent, Message, Project, ProjectCreate, StreamEvent } from '@/types'
+/**
+ * API client — thin wrapper around fetch for all backend communication.
+ *
+ * Design principles:
+ *  - All requests are authenticated via Firebase ID tokens (injected by authHeaders()).
+ *  - REST operations (get/post/patch/del) are generic and typed at call sites.
+ *  - SSE streaming uses a shared readSSEStream() helper to avoid duplication
+ *    and ensure consistent buffer handling across chat and ingestion.
+ *  - AbortSignal support lets callers cancel in-flight requests (important
+ *    for cleaning up when a component unmounts mid-stream).
+ */
 
+import { auth } from './firebase'
+import type {
+  BrandCore,
+  Chat,
+  IngestionEvent,
+  Message,
+  Project,
+  ProjectCreate,
+  StreamEvent,
+} from '@/types'
+
+// All backend requests are proxied through Next.js rewrites defined in
+// next.config.js so the browser never talks to the backend directly.
 const API = '/api/backend'
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Auth headers
 // ---------------------------------------------------------------------------
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -16,67 +38,160 @@ async function authHeaders(): Promise<HeadersInit> {
   }
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, { headers: await authHeaders() })
+// ---------------------------------------------------------------------------
+// Core HTTP helpers
+// ---------------------------------------------------------------------------
+
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    headers: await authHeaders(),
+    signal,
+  })
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`)
   return res.json()
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify(body),
+    signal,
   })
   if (!res.ok) throw new Error(`POST ${path} → ${res.status}: ${await res.text()}`)
   return res.json()
 }
 
-async function patch<T>(path: string, body: unknown): Promise<T> {
+async function patch<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method: 'PATCH',
     headers: await authHeaders(),
     body: JSON.stringify(body),
+    signal,
   })
   if (!res.ok) throw new Error(`PATCH ${path} → ${res.status}: ${await res.text()}`)
   return res.json()
 }
 
-async function del(path: string): Promise<void> {
+async function del(path: string, signal?: AbortSignal): Promise<void> {
   const res = await fetch(`${API}${path}`, {
     method: 'DELETE',
     headers: await authHeaders(),
+    signal,
   })
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}: ${await res.text()}`)
 }
 
 // ---------------------------------------------------------------------------
-// API surface
+// Shared SSE stream reader
+// ---------------------------------------------------------------------------
+
+/**
+ * Read a Server-Sent Events stream from a ReadableStream, parsing each
+ * `data: ...` line as JSON and dispatching to the appropriate callback.
+ *
+ * This is used by both streamMessage() and streamIngestion() so the
+ * buffering and parsing logic lives in exactly one place.
+ *
+ * @param reader   ReadableStreamDefaultReader obtained from response.body.
+ * @param onEvent  Called for each parsed event object.
+ * @param onDone   Called when the sentinel `data: [DONE]` is received OR
+ *                 when the stream closes naturally (done === true).
+ */
+async function readSSEStream<TEvent>(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onEvent: (event: TEvent) => void,
+  onDone: () => void,
+): Promise<void> {
+  const decoder = new TextDecoder()
+  // Incomplete line fragments are buffered here across read() calls.
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      // SSE lines are separated by \n. The last element may be an incomplete
+      // line; keep it in the buffer for the next iteration.
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+
+        const raw = line.slice(6).trim()
+
+        // The [DONE] sentinel signals the end of the logical stream.
+        if (raw === '[DONE]') {
+          onDone()
+          return
+        }
+
+        try {
+          const event = JSON.parse(raw) as TEvent
+          onEvent(event)
+        } catch {
+          // Malformed JSON — skip the line. The backend logs these.
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  // Stream closed without an explicit [DONE] — treat as completion.
+  onDone()
+}
+
+// ---------------------------------------------------------------------------
+// Public API surface
 // ---------------------------------------------------------------------------
 
 export const api = {
+  // -------------------------------------------------------------------------
+  // Projects
+  // -------------------------------------------------------------------------
   projects: {
-    list: () => get<Project[]>('/projects'),
-    get: (id: string) => get<Project>(`/projects/${id}`),
-    create: (body: ProjectCreate) => post<Project>('/projects', body),
-    update: (id: string, body: Partial<ProjectCreate>) => patch<Project>(`/projects/${id}`, body),
-    delete: (id: string) => del(`/projects/${id}`),
+    list: (signal?: AbortSignal) => get<Project[]>('/projects', signal),
+    get: (id: string, signal?: AbortSignal) => get<Project>(`/projects/${id}`, signal),
+    create: (body: ProjectCreate, signal?: AbortSignal) =>
+      post<Project>('/projects', body, signal),
+    update: (id: string, body: Partial<ProjectCreate>, signal?: AbortSignal) =>
+      patch<Project>(`/projects/${id}`, body, signal),
+    delete: (id: string, signal?: AbortSignal) => del(`/projects/${id}`, signal),
   },
 
+  // -------------------------------------------------------------------------
+  // Chats
+  // -------------------------------------------------------------------------
   chats: {
-    list: (projectId: string) => get<Chat[]>(`/projects/${projectId}/chats`),
-    get: (projectId: string, chatId: string) =>
-      get<Chat>(`/projects/${projectId}/chats/${chatId}`),
-    create: (projectId: string, name?: string) =>
-      post<Chat>(`/projects/${projectId}/chats`, { name: name ?? 'New Chat' }),
-    rename: (projectId: string, chatId: string, name: string) =>
-      patch<Chat>(`/projects/${projectId}/chats/${chatId}`, { name }),
-    delete: (projectId: string, chatId: string) =>
-      del(`/projects/${projectId}/chats/${chatId}`),
-    messages: (projectId: string, chatId: string) =>
-      get<Message[]>(`/projects/${projectId}/chats/${chatId}/messages`),
+    list: (projectId: string, signal?: AbortSignal) =>
+      get<Chat[]>(`/projects/${projectId}/chats`, signal),
+    get: (projectId: string, chatId: string, signal?: AbortSignal) =>
+      get<Chat>(`/projects/${projectId}/chats/${chatId}`, signal),
+    create: (projectId: string, name?: string, signal?: AbortSignal) =>
+      post<Chat>(`/projects/${projectId}/chats`, { name: name ?? 'New Chat' }, signal),
+    rename: (projectId: string, chatId: string, name: string, signal?: AbortSignal) =>
+      patch<Chat>(`/projects/${projectId}/chats/${chatId}`, { name }, signal),
+    delete: (projectId: string, chatId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/chats/${chatId}`, signal),
+    messages: (projectId: string, chatId: string, signal?: AbortSignal) =>
+      get<Message[]>(`/projects/${projectId}/chats/${chatId}/messages`, signal),
   },
 
+  // -------------------------------------------------------------------------
+  // Chat streaming (SSE)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Send a user message and stream the assistant's response via SSE.
+   *
+   * @param signal  Optional AbortSignal to cancel the request (e.g. on
+   *                component unmount or when the user hits "Stop").
+   */
   async streamMessage(
     projectId: string,
     chatId: string,
@@ -86,6 +201,7 @@ export const api = {
       onDone: () => void
       onError: (err: string) => void
     },
+    signal?: AbortSignal,
   ): Promise<void> {
     const user = auth.currentUser
     if (!user) { callbacks.onError('Not authenticated'); return }
@@ -98,8 +214,11 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ content }),
+        signal,
       })
     } catch (err) {
+      // AbortError is expected when signal.abort() is called — don't surface it as an error.
+      if (err instanceof DOMException && err.name === 'AbortError') return
       callbacks.onError(String(err))
       return
     }
@@ -109,45 +228,40 @@ export const api = {
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No readable stream in response'); return }
 
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const raw = line.slice(6).trim()
-          if (raw === '[DONE]') { callbacks.onDone(); return }
-          try {
-            const event = JSON.parse(raw) as StreamEvent
-            if (event.type === 'delta') callbacks.onDelta(event.content)
-            if (event.type === 'error') callbacks.onError(event.error)
-          } catch { /* skip malformed */ }
-        }
-      }
-    } finally {
-      reader.releaseLock()
-    }
-    callbacks.onDone()
+    await readSSEStream<StreamEvent>(
+      reader,
+      (event) => {
+        if (event.type === 'delta') callbacks.onDelta(event.content)
+        if (event.type === 'error') callbacks.onError(event.error)
+      },
+      callbacks.onDone,
+    )
   },
 
+  // -------------------------------------------------------------------------
+  // Brand Core
+  // -------------------------------------------------------------------------
   brandCore: {
-    get: (projectId: string) =>
+    get: (projectId: string, signal?: AbortSignal) =>
       get<{ brandCore: BrandCore | null; ingestionStatus: string | null }>(
         `/projects/${projectId}/brand-core`,
+        signal,
       ),
-    update: (projectId: string, data: Partial<BrandCore>) =>
-      patch<{ brandCore: BrandCore }>(`/projects/${projectId}/brand-core`, data),
-    clear: (projectId: string) =>
-      del(`/projects/${projectId}/brand-core`),
+    update: (projectId: string, data: Partial<BrandCore>, signal?: AbortSignal) =>
+      patch<{ brandCore: BrandCore }>(`/projects/${projectId}/brand-core`, data, signal),
+    clear: (projectId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/brand-core`, signal),
   },
 
+  // -------------------------------------------------------------------------
+  // Brand ingestion streaming (SSE)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start brand ingestion and stream progress events via SSE.
+   *
+   * @param signal  Optional AbortSignal to cancel mid-ingestion.
+   */
   async streamIngestion(
     projectId: string,
     body: { websiteUrl?: string; instagramHandle?: string },
@@ -157,6 +271,7 @@ export const api = {
       onDone: (brandCore: BrandCore) => void
       onError: (message: string) => void
     },
+    signal?: AbortSignal,
   ): Promise<void> {
     const user = auth.currentUser
     if (!user) { callbacks.onError('Not authenticated'); return }
@@ -168,8 +283,10 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
+        signal,
       })
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       callbacks.onError(String(err))
       return
     }
@@ -179,34 +296,20 @@ export const api = {
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }
 
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const raw = line.slice(6).trim()
-          if (raw === '[DONE]') return
-          try {
-            const event = JSON.parse(raw) as IngestionEvent
-            if (event.type === 'step') callbacks.onStep(event)
-            if (event.type === 'progress') callbacks.onProgress(event.pct)
-            if (event.type === 'done') callbacks.onDone(event.brandCore)
-            if (event.type === 'error') callbacks.onError(event.message)
-          } catch { /* skip malformed */ }
-        }
-      }
-    } finally {
-      reader.releaseLock()
-    }
+    await readSSEStream<IngestionEvent>(
+      reader,
+      (event) => {
+        if (event.type === 'step')     callbacks.onStep(event)
+        if (event.type === 'progress') callbacks.onProgress(event.pct)
+        if (event.type === 'done')     callbacks.onDone(event.brandCore)
+        if (event.type === 'error')    callbacks.onError(event.message)
+      },
+      () => {/* ingestion done is signalled via the 'done' event type, not [DONE] sentinel */},
+    )
   },
 
-  health: () => get<{ status: string }>('/health'),
+  // -------------------------------------------------------------------------
+  // Health
+  // -------------------------------------------------------------------------
+  health: (signal?: AbortSignal) => get<{ status: string }>('/health', signal),
 }

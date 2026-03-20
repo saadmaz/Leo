@@ -1,6 +1,12 @@
 """
-Brand Core extractor — sends scraped content to Claude and gets back a
+Brand Core extractor — sends scraped content to Claude and parses back a
 structured BrandCore JSON object.
+
+Uses the shared LLM client from llm_service so we maintain a single
+AsyncAnthropic instance per process (avoids connection pool fragmentation).
+The extraction model is configured separately from the chat model because
+extraction is a one-shot, non-streamed call that can use a smaller/cheaper
+model without sacrificing quality.
 """
 
 import json
@@ -8,9 +14,14 @@ import logging
 import re
 from typing import Any
 
-import anthropic
+from backend.config import settings
+from backend.services.llm_service import get_client
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# System prompt for the extraction call
+# ---------------------------------------------------------------------------
 
 EXTRACTION_SYSTEM = """\
 You are a brand intelligence analyst. You will receive raw content scraped from a brand's
@@ -53,19 +64,39 @@ Rules:
 - Be concise: value propositions should be 1 sentence, themes should be 2-4 words each.
 """
 
+# Maximum characters of combined scraped content sent to the LLM.
+# Keeps the prompt within a safe token budget while preserving most signal.
+_MAX_CONTENT_CHARS = 12_000
+
 
 async def extract_brand_core(scraped_data: list[dict], api_key: str) -> dict:
     """
-    Takes a list of scraped source dicts (website, instagram, etc.)
-    and returns a parsed BrandCore dict.
+    Analyse scraped brand content and return a structured BrandCore dict.
+
+    Args:
+        scraped_data: List of dicts produced by firecrawl_client and/or
+                      apify_client. Each dict must have a 'source_type' key.
+        api_key:      Anthropic API key (passed explicitly so this module
+                      remains testable in isolation).
+
+    Returns:
+        A BrandCore dict matching the schema in EXTRACTION_SYSTEM.
+        On JSON parse failure, returns a minimal valid skeleton so callers
+        always receive a usable dict (logged as an error).
+
+    Note:
+        api_key is accepted as a parameter for backwards-compatibility but
+        the function always uses the shared client from llm_service.get_client().
+        The parameter is ignored — the client reads its key from settings.
     """
     combined = _build_combined_content(scraped_data)
-    logger.info("Brand extractor: sending %d chars to Claude", len(combined))
+    logger.info("Brand extractor: sending %d chars to Claude (%s)", len(combined), settings.LLM_EXTRACTION_MODEL)
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    # Re-use the shared singleton rather than spawning a new connection pool.
+    client = get_client()
 
     message = await client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model=settings.LLM_EXTRACTION_MODEL,
         max_tokens=2048,
         system=EXTRACTION_SYSTEM,
         messages=[
@@ -73,7 +104,7 @@ async def extract_brand_core(scraped_data: list[dict], api_key: str) -> dict:
                 "role": "user",
                 "content": (
                     "Here is the brand content to analyse:\n\n"
-                    f"{combined[:12000]}"  # cap at ~12k chars
+                    f"{combined[:_MAX_CONTENT_CHARS]}"
                 ),
             }
         ],
@@ -85,8 +116,16 @@ async def extract_brand_core(scraped_data: list[dict], api_key: str) -> dict:
     return brand_core
 
 
+# ---------------------------------------------------------------------------
+# Content assembly
+# ---------------------------------------------------------------------------
+
 def _build_combined_content(scraped_data: list[dict]) -> str:
-    """Assemble a readable text block from all scraped sources."""
+    """
+    Assemble a single readable text block from all scraped sources.
+    Each source is wrapped in a clearly labelled section so Claude can
+    distinguish website copy from Instagram captions.
+    """
     sections: list[str] = []
 
     for source in scraped_data:
@@ -103,7 +142,9 @@ def _build_combined_content(scraped_data: list[dict]) -> str:
             if meta.get("description"):
                 header += f"Meta description: {meta['description']}\n"
             if extract:
+                # Firecrawl's structured extract (brand name, tone, colours, etc.)
                 header += f"Extracted insights: {json.dumps(extract, ensure_ascii=False)}\n"
+            # Cap per-source markdown to keep total within _MAX_CONTENT_CHARS.
             header += f"\nContent:\n{markdown[:4000]}\n"
             sections.append(header)
 
@@ -122,19 +163,39 @@ def _build_combined_content(scraped_data: list[dict]) -> str:
                 header += f"\nRecent captions:\n{captions[:4000]}\n"
             sections.append(header)
 
+        else:
+            logger.debug("Brand extractor: unknown source type %r — skipping", src_type)
+
     return "\n\n".join(sections)
 
 
+# ---------------------------------------------------------------------------
+# JSON parsing
+# ---------------------------------------------------------------------------
+
 def _parse_json(raw: str) -> dict:
-    """Parse Claude's response, stripping any accidental markdown fences."""
-    # Remove ```json ... ``` wrappers if present
+    """
+    Parse Claude's response into a dict, stripping any accidental markdown fences.
+
+    Claude occasionally wraps the JSON in ```json ... ``` even when instructed
+    not to. This handles that gracefully. On parse failure, a minimal valid
+    Brand Core skeleton is returned so the ingestion pipeline doesn't crash —
+    the calling pipeline logs this as an error and the UI shows whatever
+    partial data was extracted.
+    """
+    # Strip ```json ... ``` or ``` ... ``` wrappers.
     clean = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
     clean = re.sub(r"\s*```$", "", clean, flags=re.MULTILINE)
+
     try:
         return json.loads(clean.strip())
     except json.JSONDecodeError as exc:
-        logger.error("Brand extractor JSON parse error: %s\nRaw: %s", exc, raw[:500])
-        # Return a minimal valid Brand Core rather than crashing
+        logger.error(
+            "Brand extractor: JSON parse failed — %s\nRaw response (first 500 chars): %s",
+            exc, raw[:500]
+        )
+        # Return a minimal skeleton so the pipeline can continue and save
+        # whatever partial data exists rather than failing completely.
         return {
             "tone": None,
             "visual": None,

@@ -20,6 +20,7 @@ export function Sidebar() {
   const [creating, setCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [showNewProject, setShowNewProject] = useState(false)
+  const [createError, setCreateError] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -40,6 +41,7 @@ export function Sidebar() {
   async function createProject() {
     if (!newProjectName.trim()) return
     setCreating(true)
+    setCreateError('')
     try {
       const project = await api.projects.create({ name: newProjectName.trim() })
       setProjects([project, ...projects])
@@ -50,10 +52,10 @@ export function Sidebar() {
       setChats([chat])
       setActiveChat(chat)
       router.push(`/projects/${project.id}/chats/${chat.id}`)
-      // Prompt user to build Brand Core immediately after project creation
       setIngestionOpen(true)
     } catch (err) {
       console.error(err)
+      setCreateError(String(err))
     } finally {
       setCreating(false)
     }
@@ -116,6 +118,9 @@ export function Sidebar() {
                   if (e.key === 'Escape') setShowNewProject(false)
                 }}
               />
+              {createError && (
+                <p className="text-xs text-red-500 break-all">{createError}</p>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={createProject}
@@ -125,7 +130,7 @@ export function Sidebar() {
                   {creating ? 'Creating…' : 'Create'}
                 </button>
                 <button
-                  onClick={() => setShowNewProject(false)}
+                  onClick={() => { setShowNewProject(false); setCreateError('') }}
                   className="flex-1 rounded-md border border-border py-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                   Cancel

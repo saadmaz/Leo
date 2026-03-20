@@ -1,45 +1,104 @@
+/**
+ * Zustand application store — single source of truth for all client state.
+ *
+ * Sections:
+ *  - Auth        — current Firebase user
+ *  - Projects    — list, active selection, CRUD helpers
+ *  - Chats       — list for active project, active selection, CRUD helpers
+ *  - Messages    — optimistic message list for the active chat
+ *  - Streaming   — in-flight chat stream state and cancellation
+ *  - UI          — sidebar open/close, panel visibility
+ *  - Ingestion   — brand ingestion progress tracking
+ *
+ * Design notes:
+ *  - Upsert helpers prevent duplicate entries when re-fetching data.
+ *  - streamController holds an AbortController for the active SSE stream so
+ *    callers can cancel mid-stream (e.g. on component unmount or user action).
+ *  - UI state (sidebar, panels) is intentionally co-located with domain state
+ *    to avoid prop-drilling; consider splitting into a separate uiStore if the
+ *    app grows significantly.
+ */
+
 import { create } from 'zustand'
-import type { AppUser, BrandCore, Chat, IngestionStep, OptimisticMessage, Project } from '@/types'
+import type {
+  AppUser,
+  BrandCore,
+  Chat,
+  IngestionStep,
+  OptimisticMessage,
+  Project,
+} from '@/types'
 
 interface AppState {
+  // ---------------------------------------------------------------------------
   // Auth
+  // ---------------------------------------------------------------------------
   user: AppUser | null
   setUser: (user: AppUser | null) => void
 
+  // ---------------------------------------------------------------------------
   // Projects
+  // ---------------------------------------------------------------------------
   projects: Project[]
   activeProject: Project | null
   setProjects: (projects: Project[]) => void
   setActiveProject: (project: Project | null) => void
+  /** Insert or replace a project by id. Prepends new projects to the list. */
   upsertProject: (project: Project) => void
   removeProject: (id: string) => void
 
+  // ---------------------------------------------------------------------------
   // Chats
+  // ---------------------------------------------------------------------------
   chats: Chat[]
   activeChat: Chat | null
   setChats: (chats: Chat[]) => void
+  /** Switching the active chat also clears the message list. */
   setActiveChat: (chat: Chat | null) => void
+  /** Insert or replace a chat by id. Prepends new chats to the list. */
   upsertChat: (chat: Chat) => void
   removeChat: (id: string) => void
 
+  // ---------------------------------------------------------------------------
   // Messages
+  // ---------------------------------------------------------------------------
   messages: OptimisticMessage[]
   setMessages: (messages: OptimisticMessage[]) => void
-  appendDelta: (id: string, delta: string) => void
+  /** Append a new optimistic message (displayed immediately, before server ack). */
   addMessage: (msg: OptimisticMessage) => void
+  /** Append a text delta to an in-progress streaming message. */
+  appendDelta: (id: string, delta: string) => void
+  /** Mark a message as fully received and update its final content. */
   finaliseMessage: (id: string, content: string) => void
 
-  // UI
+  // ---------------------------------------------------------------------------
+  // Streaming — chat SSE state + cancellation
+  // ---------------------------------------------------------------------------
   isStreaming: boolean
   setIsStreaming: (v: boolean) => void
+  /**
+   * AbortController for the active SSE stream.
+   * Set this before calling api.streamMessage(), clear it on completion.
+   * Components can call streamController?.abort() to stop the stream early.
+   */
+  streamController: AbortController | null
+  setStreamController: (controller: AbortController | null) => void
+
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
   sidebarOpen: boolean
   setSidebarOpen: (v: boolean) => void
 
+  // ---------------------------------------------------------------------------
   // Brand Core panel
+  // ---------------------------------------------------------------------------
   brandCorePanelOpen: boolean
   setBrandCorePanelOpen: (v: boolean) => void
 
+  // ---------------------------------------------------------------------------
   // Ingestion
+  // ---------------------------------------------------------------------------
   ingestionOpen: boolean
   setIngestionOpen: (v: boolean) => void
   ingestionSteps: IngestionStep[]
@@ -49,16 +108,23 @@ interface AppState {
   setIngestionProgress: (pct: number) => void
   setIngestionRunning: (v: boolean) => void
   resetIngestion: () => void
-  /** Called when ingestion completes — updates the active project's brandCore. */
+  /**
+   * Called when ingestion completes successfully.
+   * Updates the brand core on both the project list and the active project.
+   */
   onIngestionDone: (projectId: string, brandCore: BrandCore) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  // ---------------------------------------------------------------------------
   // Auth
+  // ---------------------------------------------------------------------------
   user: null,
   setUser: (user) => set({ user }),
 
+  // ---------------------------------------------------------------------------
   // Projects
+  // ---------------------------------------------------------------------------
   projects: [],
   activeProject: null,
   setProjects: (projects) => set({ projects }),
@@ -68,6 +134,7 @@ export const useAppStore = create<AppState>((set) => ({
       projects: s.projects.some((p) => p.id === project.id)
         ? s.projects.map((p) => (p.id === project.id ? project : p))
         : [project, ...s.projects],
+      // Keep activeProject in sync if it's the one being updated.
       activeProject: s.activeProject?.id === project.id ? project : s.activeProject,
     })),
   removeProject: (id) =>
@@ -76,7 +143,9 @@ export const useAppStore = create<AppState>((set) => ({
       activeProject: s.activeProject?.id === id ? null : s.activeProject,
     })),
 
+  // ---------------------------------------------------------------------------
   // Chats
+  // ---------------------------------------------------------------------------
   chats: [],
   activeChat: null,
   setChats: (chats) => set({ chats }),
@@ -94,7 +163,9 @@ export const useAppStore = create<AppState>((set) => ({
       activeChat: s.activeChat?.id === id ? null : s.activeChat,
     })),
 
+  // ---------------------------------------------------------------------------
   // Messages
+  // ---------------------------------------------------------------------------
   messages: [],
   setMessages: (messages) => set({ messages }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
@@ -111,17 +182,29 @@ export const useAppStore = create<AppState>((set) => ({
       ),
     })),
 
-  // UI
+  // ---------------------------------------------------------------------------
+  // Streaming
+  // ---------------------------------------------------------------------------
   isStreaming: false,
   setIsStreaming: (isStreaming) => set({ isStreaming }),
+  streamController: null,
+  setStreamController: (streamController) => set({ streamController }),
+
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
   sidebarOpen: true,
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
 
+  // ---------------------------------------------------------------------------
   // Brand Core panel
+  // ---------------------------------------------------------------------------
   brandCorePanelOpen: false,
   setBrandCorePanelOpen: (brandCorePanelOpen) => set({ brandCorePanelOpen }),
 
+  // ---------------------------------------------------------------------------
   // Ingestion
+  // ---------------------------------------------------------------------------
   ingestionOpen: false,
   setIngestionOpen: (ingestionOpen) => set({ ingestionOpen }),
   ingestionSteps: [],
@@ -129,6 +212,7 @@ export const useAppStore = create<AppState>((set) => ({
   ingestionRunning: false,
   addIngestionStep: (step) =>
     set((s) => ({
+      // Replace existing step with the same label (e.g. running → done).
       ingestionSteps: [...s.ingestionSteps.filter((x) => x.label !== step.label), step],
     })),
   setIngestionProgress: (ingestionProgress) => set({ ingestionProgress }),
@@ -138,7 +222,9 @@ export const useAppStore = create<AppState>((set) => ({
   onIngestionDone: (projectId, brandCore) =>
     set((s) => {
       const updated = s.projects.map((p) =>
-        p.id === projectId ? { ...p, brandCore, ingestionStatus: 'complete' as const } : p,
+        p.id === projectId
+          ? { ...p, brandCore, ingestionStatus: 'complete' as const }
+          : p,
       )
       const activeProject =
         s.activeProject?.id === projectId
