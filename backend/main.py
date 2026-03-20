@@ -20,12 +20,16 @@ from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 # Format: "2024-01-01 12:00:00 [req_id=abc123] INFO backend.foo — message"
 # Outside a request context, req_id shows as '-'.
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=settings.LOG_LEVEL,
-    format="%(asctime)s [req_id=%(request_id)s] %(levelname)s %(name)s — %(message)s",
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(logging.Formatter(
+    fmt="%(asctime)s [req_id=%(request_id)s] %(levelname)s %(name)s — %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-)
-logging.getLogger().addFilter(RequestIdFilter())
+))
+# Filter must be on the handler (not the logger) so it runs for records
+# propagated up from uvicorn's child loggers too.
+_log_handler.addFilter(RequestIdFilter())
+
+logging.basicConfig(handlers=[_log_handler], level=settings.LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
 
 
