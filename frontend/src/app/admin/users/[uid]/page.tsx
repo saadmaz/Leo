@@ -270,7 +270,7 @@ export default function AdminUserDetailPage() {
               </p>
               <p className="text-xs text-muted-foreground">
                 {user.suspended
-                  ? 'Re-enable the user's ability to sign in.'
+                  ? "Re-enable the user's ability to sign in."
                   : 'Block the user from signing in (Firebase Auth disabled).'}
               </p>
             </div>
