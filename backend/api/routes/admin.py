@@ -90,12 +90,13 @@ class ChangelogRequest(BaseModel):
     body: str
     version: str = ""
     publishedAt: Optional[str] = None
+    tags: Optional[list[str]] = None
 
 
 class BroadcastRequest(BaseModel):
     subject: str
-    htmlBody: str
-    targetTier: Optional[str] = None   # None = all users; "free"|"pro"|"agency" = segment
+    html_body: str
+    segment: Optional[str] = None   # None = all users; "free"|"pro"|"agency" = segment
 
 
 # ---------------------------------------------------------------------------
@@ -556,13 +557,13 @@ def _ping_key(name: str, value: Optional[str]) -> str:
 # Announcements (admin CRUD)
 # ---------------------------------------------------------------------------
 
-@router.get("/announcements")
+@router.get("/communications/announcements")
 def list_announcements(_user: SuperAdminUser):
     """Return all announcements (active and inactive), newest first."""
     return firebase_service.list_announcements(active_only=False)
 
 
-@router.post("/announcements")
+@router.post("/communications/announcements")
 def create_announcement(body: AnnouncementRequest, user: SuperAdminUser):
     """Create a new in-app announcement banner."""
     data = body.model_dump()
@@ -576,7 +577,7 @@ def create_announcement(body: AnnouncementRequest, user: SuperAdminUser):
     return result
 
 
-@router.patch("/announcements/{announcement_id}")
+@router.patch("/communications/announcements/{announcement_id}")
 def update_announcement(announcement_id: str, body: dict, user: SuperAdminUser):
     """Toggle active status or update any field on an announcement."""
     result = firebase_service.update_announcement(announcement_id, body)
@@ -591,7 +592,7 @@ def update_announcement(announcement_id: str, body: dict, user: SuperAdminUser):
     return result
 
 
-@router.delete("/announcements/{announcement_id}")
+@router.delete("/communications/announcements/{announcement_id}")
 def delete_announcement(announcement_id: str, user: SuperAdminUser):
     """Delete an announcement."""
     firebase_service.delete_announcement(announcement_id)
@@ -607,13 +608,13 @@ def delete_announcement(announcement_id: str, user: SuperAdminUser):
 # Changelog (admin CRUD)
 # ---------------------------------------------------------------------------
 
-@router.get("/changelog")
+@router.get("/communications/changelog")
 def list_changelog(_user: SuperAdminUser, limit: int = Query(50, ge=1, le=200)):
     """Return changelog entries newest first."""
     return firebase_service.list_changelog_entries(limit=limit)
 
 
-@router.post("/changelog")
+@router.post("/communications/changelog")
 def create_changelog(body: ChangelogRequest, user: SuperAdminUser):
     """Create a new What's New changelog entry."""
     data = body.model_dump()
@@ -627,7 +628,7 @@ def create_changelog(body: ChangelogRequest, user: SuperAdminUser):
     return result
 
 
-@router.delete("/changelog/{entry_id}")
+@router.delete("/communications/changelog/{entry_id}")
 def delete_changelog_entry(entry_id: str, user: SuperAdminUser):
     """Delete a changelog entry."""
     firebase_service.delete_changelog_entry(entry_id)
@@ -653,8 +654,8 @@ async def send_broadcast(body: BroadcastRequest, user: SuperAdminUser):
 
     all_users = firebase_service.list_all_users(limit=5000)
 
-    if body.targetTier:
-        recipients = [u["email"] for u in all_users if u.get("tier") == body.targetTier and u.get("email")]
+    if body.segment:
+        recipients = [u["email"] for u in all_users if u.get("tier") == body.segment and u.get("email")]
     else:
         recipients = [u["email"] for u in all_users if u.get("email")]
 
@@ -665,7 +666,7 @@ async def send_broadcast(body: BroadcastRequest, user: SuperAdminUser):
         email_service.send_broadcast,
         recipients,
         body.subject,
-        body.htmlBody,
+        body.html_body,
     )
 
     firebase_service.write_audit_log(
@@ -673,7 +674,7 @@ async def send_broadcast(body: BroadcastRequest, user: SuperAdminUser):
         action="email_broadcast",
         details={
             "subject": body.subject,
-            "targetTier": body.targetTier or "all",
+            "targetTier": body.segment or "all",
             "recipientCount": len(recipients),
             "sent": result["sent"],
             "failed": result["failed"],
