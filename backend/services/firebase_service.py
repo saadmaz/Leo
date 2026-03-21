@@ -239,6 +239,157 @@ def get_user_by_email(email: str) -> Optional[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Admin — user management
+# ---------------------------------------------------------------------------
+
+def set_super_admin_claim(uid: str) -> None:
+    """
+    Grant the superAdmin custom claim to a Firebase Auth user.
+    Call this once per admin account (from a secure script or the Firebase console).
+    """
+    auth.set_custom_user_claims(uid, {"superAdmin": True})
+    logger.info("Granted superAdmin claim to uid %s", uid)
+
+
+def revoke_super_admin_claim(uid: str) -> None:
+    """Remove the superAdmin custom claim from a Firebase Auth user."""
+    auth.set_custom_user_claims(uid, {"superAdmin": False})
+    logger.info("Revoked superAdmin claim from uid %s", uid)
+
+
+def list_all_users(limit: int = 500) -> list[dict]:
+    """
+    Return up to `limit` user profile documents from the Firestore users collection,
+    sorted by createdAt descending (most recent first).
+
+    NOTE: This performs a full collection scan. Acceptable at current scale;
+    add server-side pagination if the user base exceeds ~10,000.
+    """
+    db = get_db()
+    docs = db.collection("users").limit(limit).stream()
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    return sorted(results, key=lambda u: u.get("createdAt", ""), reverse=True)
+
+
+def get_user_project_count(uid: str) -> int:
+    """Return the number of projects the user owns."""
+    db = get_db()
+    docs = (
+        db.collection("projects")
+        .where(f"members.{uid}", "in", ["admin", "editor", "viewer"])
+        .stream()
+    )
+    return sum(1 for _ in docs)
+
+
+def suspend_user(uid: str) -> None:
+    """
+    Disable a Firebase Auth account (the user can no longer sign in).
+    The Firestore profile is preserved; set a `suspended` flag for UI.
+    """
+    auth.update_user(uid, disabled=True)
+    db = get_db()
+    db.collection("users").document(uid).update({
+        "suspended": True,
+        "updatedAt": _utcnow(),
+    })
+    logger.info("Suspended user %s", uid)
+
+
+def unsuspend_user(uid: str) -> None:
+    """Re-enable a previously suspended Firebase Auth account."""
+    auth.update_user(uid, disabled=False)
+    db = get_db()
+    db.collection("users").document(uid).update({
+        "suspended": False,
+        "updatedAt": _utcnow(),
+    })
+    logger.info("Unsuspended user %s", uid)
+
+
+def delete_user_completely(uid: str) -> None:
+    """
+    Delete the Firebase Auth record AND the Firestore user profile.
+    Projects owned by the user are NOT deleted (they become orphaned).
+    For a full cascade, call delete_project_deep() for each of their projects first.
+    """
+    try:
+        auth.delete_user(uid)
+    except auth.UserNotFoundError:
+        logger.warning("delete_user_completely: Firebase Auth user %s not found", uid)
+
+    db = get_db()
+    db.collection("users").document(uid).delete()
+    logger.info("Deleted user %s from Auth and Firestore", uid)
+
+
+def override_user_limits(uid: str, overrides: dict) -> None:
+    """
+    Persist admin-defined usage limit overrides to the user's Firestore profile.
+    Keys in `overrides` are stored under a top-level `adminOverrides` map so
+    billing_service can check them before applying plan defaults.
+
+    Example overrides: {"messagesLimit": 9999, "projectsLimit": 50}
+    """
+    db = get_db()
+    updates = {f"adminOverrides.{k}": v for k, v in overrides.items()}
+    updates["updatedAt"] = _utcnow()
+    db.collection("users").document(uid).update(updates)
+
+
+def get_platform_stats() -> dict:
+    """
+    Return aggregate platform statistics for the admin dashboard.
+    Performs multiple Firestore scans — call infrequently (cache if needed).
+    """
+    import time as _time
+
+    db = get_db()
+
+    # Count users by tier
+    tier_counts: dict[str, int] = {"free": 0, "pro": 0, "agency": 0}
+    total_messages = 0
+    new_signups_7d = 0
+    suspended_count = 0
+
+    cutoff_7d = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    from datetime import timedelta
+    cutoff_7d = cutoff_7d - timedelta(days=7)
+    cutoff_7d_iso = cutoff_7d.isoformat()
+
+    for doc in db.collection("users").stream():
+        data = doc.to_dict() or {}
+        tier = data.get("tier", "free")
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        billing = data.get("billing", {})
+        total_messages += billing.get("messagesUsed", 0)
+        if data.get("createdAt", "") >= cutoff_7d_iso:
+            new_signups_7d += 1
+        if data.get("suspended"):
+            suspended_count += 1
+
+    # Count total projects
+    total_projects = sum(1 for _ in db.collection("projects").stream())
+
+    total_users = sum(tier_counts.values())
+
+    # Estimated MRR (based on tier counts × plan price)
+    mrr = (tier_counts.get("pro", 0) * 29) + (tier_counts.get("agency", 0) * 99)
+
+    return {
+        "totalUsers": total_users,
+        "usersByTier": tier_counts,
+        "newSignups7d": new_signups_7d,
+        "suspendedUsers": suspended_count,
+        "totalProjects": total_projects,
+        "totalMessagesThisMonth": total_messages,
+        "estimatedMrr": mrr,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Projects
 # ---------------------------------------------------------------------------
 
