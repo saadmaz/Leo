@@ -173,6 +173,14 @@ def increment_ingestions_used(uid: str) -> None:
     )
 
 
+def reset_messages_used(uid: str) -> None:
+    """Reset the monthly message counter when the billing period rolls over."""
+    db = get_db()
+    db.collection("users").document(uid).update(
+        {"billing.messagesUsed": 0, "billing.messagesResetAt": None}
+    )
+
+
 def reset_monthly_usage(uid: str) -> None:
     """Reset message counter at the start of a new billing period."""
     db = get_db()

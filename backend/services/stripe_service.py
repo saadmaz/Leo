@@ -26,6 +26,7 @@ PLANS = {
         "projects_limit": 1,
         "messages_limit": 20,
         "ingestions_limit": 1,
+        "campaigns_limit": 3,
     },
     "pro": {
         "label": "Pro",
@@ -33,6 +34,7 @@ PLANS = {
         "projects_limit": 10,
         "messages_limit": 500,
         "ingestions_limit": 999,  # effectively unlimited
+        "campaigns_limit": 999,   # effectively unlimited
     },
     "agency": {
         "label": "Agency",
@@ -40,6 +42,7 @@ PLANS = {
         "projects_limit": 999,
         "messages_limit": 9999,
         "ingestions_limit": 9999,
+        "campaigns_limit": 9999,
     },
 }
 

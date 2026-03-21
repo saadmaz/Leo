@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from backend.api.deps import get_project_or_404, assert_editor, assert_member
 from backend.middleware.auth import CurrentUser
-from backend.services import firebase_service, campaign_service
+from backend.services import billing_service, firebase_service, campaign_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["campaigns"])
@@ -95,6 +95,10 @@ async def generate_campaign(
     """
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
+
+    # Check campaign quota before doing anything else.
+    import asyncio
+    await asyncio.to_thread(billing_service.assert_can_generate_campaign, user["uid"], project_id)
 
     # Create a placeholder campaign document to get an ID
     campaign = firebase_service.create_campaign(project_id, {

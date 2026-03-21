@@ -29,6 +29,17 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'LEO',
   },
+  openGraph: {
+    type: 'website',
+    title: 'LEO — Your Brand. One Chat. Every Channel.',
+    description: 'Brand-aware AI marketing co-pilot. Build your Brand Core and create on-brand campaigns, content, and copy — all in one chat.',
+    siteName: 'LEO',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LEO — Your Brand. One Chat. Every Channel.',
+    description: 'Brand-aware AI marketing co-pilot. Build your Brand Core and create on-brand campaigns, content, and copy — all in one chat.',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -20,7 +20,7 @@ const PLANS = [
     icon: Sparkles,
     color: 'text-muted-foreground',
     borderColor: 'border-border',
-    features: ['1 project', '1 brand ingestion', '20 messages / month'],
+    features: ['1 project', '1 brand ingestion', '20 messages / month', '3 campaigns'],
   },
   {
     key: 'pro' as const,
@@ -30,7 +30,7 @@ const PLANS = [
     color: 'text-violet-400',
     borderColor: 'border-violet-500/50',
     popular: true,
-    features: ['10 projects', 'Unlimited brand ingestions', '500 messages / month', 'Priority support'],
+    features: ['10 projects', 'Unlimited brand ingestions', '500 messages / month', 'Unlimited campaigns', 'Priority support'],
   },
   {
     key: 'agency' as const,
@@ -39,7 +39,7 @@ const PLANS = [
     icon: Building2,
     color: 'text-amber-400',
     borderColor: 'border-amber-500/50',
-    features: ['Unlimited projects', 'Unlimited ingestions', 'Unlimited messages', 'White-label ready', 'Priority support'],
+    features: ['Unlimited projects', 'Unlimited ingestions', 'Unlimited messages', 'Unlimited campaigns', 'White-label ready', 'Priority support'],
   },
 ]
 

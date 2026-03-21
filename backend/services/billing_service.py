@@ -8,6 +8,7 @@ asyncio.to_thread() where needed.
 from __future__ import annotations
 
 import logging
+import time
 from fastapi import HTTPException, status
 
 from backend.services import firebase_service
@@ -60,6 +61,16 @@ def assert_can_send_message(uid: str) -> None:
     limit = _get_limits(plan)["messages_limit"]
 
     billing = user.get("billing", {})
+
+    # Auto-reset message counter when the billing period rolls over.
+    reset_at = billing.get("messagesResetAt")
+    if reset_at and int(reset_at) < int(time.time()):
+        try:
+            firebase_service.reset_messages_used(uid)
+            billing["messagesUsed"] = 0
+        except Exception as exc:
+            logger.warning("Failed to reset message counter for %s: %s", uid, exc)
+
     used = billing.get("messagesUsed", 0)
 
     if used >= limit:
@@ -121,6 +132,31 @@ def increment_ingestion_count(uid: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Campaign limits
+# ---------------------------------------------------------------------------
+
+def assert_can_generate_campaign(uid: str, project_id: str) -> None:
+    """Raise HTTP 402 if the user has hit their campaign limit."""
+    user = firebase_service.get_user(uid) or {}
+    plan = user.get("tier", "free")
+    limit = _get_limits(plan).get("campaigns_limit", 3)
+
+    campaigns = firebase_service.list_campaigns(project_id)
+    if len(campaigns) >= limit:
+        plan_label = _get_limits(plan)["label"]
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "campaign_limit_reached",
+                "message": f"You've reached the {plan_label} plan campaign limit of {limit}.",
+                "limit": limit,
+                "current": len(campaigns),
+                "plan": plan,
+            },
+        )
+
+
+# ---------------------------------------------------------------------------
 # Usage summary (for the billing page)
 # ---------------------------------------------------------------------------
 
@@ -152,6 +188,9 @@ def get_usage_summary(uid: str) -> dict:
         "ingestions": {
             "used": billing.get("ingestionsUsed", 0),
             "limit": limits["ingestions_limit"],
+        },
+        "campaigns": {
+            "limit": limits.get("campaigns_limit", 3),
         },
         "stripeCustomerId": billing.get("stripeCustomerId"),
         "subscriptionStatus": billing.get("subscriptionStatus"),

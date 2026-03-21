@@ -67,6 +67,7 @@ export function CampaignGenerator() {
   const {
     campaignGeneratorOpen, setCampaignGeneratorOpen,
     activeProject, upsertCampaign, setCampaignPanelOpen, setActiveCampaign,
+    openUpgradeModal,
   } = useAppStore()
 
   const [name, setName] = useState('')
@@ -126,7 +127,13 @@ export function CampaignGenerator() {
         },
         onError: (msg) => {
           setRunning(false)
-          setErrorMsg(msg)
+          if (msg.includes('402')) {
+            setCampaignGeneratorOpen(false)
+            reset()
+            openUpgradeModal("You've reached your campaign limit. Upgrade to generate unlimited campaigns.")
+          } else {
+            setErrorMsg(msg)
+          }
         },
       },
     )

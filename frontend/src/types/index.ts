@@ -285,6 +285,7 @@ export interface BillingStatus {
   projects: UsageCounter
   messages: UsageCounter
   ingestions: UsageCounter
+  campaigns?: { limit: number }
   stripeCustomerId?: string | null
   subscriptionStatus?: string | null
   currentPeriodEnd?: number | null

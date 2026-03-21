@@ -172,6 +172,10 @@ async def _handle_event(event: stripe.Event) -> None:
                 updates: dict = {"subscriptionStatus": status_val}
                 if data.get("current_period_end"):
                     updates["currentPeriodEnd"] = data["current_period_end"]
+                    # Persist the period-end as the reset timestamp so the billing
+                    # service can auto-reset the message counter on the next request
+                    # after the period rolls over.
+                    updates["messagesResetAt"] = data["current_period_end"]
                 await asyncio.to_thread(firebase_service.update_user_billing, uid, updates)
                 if plan:
                     await asyncio.to_thread(firebase_service.set_user_tier, uid, plan)
