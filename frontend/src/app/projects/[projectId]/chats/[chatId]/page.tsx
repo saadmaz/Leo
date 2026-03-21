@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Zap, ChevronRight, Cpu, Megaphone } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone } from 'lucide-react'
 import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
@@ -27,6 +27,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
   const [messagesLoading, setMessagesLoading] = useState(false)
+  const [hintsOpen, setHintsOpen] = useState(false)
 
   const {
     user,
@@ -278,6 +279,31 @@ export default function ChatPage() {
                   </p>
                 </div>
 
+                {/* Suggestion chips */}
+                <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+                  {(hasBrandCore ? [
+                    'Write 5 Instagram captions',
+                    'Create a campaign brief',
+                    'Generate a content calendar for this week',
+                    "What's my brand tone?",
+                    'Write a promotional email',
+                    'Analyse our brand positioning',
+                  ] : [
+                    'What can LEO do for my brand?',
+                    'Write 5 Instagram captions',
+                    'Create a content calendar',
+                    'Write ad copy for Meta',
+                  ]).map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => setInput(prompt)}
+                      className="rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+
                 {!hasBrandCore && !isProcessing && activeProject && (
                   <button
                     onClick={() => setIngestionOpen(true)}
@@ -287,6 +313,40 @@ export default function ChatPage() {
                     Build my Brand Core
                   </button>
                 )}
+
+                {/* What can LEO do? collapsible */}
+                <div className="max-w-xs text-left">
+                  <button
+                    onClick={() => setHintsOpen((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto"
+                  >
+                    {hintsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    What can LEO do?
+                  </button>
+                  <AnimatePresence>
+                    {hintsOpen && (
+                      <motion.ul
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="mt-2 space-y-1.5 overflow-hidden text-left"
+                      >
+                        {[
+                          'Generate on-brand captions, ad copy & emails',
+                          'Build campaign briefs and content calendars',
+                          'Analyse and refine your brand voice',
+                          'Generate images from prompts (DALL-E 3)',
+                          'Switch channels — Instagram, LinkedIn, TikTok & more',
+                        ].map((item) => (
+                          <li key={item} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                            <span className="text-primary mt-0.5 shrink-0">✦</span>
+                            {item}
+                          </li>
+                        ))}
+                      </motion.ul>
+                    )}
+                  </AnimatePresence>
+                </div>
               </motion.div>
             )}
 

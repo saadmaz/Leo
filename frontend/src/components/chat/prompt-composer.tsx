@@ -48,6 +48,7 @@ export function PromptComposer({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachments, setAttachments] = useState<ImageAttachment[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
@@ -114,6 +115,22 @@ export function PromptComposer({
     setAttachError(null)
   }
 
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    if (!isStreaming) setIsDragging(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    // Only clear if leaving the container entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+    if (!isStreaming) handleFiles(e.dataTransfer.files)
+  }
+
   const isStreaming = disabled
   const canStop = isStreaming && !!onStop
   const canSend = !isStreaming && (!!value.trim() || attachments.length > 0)
@@ -156,7 +173,17 @@ export function PromptComposer({
         )}
 
         {/* Composer input */}
-        <div className="relative rounded-xl border border-border/60 bg-card shadow-sm focus-within:border-ring focus-within:ring-1 focus-within:ring-ring transition-all">
+        <div
+          className={cn(
+            'relative rounded-xl border bg-card shadow-sm focus-within:ring-1 focus-within:ring-ring transition-all',
+            isDragging
+              ? 'border-primary border-dashed bg-primary/5'
+              : 'border-border/60 focus-within:border-ring',
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <textarea
             ref={textareaRef}
             value={value}
@@ -222,7 +249,7 @@ export function PromptComposer({
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground/40">
-          LEO can make mistakes. Always verify important brand decisions.
+          ↵ to send · Shift+↵ new line · LEO can make mistakes
         </p>
       </div>
     </div>

@@ -88,9 +88,11 @@ export function TemplateBar({ channel, brandName, onSelect }: TemplateBarProps) 
   const key = channel ?? 'general'
   const templates = TEMPLATES[key] ?? TEMPLATES.general
 
-  // Personalise with brand name when available
+  // Personalise with brand name when available (appends "for {brand}" to generation prompts)
   function personalise(t: string) {
-    return brandName ? t : t
+    if (!brandName) return t
+    if (/^Write|^Generate|^Create|^Suggest/.test(t)) return `${t} for ${brandName}`
+    return t
   }
 
   return (
