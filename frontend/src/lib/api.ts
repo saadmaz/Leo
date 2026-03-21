@@ -359,7 +359,7 @@ export const api = {
     get: (projectId: string, campaignId: string, signal?: AbortSignal) =>
       get<Campaign>(`/projects/${projectId}/campaigns/${campaignId}`, signal),
     delete: (projectId: string, campaignId: string, signal?: AbortSignal) =>
-      del<void>(`/projects/${projectId}/campaigns/${campaignId}`, signal),
+      del(`/projects/${projectId}/campaigns/${campaignId}`, signal),
   },
 
   async streamCampaignGenerate(
