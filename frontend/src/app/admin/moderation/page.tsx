@@ -243,9 +243,8 @@ function FlagCard({
             <>
               <Button
                 size="sm"
-                variant="destructive"
                 onClick={onAction}
-                className="h-7 px-2.5 text-xs"
+                className="h-7 px-2.5 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Delete content
               </Button>

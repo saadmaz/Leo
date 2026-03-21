@@ -186,10 +186,9 @@ function ProjectRow({
           <>
             <Button
               size="sm"
-              variant="destructive"
               disabled={isDeleting}
               onClick={onDelete}
-              className="h-7 px-2 text-xs"
+              className="h-7 px-2 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Confirm
             </Button>
