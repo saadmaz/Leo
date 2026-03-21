@@ -197,6 +197,44 @@ export const adminApi = {
     delete: (projectId: string) => del(`/projects/${projectId}`),
   },
 
+  featureFlags: {
+    list: () => get<FeatureFlag[]>('/feature-flags'),
+
+    toggle: (flagId: string, enabled: boolean) =>
+      patch<FeatureFlag>(`/feature-flags/${flagId}`, { enabled }),
+
+    setTiers: (flagId: string, allowedTiers: string[] | null) =>
+      patch<FeatureFlag>(`/feature-flags/${flagId}`, { allowedTiers }),
+
+    upsert: async (flagId: string, body: {
+      name: string
+      description?: string
+      enabled?: boolean
+      allowedTiers?: string[] | null
+      userOverrides?: Record<string, boolean>
+    }): Promise<FeatureFlag> => {
+      const res = await fetch(`${API}/feature-flags/${flagId}`, {
+        method: 'PUT',
+        headers: await adminHeaders(),
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error(`PUT /feature-flags/${flagId} → ${res.status}: ${await res.text()}`)
+      return res.json()
+    },
+
+    setUserOverride: (flagId: string, uid: string, value: boolean) =>
+      post<{ ok: boolean }>(`/feature-flags/${flagId}/overrides`, { uid, value }),
+
+    removeUserOverride: (flagId: string, uid: string) =>
+      del(`/feature-flags/${flagId}/overrides/${uid}`),
+
+    delete: (flagId: string) => del(`/feature-flags/${flagId}`),
+  },
+
+  system: {
+    health: () => get<SystemHealth>('/system/health'),
+  },
+
   moderation: {
     stats: () => get<ModerationStats>('/moderation/stats'),
 
@@ -213,6 +251,30 @@ export const adminApi = {
 
     abuse: () => get<AbuseReport>('/moderation/abuse'),
   },
+}
+
+export interface FeatureFlag {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  allowedTiers: string[] | null
+  userOverrides: Record<string, boolean>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HealthCheck {
+  name: string
+  status: 'ok' | 'error'
+  detail: string
+  latencyMs: number
+}
+
+export interface SystemHealth {
+  overall: 'healthy' | 'degraded' | 'down'
+  checks: HealthCheck[]
+  checkedAt: string
 }
 
 export interface ModerationStats {

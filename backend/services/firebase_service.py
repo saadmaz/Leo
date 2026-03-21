@@ -464,6 +464,72 @@ def get_moderation_stats() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Admin — feature flags
+# ---------------------------------------------------------------------------
+
+def list_feature_flags() -> list[dict]:
+    """Return all feature flag documents sorted by id."""
+    db = get_db()
+    docs = db.collection("featureFlags").stream()
+    return sorted([{"id": d.id, **d.to_dict()} for d in docs], key=lambda f: f["id"])
+
+
+def get_feature_flag(flag_id: str) -> Optional[dict]:
+    """Return a single feature flag document or None."""
+    db = get_db()
+    doc = db.collection("featureFlags").document(flag_id).get()
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def upsert_feature_flag(flag_id: str, data: dict) -> dict:
+    """
+    Create or fully replace a feature flag document.
+    Always stamps updatedAt; sets createdAt only on creation.
+    """
+    db = get_db()
+    now = _utcnow()
+    ref = db.collection("featureFlags").document(flag_id)
+    existing = ref.get()
+    if existing.exists:
+        ref.update({**data, "updatedAt": now})
+    else:
+        ref.set({**data, "createdAt": now, "updatedAt": now})
+    return get_feature_flag(flag_id) or {}
+
+
+def patch_feature_flag(flag_id: str, updates: dict) -> Optional[dict]:
+    """Partially update a feature flag (e.g. just toggle `enabled`)."""
+    db = get_db()
+    updates["updatedAt"] = _utcnow()
+    db.collection("featureFlags").document(flag_id).update(updates)
+    return get_feature_flag(flag_id)
+
+
+def delete_feature_flag(flag_id: str) -> None:
+    """Delete a feature flag document."""
+    db = get_db()
+    db.collection("featureFlags").document(flag_id).delete()
+
+
+def set_feature_flag_user_override(flag_id: str, uid: str, value: bool) -> None:
+    """Set a per-user override for a feature flag."""
+    db = get_db()
+    db.collection("featureFlags").document(flag_id).update({
+        f"userOverrides.{uid}": value,
+        "updatedAt": _utcnow(),
+    })
+
+
+def remove_feature_flag_user_override(flag_id: str, uid: str) -> None:
+    """Remove a per-user override for a feature flag."""
+    db = get_db()
+    db.collection("featureFlags").document(flag_id).update({
+        f"userOverrides.{uid}": firestore.DELETE_FIELD,
+        "updatedAt": _utcnow(),
+    })
+
+
+# ---------------------------------------------------------------------------
 # Admin — projects
 # ---------------------------------------------------------------------------
 

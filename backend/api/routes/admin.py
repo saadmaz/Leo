@@ -23,13 +23,14 @@ Endpoints:
 """
 
 import logging
-from typing import Optional
+import time
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from backend.middleware.admin_auth import SuperAdminUser
-from backend.services import firebase_service, moderation_service
+from backend.services import firebase_service, moderation_service, feature_flags_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,26 @@ class OverrideLimitsRequest(BaseModel):
 
 class ReviewFlagRequest(BaseModel):
     note: Optional[str] = None
+
+
+class FeatureFlagUpsertRequest(BaseModel):
+    name: str
+    description: str = ""
+    enabled: bool = True
+    allowedTiers: Optional[list[str]] = None   # None = all tiers
+    userOverrides: dict[str, bool] = {}
+
+
+class FeatureFlagPatchRequest(BaseModel):
+    enabled: Optional[bool] = None
+    allowedTiers: Optional[Any] = None          # list[str] or null
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class UserOverrideRequest(BaseModel):
+    uid: str
+    value: bool
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +334,200 @@ def delete_project(project_id: str, user: SuperAdminUser):
     )
     firebase_service.delete_project_deep(project_id)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Feature Flags
+# ---------------------------------------------------------------------------
+
+@router.get("/feature-flags")
+def list_feature_flags(_user: SuperAdminUser):
+    """Return all feature flag documents, sorted by ID."""
+    feature_flags_service.seed_defaults()   # no-op after first call
+    return firebase_service.list_feature_flags()
+
+
+@router.get("/feature-flags/{flag_id}")
+def get_feature_flag(flag_id: str, _user: SuperAdminUser):
+    """Return a single feature flag."""
+    flag = firebase_service.get_feature_flag(flag_id)
+    if not flag:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+    return flag
+
+
+@router.put("/feature-flags/{flag_id}")
+def upsert_feature_flag(flag_id: str, body: FeatureFlagUpsertRequest, user: SuperAdminUser):
+    """Create or fully replace a feature flag."""
+    existing = firebase_service.get_feature_flag(flag_id)
+    result = firebase_service.upsert_feature_flag(flag_id, body.model_dump())
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="feature_flag_upsert",
+        target_uid=flag_id,
+        details={"enabled": body.enabled, "new": existing is None},
+    )
+    return result
+
+
+@router.patch("/feature-flags/{flag_id}")
+def patch_feature_flag(flag_id: str, body: FeatureFlagPatchRequest, user: SuperAdminUser):
+    """Partially update a feature flag (e.g. just toggle enabled)."""
+    if not firebase_service.get_feature_flag(flag_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    # allowedTiers can legitimately be set to None (remove tier gate), so handle explicitly
+    if body.allowedTiers is not None or "allowedTiers" in body.model_fields_set:
+        updates["allowedTiers"] = body.allowedTiers
+
+    result = firebase_service.patch_feature_flag(flag_id, updates)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="feature_flag_patch",
+        target_uid=flag_id,
+        details=updates,
+    )
+    return result
+
+
+@router.delete("/feature-flags/{flag_id}")
+def delete_feature_flag(flag_id: str, user: SuperAdminUser):
+    """Delete a feature flag document."""
+    if not firebase_service.get_feature_flag(flag_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+    firebase_service.delete_feature_flag(flag_id)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="feature_flag_delete",
+        target_uid=flag_id,
+    )
+    return {"ok": True}
+
+
+@router.post("/feature-flags/{flag_id}/overrides")
+def set_user_override(flag_id: str, body: UserOverrideRequest, user: SuperAdminUser):
+    """Set a per-user override on a feature flag."""
+    if not firebase_service.get_feature_flag(flag_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+    firebase_service.set_feature_flag_user_override(flag_id, body.uid, body.value)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="feature_flag_override",
+        target_uid=body.uid,
+        details={"flagId": flag_id, "value": body.value},
+    )
+    return {"ok": True}
+
+
+@router.delete("/feature-flags/{flag_id}/overrides/{uid}")
+def remove_user_override(flag_id: str, uid: str, user: SuperAdminUser):
+    """Remove a per-user override from a feature flag."""
+    if not firebase_service.get_feature_flag(flag_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+    firebase_service.remove_feature_flag_user_override(flag_id, uid)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="feature_flag_override_remove",
+        target_uid=uid,
+        details={"flagId": flag_id},
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# System Health
+# ---------------------------------------------------------------------------
+
+@router.get("/system/health")
+def system_health(_user: SuperAdminUser):
+    """
+    Perform live health checks on every external service and return
+    a structured status report. All checks are best-effort — a failed
+    check is returned as a degraded status, not a 500.
+    """
+    from backend.config import settings
+
+    checks = []
+
+    # --- Firebase Firestore ---
+    checks.append(_check("Firebase Firestore", _ping_firebase))
+
+    # --- Anthropic (Claude) ---
+    checks.append(_check("Anthropic (Claude)", lambda: _ping_anthropic(settings)))
+
+    # --- Google Gemini ---
+    checks.append(_check("Google Gemini", lambda: _ping_gemini(settings)))
+
+    # --- Stripe ---
+    checks.append(_check("Stripe", lambda: _ping_stripe(settings)))
+
+    # --- Firecrawl ---
+    checks.append(_check("Firecrawl", lambda: _ping_key("FIRECRAWL_API_KEY", settings.FIRECRAWL_API_KEY)))
+
+    # --- Resend (Email) ---
+    checks.append(_check("Resend (Email)", lambda: _ping_key("RESEND_API_KEY", settings.RESEND_API_KEY)))
+
+    # --- Cloudflare R2 ---
+    checks.append(_check("Cloudflare R2", lambda: _ping_key("CLOUDFLARE_R2_TOKEN", settings.CLOUDFLARE_R2_TOKEN)))
+
+    overall = "healthy" if all(c["status"] == "ok" for c in checks) else \
+              "degraded" if any(c["status"] == "ok" for c in checks) else "down"
+
+    return {
+        "overall": overall,
+        "checks": checks,
+        "checkedAt": firebase_service._utcnow(),
+    }
+
+
+def _check(name: str, fn) -> dict:
+    """Run a health check function, catching all exceptions."""
+    t0 = time.perf_counter()
+    try:
+        detail = fn()
+        ms = round((time.perf_counter() - t0) * 1000)
+        return {"name": name, "status": "ok", "detail": detail or "OK", "latencyMs": ms}
+    except Exception as exc:
+        ms = round((time.perf_counter() - t0) * 1000)
+        return {"name": name, "status": "error", "detail": str(exc)[:200], "latencyMs": ms}
+
+
+def _ping_firebase() -> str:
+    db = firebase_service.get_db()
+    # Lightweight read — fetch at most 1 doc
+    list(db.collection("users").limit(1).stream())
+    return "Firestore reachable"
+
+
+def _ping_anthropic(settings) -> str:
+    if not settings.ANTHROPIC_API_KEY:
+        raise ValueError("ANTHROPIC_API_KEY not set")
+    import anthropic
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    models = client.models.list(limit=1)
+    return f"API reachable — {len(models.data)} model(s) returned"
+
+
+def _ping_gemini(settings) -> str:
+    if not settings.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not set")
+    return f"Key present (live ping skipped to avoid cost)"
+
+
+def _ping_stripe(settings) -> str:
+    if not settings.STRIPE_SECRET_KEY:
+        raise ValueError("STRIPE_SECRET_KEY not set")
+    import stripe
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    acct = stripe.Account.retrieve()
+    return f"Account: {acct.get('email') or acct.get('id', 'ok')}"
+
+
+def _ping_key(name: str, value: Optional[str]) -> str:
+    if not value:
+        raise ValueError(f"{name} not set")
+    return "Key present"
 
 
 # ---------------------------------------------------------------------------

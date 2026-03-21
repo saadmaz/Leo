@@ -12,6 +12,8 @@ import {
   BarChart2,
   ScrollText,
   ShieldAlert,
+  ToggleLeft,
+  Activity,
   LogOut,
   Shield,
   ChevronRight,
@@ -26,6 +28,8 @@ const NAV = [
   { href: '/admin/projects', label: 'Projects', icon: FolderOpen },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
+  { href: '/admin/feature-flags', label: 'Feature Flags', icon: ToggleLeft },
+  { href: '/admin/system', label: 'System Health', icon: Activity },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText },
 ]
 
