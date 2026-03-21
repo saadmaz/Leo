@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { UpgradeModal } from '@/components/billing/upgrade-modal'
+import { ProjectWizard } from '@/components/onboarding/project-wizard'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAppStore((s) => s.setUser)
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         onClose={closeUpgradeModal}
         reason={upgradeModalReason}
       />
+      <ProjectWizard />
     </>
   )
 }

@@ -35,6 +35,20 @@ async def create_project(body: ProjectCreate, user: CurrentUser):
         owner_uid=user["uid"],
         name=body.name,
         description=body.description or "",
+        website_url=body.websiteUrl,
+        instagram_url=body.instagramUrl,
+        facebook_url=body.facebookUrl,
+        linkedin_url=body.linkedinUrl,
+        tiktok_url=body.tiktokUrl,
+        x_url=body.xUrl,
+        youtube_url=body.youtubeUrl,
+        threads_url=body.threadsUrl,
+        pinterest_url=body.pinterestUrl,
+        snapchat_url=body.snapchatUrl,
+        content_model=body.contentModel or "claude-sonnet-4-6",
+        image_model=body.imageModel or "dall-e-3",
+        video_model=body.videoModel or "gemini-flash",
+        prompt_model=body.promptModel or "claude-opus-4-6",
     )
     return project
 

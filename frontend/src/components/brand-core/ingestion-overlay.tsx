@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Globe, Instagram, CheckCircle2, XCircle, Loader2, Zap } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
@@ -21,10 +21,26 @@ export function IngestionOverlay() {
     activeProject, setBrandCorePanelOpen,
   } = useAppStore()
 
-  const [websiteUrl, setWebsiteUrl] = useState('')
-  const [instagramHandle, setInstagramHandle] = useState('')
+  const [websiteUrl, setWebsiteUrl] = useState(activeProject?.websiteUrl ?? '')
+  const [instagramHandle, setInstagramHandle] = useState(
+    activeProject?.instagramUrl
+      ? activeProject.instagramUrl.replace(/.*instagram\.com\//, '').replace(/\/$/, '')
+      : ''
+  )
   const [done, setDone] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+
+  // Sync pre-fill when the overlay opens for a new project
+  useEffect(() => {
+    if (ingestionOpen && activeProject) {
+      setWebsiteUrl(activeProject.websiteUrl ?? '')
+      setInstagramHandle(
+        activeProject.instagramUrl
+          ? activeProject.instagramUrl.replace(/.*instagram\.com\//, '').replace(/\/$/, '')
+          : ''
+      )
+    }
+  }, [ingestionOpen, activeProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ingestionOpen || !activeProject) return null
 

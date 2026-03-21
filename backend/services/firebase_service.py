@@ -193,7 +193,26 @@ def get_user(uid: str) -> Optional[dict]:
 # Projects
 # ---------------------------------------------------------------------------
 
-def create_project(owner_uid: str, name: str, description: str = "") -> dict:
+def create_project(
+    owner_uid: str,
+    name: str,
+    description: str = "",
+    *,
+    website_url: Optional[str] = None,
+    instagram_url: Optional[str] = None,
+    facebook_url: Optional[str] = None,
+    linkedin_url: Optional[str] = None,
+    tiktok_url: Optional[str] = None,
+    x_url: Optional[str] = None,
+    youtube_url: Optional[str] = None,
+    threads_url: Optional[str] = None,
+    pinterest_url: Optional[str] = None,
+    snapchat_url: Optional[str] = None,
+    content_model: str = "claude-sonnet-4-6",
+    image_model: str = "dall-e-3",
+    video_model: str = "gemini-flash",
+    prompt_model: str = "claude-opus-4-6",
+) -> dict:
     """
     Create a new project owned by owner_uid.
     The owner is automatically added as an 'admin' member.
@@ -209,6 +228,22 @@ def create_project(owner_uid: str, name: str, description: str = "") -> dict:
         "members": {owner_uid: "admin"},
         "brandCore": None,
         "ingestionStatus": None,
+        # Social links
+        "websiteUrl": website_url,
+        "instagramUrl": instagram_url,
+        "facebookUrl": facebook_url,
+        "linkedinUrl": linkedin_url,
+        "tiktokUrl": tiktok_url,
+        "xUrl": x_url,
+        "youtubeUrl": youtube_url,
+        "threadsUrl": threads_url,
+        "pinterestUrl": pinterest_url,
+        "snapchatUrl": snapchat_url,
+        # Model settings
+        "contentModel": content_model,
+        "imageModel": image_model,
+        "videoModel": video_model,
+        "promptModel": prompt_model,
         "createdAt": now,
         "updatedAt": now,
     }

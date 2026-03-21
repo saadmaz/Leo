@@ -1,11 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Sparkles, Zap, MessageSquare, ArrowRight, Loader2 } from 'lucide-react'
+import { Sparkles, Zap, MessageSquare, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
-import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 
@@ -13,12 +9,12 @@ const STEPS = [
   {
     icon: <Sparkles className="w-4 h-4" />,
     title: 'Create your brand',
-    description: 'Give your brand a name — LEO will create a workspace for it.',
+    description: 'Give your brand a name, social links, and choose your AI models.',
   },
   {
     icon: <Zap className="w-4 h-4" />,
     title: 'Build your Brand Core',
-    description: 'Paste your website or Instagram URL. LEO extracts your tone, visuals, and messaging.',
+    description: 'LEO scrapes your website and Instagram to extract tone, visuals, and messaging.',
   },
   {
     icon: <MessageSquare className="w-4 h-4" />,
@@ -28,33 +24,7 @@ const STEPS = [
 ]
 
 export function OnboardingCard() {
-  const router = useRouter()
-  const { setProjects, projects, setActiveProject, setChats, setActiveChat, setIngestionOpen } = useAppStore()
-
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  async function handleCreate() {
-    if (!name.trim() || loading) return
-    setLoading(true)
-    try {
-      const project = await api.projects.create({ name: name.trim() })
-      setProjects([project, ...projects])
-      setActiveProject(project)
-      const chat = await api.chats.create(project.id, 'New Chat')
-      setChats([chat])
-      setActiveChat(chat)
-      router.push(`/projects/${project.id}/chats/${chat.id}`)
-      setTimeout(() => setIngestionOpen(true), 400)
-      toast.success(`Brand "${project.name}" created — let's build your Brand Core!`)
-    } catch (err) {
-      toast.error(String(err).includes('402')
-        ? 'Project limit reached — upgrade to create more brands.'
-        : 'Failed to create project')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { setWizardOpen } = useAppStore()
 
   return (
     <motion.div
@@ -95,45 +65,23 @@ export function OnboardingCard() {
               {i + 1}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className={cn('text-sm font-medium', i !== 0 && 'text-muted-foreground')}>
-                  {step.title}
-                </span>
-              </div>
+              <span className={cn('text-sm font-medium', i !== 0 && 'text-muted-foreground')}>
+                {step.title}
+              </span>
               <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Create form */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-        <p className="text-sm font-medium">Name your brand</p>
-        <div className="flex gap-2">
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
-            placeholder="e.g. Acme Coffee Co."
-            className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <button
-            onClick={handleCreate}
-            disabled={!name.trim() || loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors shrink-0"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                Get started
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      {/* CTA */}
+      <button
+        onClick={() => setWizardOpen(true)}
+        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+      >
+        Get started
+        <ArrowRight className="w-4 h-4" />
+      </button>
     </motion.div>
   )
 }

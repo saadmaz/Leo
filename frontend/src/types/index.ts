@@ -56,6 +56,22 @@ export interface Project {
   ownerId: string
   brandCore?: BrandCore | null
   ingestionStatus?: 'pending' | 'processing' | 'complete' | 'error' | null
+  // Social links
+  websiteUrl?: string | null
+  instagramUrl?: string | null
+  facebookUrl?: string | null
+  linkedinUrl?: string | null
+  tiktokUrl?: string | null
+  xUrl?: string | null
+  youtubeUrl?: string | null
+  threadsUrl?: string | null
+  pinterestUrl?: string | null
+  snapchatUrl?: string | null
+  // Model settings
+  contentModel?: string | null
+  imageModel?: string | null
+  videoModel?: string | null
+  promptModel?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -63,6 +79,22 @@ export interface Project {
 export interface ProjectCreate {
   name: string
   description?: string
+  // Social links
+  websiteUrl?: string
+  instagramUrl?: string
+  facebookUrl?: string
+  linkedinUrl?: string
+  tiktokUrl?: string
+  xUrl?: string
+  youtubeUrl?: string
+  threadsUrl?: string
+  pinterestUrl?: string
+  snapchatUrl?: string
+  // Model settings
+  contentModel?: string
+  imageModel?: string
+  videoModel?: string
+  promptModel?: string
 }
 
 // ---------------------------------------------------------------------------

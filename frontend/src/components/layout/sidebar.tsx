@@ -7,7 +7,6 @@ import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu,
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
@@ -28,16 +27,13 @@ export function Sidebar() {
 
   const {
     user, projects, setProjects, activeProject, setActiveProject,
-    chats, setChats, setActiveChat, setIngestionOpen,
-    billingStatus, openUpgradeModal,
+    chats, setChats, setActiveChat,
+    billingStatus,
     upsertProject, removeProject, upsertChat, removeChat,
     sidebarOpen, setSidebarOpen,
+    setWizardOpen,
   } = useAppStore()
 
-  const [creating, setCreating] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [showNewProject, setShowNewProject] = useState(false)
-  const [createError, setCreateError] = useState('')
   const [projectsLoading, setProjectsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
@@ -62,36 +58,6 @@ export function Sidebar() {
     const found = projects.find((p) => p.id === params.projectId)
     if (found && found.id !== activeProject?.id) setActiveProject(found)
   }, [params.projectId, projects, activeProject, setActiveProject])
-
-  async function createProject() {
-    if (!newProjectName.trim()) return
-    setCreating(true)
-    setCreateError('')
-    try {
-      const project = await api.projects.create({ name: newProjectName.trim() })
-      setProjects([project, ...projects])
-      setActiveProject(project)
-      setNewProjectName('')
-      setShowNewProject(false)
-      const chat = await api.chats.create(project.id, 'New Chat')
-      setChats([chat])
-      setActiveChat(chat)
-      router.push(`/projects/${project.id}/chats/${chat.id}`)
-      setIngestionOpen(true)
-      toast.success(`Brand "${project.name}" created`)
-    } catch (err) {
-      const msg = String(err)
-      if (msg.includes('402')) {
-        setShowNewProject(false)
-        openUpgradeModal("You've reached your project limit. Upgrade to create more brands.")
-      } else {
-        setCreateError(msg)
-        toast.error('Failed to create project')
-      }
-    } finally {
-      setCreating(false)
-    }
-  }
 
   async function openChat(project: Project, chat: Chat) {
     setActiveProject(project)
@@ -211,7 +177,7 @@ export function Sidebar() {
           <span className="text-base font-bold tracking-tight">LEO</span>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setShowNewProject(true)}
+              onClick={() => setWizardOpen(true)}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               title="New project"
             >
@@ -228,49 +194,6 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* New project input */}
-        <AnimatePresence>
-          {showNewProject && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-b border-border"
-            >
-              <div className="p-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">New project</p>
-                <input
-                  autoFocus
-                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder="Brand name…"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') createProject()
-                    if (e.key === 'Escape') setShowNewProject(false)
-                  }}
-                />
-                {createError && <p className="text-xs text-red-500 break-all">{createError}</p>}
-                <div className="flex gap-2">
-                  <button
-                    onClick={createProject}
-                    disabled={creating || !newProjectName.trim()}
-                    className="flex-1 rounded-md bg-primary text-primary-foreground py-1 text-xs font-medium disabled:opacity-50"
-                  >
-                    {creating ? 'Creating…' : 'Create'}
-                  </button>
-                  <button
-                    onClick={() => { setShowNewProject(false); setCreateError('') }}
-                    className="flex-1 rounded-md border border-border py-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Project list */}
         <div className="flex-1 overflow-y-auto py-2">
           {projectsLoading ? (
@@ -286,7 +209,7 @@ export function Sidebar() {
             <div className="px-4 py-8 text-center">
               <Layers className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
               <p className="text-xs text-muted-foreground">No projects yet.</p>
-              <button onClick={() => setShowNewProject(true)} className="mt-2 text-xs text-primary underline underline-offset-2">
+              <button onClick={() => setWizardOpen(true)} className="mt-2 text-xs text-primary underline underline-offset-2">
                 Create your first brand
               </button>
             </div>

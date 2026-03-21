@@ -123,6 +123,12 @@ interface AppState {
   setActiveChannel: (channel: ChannelKey | null) => void
 
   // ---------------------------------------------------------------------------
+  // Project Wizard
+  // ---------------------------------------------------------------------------
+  wizardOpen: boolean
+  setWizardOpen: (v: boolean) => void
+
+  // ---------------------------------------------------------------------------
   // Billing
   // ---------------------------------------------------------------------------
   billingStatus: BillingStatus | null
@@ -256,6 +262,12 @@ export const useAppStore = create<AppState>((set) => ({
   // ---------------------------------------------------------------------------
   activeChannel: null,
   setActiveChannel: (activeChannel) => set({ activeChannel }),
+
+  // ---------------------------------------------------------------------------
+  // Project Wizard
+  // ---------------------------------------------------------------------------
+  wizardOpen: false,
+  setWizardOpen: (wizardOpen) => set({ wizardOpen }),
 
   // ---------------------------------------------------------------------------
   // Billing
