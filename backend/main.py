@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns
+from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate
 from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
 # ---------------------------------------------------------------------------
@@ -52,6 +52,11 @@ async def lifespan(app: FastAPI):
         logger.warning("ANTHROPIC_API_KEY is not set — chat and ingestion will not work.")
     else:
         logger.info("Anthropic API key loaded (model: %s).", settings.LLM_CHAT_MODEL)
+
+    if not settings.OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY is not set — image generation will return 503.")
+    else:
+        logger.info("OpenAI API key loaded — image generation enabled.")
 
     yield  # server is running
 
@@ -104,6 +109,7 @@ app.include_router(brand_core.router)
 app.include_router(billing.router)
 app.include_router(assets.router)
 app.include_router(campaigns.router)
+app.include_router(generate.router)
 
 # ---------------------------------------------------------------------------
 # Health endpoints
@@ -133,6 +139,7 @@ def debug_config():
 
     return {
         "ANTHROPIC_API_KEY": _status(settings.ANTHROPIC_API_KEY),
+        "OPENAI_API_KEY": _status(settings.OPENAI_API_KEY),
         "FIREBASE_PROJECT_ID": _status(settings.FIREBASE_PROJECT_ID),
         "FIRECRAWL_API_KEY": _status(settings.FIRECRAWL_API_KEY),
         "APIFY_API_KEY": _status(settings.APIFY_API_KEY),

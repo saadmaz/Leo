@@ -67,7 +67,8 @@ CHANNEL_PRESETS: dict[str, dict] = {
             "- Scripts: hook (0–3 s), content (3–45 s), CTA.\n"
             "- Tone: authentic, energetic, trend-aware. Speak directly to camera.\n"
             "- Captions: short (1–3 lines), 3–5 hashtags.\n"
-            "- Output scripts using the 'captions' artifact type with platform='TikTok'."
+            "- Output video scripts using the 'video_script' artifact type with platform='TikTok'.\n"
+            "- Output post captions using the 'captions' artifact type."
         ),
     },
     "meta_ads": {
@@ -96,7 +97,7 @@ CHANNEL_PRESETS: dict[str, dict] = {
             "- Subject line: 30–50 chars. Preview text: 40–130 chars.\n"
             "- Structure: hook → value → proof → CTA.\n"
             "- One clear primary CTA per email.\n"
-            "- Output the full email body using the 'captions' artifact type with platform='Email'."
+            "- Output using the 'email_content' artifact type (subject, previewText, body, cta)."
         ),
     },
 }
@@ -254,12 +255,44 @@ type="content_calendar"
   ]
 }
 
+type="video_script"
+{
+  "platform": "TikTok" | "Instagram Reels" | "YouTube Shorts" | "YouTube",
+  "duration": "30s" | "60s" | "3–5 min" | "...",
+  "scenes": [
+    {
+      "timestamp": "0:00–0:03",
+      "visual": "Description of what to show on screen",
+      "audio": "Voiceover / dialogue / music note",
+      "caption": "On-screen text overlay (optional)"
+    }
+  ],
+  "hashtags": ["tag1", "tag2"]
+}
+
+type="email_content"
+{
+  "subject": "30–50 char subject line",
+  "previewText": "40–130 char preview shown in inbox",
+  "body": "Full email body in plain text or light markdown",
+  "cta": "Button / link text"
+}
+
+type="image_prompt"
+{
+  "prompt": "Detailed image generation prompt optimised for DALL-E 3",
+  "style": "vivid" | "natural",
+  "aspectRatio": "square" | "landscape" | "portrait",
+  "context": "Brief explanation of how this image fits the brand or campaign"
+}
+
 Rules:
-- Always use an artifact for captions (5+ items), ad copy, campaign briefs, colour palettes, and content calendars.
+- Always use an artifact for captions (3+ items), ad copy, campaign briefs, colour palettes, content calendars, video scripts, email content, and image prompts.
 - Place the artifact after a short conversational intro — never instead of it.
 - Put ONLY JSON inside the artifact block. No markdown inside the block.
 - You may include multiple artifacts in one response if appropriate.
 - For everything else (strategy, analysis, explanations), use normal markdown.
+- When the user asks for an image or visual content, output an image_prompt artifact instead of describing the image — the UI will generate it.
 """
 
 

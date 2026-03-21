@@ -12,6 +12,7 @@ _DEFAULT_SA_PATH = os.path.join(_BACKEND_DIR, "firebase-service-account.json")
 class Settings(BaseSettings):
     # --- LLM Providers ---
     ANTHROPIC_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     OPENROUTER_API_KEY: Optional[str] = None

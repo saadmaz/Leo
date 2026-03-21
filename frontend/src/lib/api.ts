@@ -405,6 +405,17 @@ export const api = {
   },
 
   // -------------------------------------------------------------------------
+  // Generate (image, etc.)
+  // -------------------------------------------------------------------------
+  generate: {
+    image: (
+      projectId: string,
+      body: { prompt: string; style?: string; aspectRatio?: string },
+      signal?: AbortSignal,
+    ) => post<{ url: string }>(`/projects/${projectId}/generate/image`, body, signal),
+  },
+
+  // -------------------------------------------------------------------------
   // Billing
   // -------------------------------------------------------------------------
   billing: {

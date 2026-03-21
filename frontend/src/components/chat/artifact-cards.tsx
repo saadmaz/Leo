@@ -2,14 +2,16 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays } from 'lucide-react'
+import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
+import { useAppStore } from '@/stores/app-store'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ArtifactType = 'captions' | 'ad_copy' | 'campaign_brief' | 'colour_palette' | 'content_calendar'
+export type ArtifactType = 'captions' | 'ad_copy' | 'campaign_brief' | 'colour_palette' | 'content_calendar' | 'video_script' | 'email_content' | 'image_prompt'
 
 export interface CaptionsArtifact {
   type: 'captions'
@@ -54,12 +56,46 @@ export interface ContentCalendarArtifact {
   entries: ContentCalendarEntry[]
 }
 
+export interface VideoScriptScene {
+  timestamp: string
+  visual: string
+  audio: string
+  caption?: string
+}
+
+export interface VideoScriptArtifact {
+  type: 'video_script'
+  platform: string
+  duration: string
+  scenes: VideoScriptScene[]
+  hashtags?: string[]
+}
+
+export interface EmailContentArtifact {
+  type: 'email_content'
+  subject: string
+  previewText?: string
+  body: string
+  cta?: string
+}
+
+export interface ImagePromptArtifact {
+  type: 'image_prompt'
+  prompt: string
+  style: 'vivid' | 'natural'
+  aspectRatio: 'square' | 'landscape' | 'portrait'
+  context?: string
+}
+
 export type Artifact =
   | CaptionsArtifact
   | AdCopyArtifact
   | CampaignBriefArtifact
   | ColourPaletteArtifact
   | ContentCalendarArtifact
+  | VideoScriptArtifact
+  | EmailContentArtifact
+  | ImagePromptArtifact
 
 // ---------------------------------------------------------------------------
 // Parser
@@ -99,6 +135,9 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
       {artifact.type === 'campaign_brief' && <CampaignBriefCard artifact={artifact} />}
       {artifact.type === 'colour_palette' && <ColourPaletteCard artifact={artifact} />}
       {artifact.type === 'content_calendar' && <ContentCalendarCard artifact={artifact} />}
+      {artifact.type === 'video_script' && <VideoScriptCard artifact={artifact} />}
+      {artifact.type === 'email_content' && <EmailContentCard artifact={artifact} />}
+      {artifact.type === 'image_prompt' && <ImagePromptCard artifact={artifact} />}
     </motion.div>
   )
 }
@@ -301,6 +340,220 @@ function ContentCalendarCard({ artifact }: { artifact: ContentCalendarArtifact }
     </Card>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Video script card
+// ---------------------------------------------------------------------------
+
+function VideoScriptCard({ artifact }: { artifact: VideoScriptArtifact }) {
+  const copyText = artifact.scenes
+    .map((s) => `[${s.timestamp}]\nVisual: ${s.visual}\nAudio: ${s.audio}${s.caption ? `\nCaption: ${s.caption}` : ''}`)
+    .join('\n\n')
+    + (artifact.hashtags?.length ? '\n\n' + artifact.hashtags.map((h) => `#${h}`).join(' ') : '')
+
+  return (
+    <Card icon={<Video className="w-3.5 h-3.5" />} title={`${artifact.platform} Script`} copyText={copyText}>
+      <div className="space-y-0.5 mb-3">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
+          {artifact.duration}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {artifact.scenes.map((scene, i) => (
+          <div key={i} className="rounded-lg border border-border bg-background p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{scene.timestamp}</span>
+            </div>
+            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+              <span className="font-semibold text-muted-foreground uppercase tracking-wide pt-0.5">Visual</span>
+              <p className="text-sm leading-snug">{scene.visual}</p>
+              <span className="font-semibold text-muted-foreground uppercase tracking-wide pt-0.5">Audio</span>
+              <p className="text-sm leading-snug">{scene.audio}</p>
+              {scene.caption && (
+                <>
+                  <span className="font-semibold text-muted-foreground uppercase tracking-wide pt-0.5">Caption</span>
+                  <p className="text-sm leading-snug text-primary">{scene.caption}</p>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {artifact.hashtags && artifact.hashtags.length > 0 && (
+        <p className="mt-3 text-xs text-primary/70">
+          {artifact.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
+        </p>
+      )}
+    </Card>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Email content card
+// ---------------------------------------------------------------------------
+
+function EmailContentCard({ artifact }: { artifact: EmailContentArtifact }) {
+  const copyText = [
+    `Subject: ${artifact.subject}`,
+    artifact.previewText ? `Preview: ${artifact.previewText}` : '',
+    `\n${artifact.body}`,
+    artifact.cta ? `\nCTA: ${artifact.cta}` : '',
+  ].filter(Boolean).join('\n')
+
+  return (
+    <Card icon={<Mail className="w-3.5 h-3.5" />} title="Email" copyText={copyText}>
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-background p-3 space-y-2">
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Subject</p>
+            <p className="text-sm font-medium">{artifact.subject}</p>
+          </div>
+          {artifact.previewText && (
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Preview text</p>
+              <p className="text-xs text-muted-foreground">{artifact.previewText}</p>
+            </div>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Body</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{artifact.body}</p>
+        </div>
+        {artifact.cta && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">CTA button</p>
+            <span className="text-sm font-medium text-primary">{artifact.cta}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Image prompt card (generates image on demand via DALL-E 3)
+// ---------------------------------------------------------------------------
+
+const ASPECT_LABELS: Record<string, string> = {
+  square: '1:1 Square',
+  landscape: '16:9 Landscape',
+  portrait: '9:16 Portrait',
+}
+
+function ImagePromptCard({ artifact }: { artifact: ImagePromptArtifact }) {
+  const { activeProject } = useAppStore()
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  async function handleGenerate() {
+    if (!activeProject) return
+    setStatus('loading')
+    setErrorMsg('')
+    try {
+      const { url } = await api.generate.image(activeProject.id, {
+        prompt: artifact.prompt,
+        style: artifact.style ?? 'vivid',
+        aspectRatio: artifact.aspectRatio ?? 'square',
+      })
+      setImageUrl(url)
+      setStatus('done')
+    } catch (err) {
+      setErrorMsg(String(err))
+      setStatus('error')
+    }
+  }
+
+  return (
+    <Card icon={<ImageIcon className="w-3.5 h-3.5" />} title="Image Generation">
+      <div className="space-y-3">
+        {artifact.context && (
+          <p className="text-xs text-muted-foreground italic">{artifact.context}</p>
+        )}
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Prompt</p>
+          <p className="text-sm leading-relaxed">{artifact.prompt}</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="px-2 py-0.5 rounded-full bg-muted capitalize">{artifact.style ?? 'vivid'}</span>
+          <span className="px-2 py-0.5 rounded-full bg-muted">{ASPECT_LABELS[artifact.aspectRatio ?? 'square']}</span>
+        </div>
+
+        {status === 'idle' && (
+          <button
+            onClick={handleGenerate}
+            disabled={!activeProject}
+            className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            Generate with DALL-E 3
+          </button>
+        )}
+
+        {status === 'loading' && (
+          <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Generating image…
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="space-y-2">
+            <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{errorMsg}</p>
+            <button
+              onClick={handleGenerate}
+              className="w-full py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {status === 'done' && imageUrl && (
+          <div className="space-y-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt="Generated image"
+              className={cn(
+                'w-full rounded-xl border border-border object-cover',
+                artifact.aspectRatio === 'portrait' ? 'max-h-[480px]' :
+                artifact.aspectRatio === 'landscape' ? 'max-h-[280px]' : 'max-h-[380px]',
+              )}
+            />
+            <div className="flex gap-2">
+              <a
+                href={imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Open full size
+              </a>
+              <a
+                href={imageUrl}
+                download="leo-generated.png"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Download className="w-3 h-3" />
+                Download
+              </a>
+              <button
+                onClick={() => { setStatus('idle'); setImageUrl(null) }}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Regenerate
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 
 // ---------------------------------------------------------------------------
 // Shared card shell
