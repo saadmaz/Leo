@@ -72,6 +72,8 @@ export interface Project {
   imageModel?: string | null
   videoModel?: string | null
   promptModel?: string | null
+  // Assets
+  logoUrl?: string | null
   createdAt: string
   updatedAt: string
 }

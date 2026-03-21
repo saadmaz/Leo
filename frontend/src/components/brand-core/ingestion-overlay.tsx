@@ -2,11 +2,100 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Globe, Instagram, CheckCircle2, XCircle, Loader2, Zap } from 'lucide-react'
+import { X, Globe, CheckCircle2, XCircle, Loader2, Zap } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { IngestionStep } from '@/types'
 import { cn } from '@/lib/utils'
+
+// ---------------------------------------------------------------------------
+// Platform icon helpers
+// ---------------------------------------------------------------------------
+
+function PlatformIcon({ platform, className }: { platform: string; className?: string }) {
+  const base = cn('w-3.5 h-3.5 shrink-0', className)
+  switch (platform) {
+    case 'instagram':
+      return (
+        <svg className={base} viewBox="0 0 24 24" fill="none">
+          <defs>
+            <linearGradient id="ig-grad-io" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#f09433"/>
+              <stop offset="25%" stopColor="#e6683c"/>
+              <stop offset="50%" stopColor="#dc2743"/>
+              <stop offset="75%" stopColor="#cc2366"/>
+              <stop offset="100%" stopColor="#bc1888"/>
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="20" height="20" rx="5" stroke="url(#ig-grad-io)" strokeWidth="2"/>
+          <circle cx="12" cy="12" r="4" stroke="url(#ig-grad-io)" strokeWidth="2"/>
+          <circle cx="17.5" cy="6.5" r="1" fill="url(#ig-grad-io)"/>
+        </svg>
+      )
+    case 'facebook':
+      return (
+        <svg className={base} viewBox="0 0 24 24" fill="#1877F2">
+          <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.313 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.887v2.254h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+        </svg>
+      )
+    case 'tiktok':
+      return (
+        <svg className={base} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z"/>
+        </svg>
+      )
+    case 'linkedin':
+      return (
+        <svg className={base} viewBox="0 0 24 24" fill="#0A66C2">
+          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+        </svg>
+      )
+    case 'x':
+      return (
+        <svg className={base} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      )
+    case 'youtube':
+      return (
+        <svg className={base} viewBox="0 0 24 24" fill="#FF0000">
+          <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        </svg>
+      )
+    default:
+      return <Globe className={base} />
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Platform row in the "sources" section
+// ---------------------------------------------------------------------------
+
+interface PlatformRowProps {
+  platform: string
+  label: string
+  value: string
+  enabled: boolean
+  onToggle: (v: boolean) => void
+}
+
+function PlatformRow({ platform, label, value, enabled, onToggle }: PlatformRowProps) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer group">
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => onToggle(e.target.checked)}
+        className="accent-primary w-3.5 h-3.5"
+      />
+      <PlatformIcon platform={platform} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+      <div className="min-w-0 flex-1">
+        <span className="text-xs font-medium text-foreground">{label}</span>
+        <p className="text-xs text-muted-foreground truncate">{value}</p>
+      </div>
+    </label>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Main overlay
@@ -21,31 +110,50 @@ export function IngestionOverlay() {
     activeProject, setBrandCorePanelOpen,
   } = useAppStore()
 
-  const [websiteUrl, setWebsiteUrl] = useState(activeProject?.websiteUrl ?? '')
-  const [instagramHandle, setInstagramHandle] = useState(
-    activeProject?.instagramUrl
-      ? activeProject.instagramUrl.replace(/.*instagram\.com\//, '').replace(/\/$/, '')
-      : ''
-  )
+  // Which platforms are enabled (checked) for this run
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({})
   const [done, setDone] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Sync pre-fill when the overlay opens for a new project
+  // Build the list of stored social links on the active project
+  interface PlatformDef {
+    key: string
+    platform: string
+    label: string
+    value: string
+  }
+
+  function buildPlatforms(): PlatformDef[] {
+    if (!activeProject) return []
+    const defs: PlatformDef[] = []
+    if (activeProject.websiteUrl)   defs.push({ key: 'websiteUrl',   platform: 'website',   label: 'Website',   value: activeProject.websiteUrl })
+    if (activeProject.instagramUrl) defs.push({ key: 'instagramUrl', platform: 'instagram', label: 'Instagram', value: activeProject.instagramUrl })
+    if (activeProject.facebookUrl)  defs.push({ key: 'facebookUrl',  platform: 'facebook',  label: 'Facebook',  value: activeProject.facebookUrl })
+    if (activeProject.tiktokUrl)    defs.push({ key: 'tiktokUrl',    platform: 'tiktok',    label: 'TikTok',    value: activeProject.tiktokUrl })
+    if (activeProject.linkedinUrl)  defs.push({ key: 'linkedinUrl',  platform: 'linkedin',  label: 'LinkedIn',  value: activeProject.linkedinUrl })
+    if (activeProject.xUrl)         defs.push({ key: 'xUrl',         platform: 'x',         label: 'X / Twitter', value: activeProject.xUrl })
+    if (activeProject.youtubeUrl)   defs.push({ key: 'youtubeUrl',   platform: 'youtube',   label: 'YouTube',   value: activeProject.youtubeUrl })
+    return defs
+  }
+
+  const platforms = buildPlatforms()
+
+  // Reset enabled map whenever the overlay opens for a (possibly new) project
   useEffect(() => {
     if (ingestionOpen && activeProject) {
-      setWebsiteUrl(activeProject.websiteUrl ?? '')
-      setInstagramHandle(
-        activeProject.instagramUrl
-          ? activeProject.instagramUrl.replace(/.*instagram\.com\//, '').replace(/\/$/, '')
-          : ''
-      )
+      const initial: Record<string, boolean> = {}
+      buildPlatforms().forEach((p) => { initial[p.key] = true })
+      setEnabled(initial)
+      setDone(false)
+      setErrorMsg('')
     }
   }, [ingestionOpen, activeProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ingestionOpen || !activeProject) return null
 
+  const canStart = platforms.some((p) => enabled[p.key]) && !ingestionRunning && !done
+
   async function startIngestion() {
-    if (!websiteUrl.trim() && !instagramHandle.trim()) return
     if (!activeProject) return
 
     resetIngestion()
@@ -53,15 +161,24 @@ export function IngestionOverlay() {
     setErrorMsg('')
     setIngestionRunning(true)
 
+    // Build the instagram handle from URL if stored
+    const igUrl = activeProject.instagramUrl ?? ''
+    const igHandle = igUrl ? igUrl.replace(/.*instagram\.com\//, '').replace(/\/$/, '') : undefined
+
     await api.streamIngestion(
       activeProject.id,
       {
-        websiteUrl: websiteUrl.trim() || undefined,
-        instagramHandle: instagramHandle.trim() || undefined,
+        websiteUrl:      enabled['websiteUrl']   ? activeProject.websiteUrl   ?? undefined : undefined,
+        instagramHandle: enabled['instagramUrl'] ? igHandle                               : undefined,
+        facebookUrl:     enabled['facebookUrl']  ? activeProject.facebookUrl  ?? undefined : undefined,
+        tiktokUrl:       enabled['tiktokUrl']    ? activeProject.tiktokUrl    ?? undefined : undefined,
+        linkedinUrl:     enabled['linkedinUrl']  ? activeProject.linkedinUrl  ?? undefined : undefined,
+        xUrl:            enabled['xUrl']         ? activeProject.xUrl         ?? undefined : undefined,
+        youtubeUrl:      enabled['youtubeUrl']   ? activeProject.youtubeUrl   ?? undefined : undefined,
       },
       {
-        onStep: (step) => addIngestionStep(step),
-        onProgress: (pct) => setIngestionProgress(pct),
+        onStep:     (step) => addIngestionStep(step),
+        onProgress: (pct)  => setIngestionProgress(pct),
         onDone: (brandCore) => {
           onIngestionDone(activeProject.id, brandCore)
           setIngestionRunning(false)
@@ -76,11 +193,9 @@ export function IngestionOverlay() {
   }
 
   function handleClose() {
-    if (ingestionRunning) return  // don't close mid-stream
+    if (ingestionRunning) return
     setIngestionOpen(false)
     resetIngestion()
-    setWebsiteUrl('')
-    setInstagramHandle('')
     setDone(false)
     setErrorMsg('')
   }
@@ -89,8 +204,6 @@ export function IngestionOverlay() {
     handleClose()
     setBrandCorePanelOpen(true)
   }
-
-  const canStart = (websiteUrl.trim() || instagramHandle.trim()) && !ingestionRunning && !done
 
   return (
     <AnimatePresence>
@@ -130,7 +243,7 @@ export function IngestionOverlay() {
               </div>
 
               <div className="p-6 space-y-5">
-                {/* Input form — hide while running */}
+                {/* Source selection — hide while running */}
                 {!ingestionRunning && !done && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -138,33 +251,28 @@ export function IngestionOverlay() {
                     className="space-y-4"
                   >
                     <p className="text-sm text-muted-foreground">
-                      Give LEO your brand&apos;s digital presence. It&apos;ll crawl the content
-                      and extract your Brand Core automatically.
+                      LEO will crawl your brand&apos;s digital presence and extract a Brand Core profile.
+                      Select the sources to include:
                     </p>
 
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <input
-                          type="url"
-                          placeholder="https://yourbrand.com"
-                          value={websiteUrl}
-                          onChange={(e) => setWebsiteUrl(e.target.value)}
-                          className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
-                        />
+                    {platforms.length === 0 ? (
+                      <p className="text-sm text-muted-foreground bg-muted/40 rounded-xl px-4 py-3">
+                        No social links are stored for this project. Edit the project to add them.
+                      </p>
+                    ) : (
+                      <div className="space-y-3 bg-muted/30 rounded-xl px-4 py-3">
+                        {platforms.map((p) => (
+                          <PlatformRow
+                            key={p.key}
+                            platform={p.platform}
+                            label={p.label}
+                            value={p.value}
+                            enabled={!!enabled[p.key]}
+                            onToggle={(v) => setEnabled((prev) => ({ ...prev, [p.key]: v }))}
+                          />
+                        ))}
                       </div>
-
-                      <div className="relative">
-                        <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <input
-                          type="text"
-                          placeholder="@yourbrand (Instagram handle)"
-                          value={instagramHandle}
-                          onChange={(e) => setInstagramHandle(e.target.value)}
-                          className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
-                        />
-                      </div>
-                    </div>
+                    )}
 
                     {errorMsg && (
                       <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{errorMsg}</p>
@@ -279,8 +387,8 @@ export function IngestionOverlay() {
 // ---------------------------------------------------------------------------
 
 function StepIcon({ status }: { status: IngestionStep['status'] }) {
-  if (status === 'done') return <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-  if (status === 'error') return <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+  if (status === 'done')    return <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+  if (status === 'error')   return <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
   if (status === 'running') return <Loader2 className="w-4 h-4 text-primary shrink-0 animate-spin mt-0.5" />
   return <div className="w-4 h-4 rounded-full border border-border shrink-0 mt-0.5" />
 }

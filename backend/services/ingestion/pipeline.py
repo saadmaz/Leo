@@ -28,22 +28,18 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _step(label: str, status: str = "running", detail: str = "") -> dict:
-    """Emit a labelled step with a status badge shown in the progress overlay."""
     return {"type": "step", "label": label, "status": status, "detail": detail}
 
 
 def _progress(pct: int) -> dict:
-    """Emit a progress percentage (0–100) for the progress bar."""
     return {"type": "progress", "pct": max(0, min(100, pct))}
 
 
 def _done(brand_core: dict) -> dict:
-    """Emit the final success event with the extracted Brand Core."""
     return {"type": "done", "brandCore": brand_core}
 
 
 def _error(message: str) -> dict:
-    """Emit a terminal error event. The pipeline stops after yielding this."""
     return {"type": "error", "message": message}
 
 
@@ -52,17 +48,9 @@ def _error(message: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _validate_url(url: str) -> str:
-    """
-    Ensure the URL has an http or https scheme and a non-empty host.
-    Returns the (possibly normalised) URL string.
-    Raises ValueError with a user-friendly message on failure.
-    """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
-        raise ValueError(
-            f"Invalid URL scheme {parsed.scheme!r} in {url!r}. "
-            "Only http:// and https:// are supported."
-        )
+        raise ValueError(f"Invalid URL scheme {parsed.scheme!r} in {url!r}.")
     if not parsed.netloc:
         raise ValueError(f"URL has no host: {url!r}")
     return url
@@ -74,29 +62,33 @@ def _validate_url(url: str) -> str:
 
 async def run(
     project_id: str,
-    website_url: Optional[str],
-    instagram_handle: Optional[str],
+    website_url: Optional[str] = None,
+    instagram_handle: Optional[str] = None,
+    facebook_url: Optional[str] = None,
+    tiktok_url: Optional[str] = None,
+    linkedin_url: Optional[str] = None,
+    x_url: Optional[str] = None,
+    youtube_url: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """
-    Async generator that drives the four-step ingestion pipeline:
+    Async generator that drives the multi-platform brand ingestion pipeline:
       1. Website scraping via Firecrawl
       2. Instagram scraping via Apify
-      3. Brand Core extraction via Claude
-      4. Persist to Firestore
+      3. Facebook, TikTok, LinkedIn, X, YouTube scraping via Apify (optional)
+      4. Brand Core extraction via Claude
+      5. Persist to Firestore
 
-    At least one of website_url or instagram_handle must be non-None.
-    The generator always terminates; callers must handle both 'done' and
-    'error' terminal events.
-
-    Usage:
-        async for event in pipeline.run(project_id, website_url, handle):
-            yield sse_format(event)
+    At least one source must be provided.
     """
-    if not website_url and not instagram_handle:
-        yield _error("Provide at least a website URL or Instagram handle.")
+    has_any = any([
+        website_url, instagram_handle, facebook_url,
+        tiktok_url, linkedin_url, x_url, youtube_url,
+    ])
+    if not has_any:
+        yield _error("Provide at least a website URL or one social media link.")
         return
 
-    # --- Input validation ---
+    # Validate website URL if provided
     if website_url:
         try:
             website_url = _validate_url(website_url)
@@ -104,78 +96,188 @@ async def run(
             yield _error(str(exc))
             return
 
-    # instagram_handle normalisation is already done in IngestRequest.normalise_handle;
-    # strip @ here as a defensive measure in case the pipeline is called directly.
+    # Normalise Instagram handle
     if instagram_handle:
         instagram_handle = instagram_handle.lstrip("@").strip()
         if not instagram_handle:
             yield _error("Instagram handle cannot be empty after normalisation.")
             return
 
-    # Mark the project as processing so the UI can show a spinner.
     firebase_service.update_project(project_id, {"ingestionStatus": "processing"})
 
     scraped_data: list[dict] = []
 
+    # Count total sources to weight progress bar
+    sources = [
+        s for s in [website_url, instagram_handle, facebook_url, tiktok_url, linkedin_url, x_url, youtube_url]
+        if s
+    ]
+    n = max(len(sources), 1)
+    # Progress: 0-60 for scraping, 60-95 for extraction, 95-100 for save
+    progress_per_source = 60 // n
+    current_progress = 0
+
     # -----------------------------------------------------------------------
-    # Step 1 — Website scraping
+    # Step 1 — Website
     # -----------------------------------------------------------------------
     if website_url:
-        yield _step("Connecting to website…")
-        yield _progress(5)
+        yield _step("Scraping website…", "running")
+        yield _progress(current_progress + 5)
 
         if not settings.FIRECRAWL_API_KEY:
-            yield _step("Connecting to website…", "skipped", "FIRECRAWL_API_KEY not configured")
+            yield _step("Website scraping skipped", "skipped", "FIRECRAWL_API_KEY not configured")
         else:
             try:
-                yield _step("Reading page content…", "running")
-                yield _progress(15)
                 result = await firecrawl_client.scrape_url(website_url, settings.FIRECRAWL_API_KEY)
                 scraped_data.append(result)
                 yield _step("Website content extracted", "done")
-                yield _progress(30)
             except Exception as exc:
-                logger.warning("Website scrape failed for %s: %s", website_url, exc)
-                # Non-fatal — continue to Instagram step if available.
+                logger.warning("Website scrape failed: %s", exc)
                 yield _step("Website scraping failed", "error", str(exc)[:120])
 
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
     # -----------------------------------------------------------------------
-    # Step 2 — Instagram scraping
+    # Step 2 — Instagram
     # -----------------------------------------------------------------------
     if instagram_handle:
-        yield _step("Connecting to Instagram…", "running")
-        yield _progress(35)
+        yield _step(f"Scraping Instagram @{instagram_handle}…", "running")
 
         if not settings.APIFY_API_KEY:
-            yield _step("Connecting to Instagram…", "skipped", "APIFY_API_KEY not configured")
+            yield _step("Instagram skipped", "skipped", "APIFY_API_KEY not configured")
         else:
             try:
-                yield _step(f"Reading @{instagram_handle} posts…", "running")
-                yield _progress(45)
                 result = await apify_client.scrape_instagram(
                     instagram_handle, settings.APIFY_API_KEY, max_posts=30
                 )
                 scraped_data.append(result)
                 yield _step("Instagram content extracted", "done")
-                yield _progress(60)
             except Exception as exc:
-                logger.warning("Instagram scrape failed for @%s: %s", instagram_handle, exc)
-                # Non-fatal — continue to extraction if website data was collected.
+                logger.warning("Instagram scrape failed: %s", exc)
                 yield _step("Instagram scraping failed", "error", str(exc)[:120])
 
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
     # -----------------------------------------------------------------------
-    # Guard — bail if neither source produced data
+    # Step 3 — Facebook
+    # -----------------------------------------------------------------------
+    if facebook_url:
+        yield _step("Scraping Facebook page…", "running")
+
+        if not settings.APIFY_API_KEY:
+            yield _step("Facebook skipped", "skipped", "APIFY_API_KEY not configured")
+        else:
+            try:
+                result = await apify_client.scrape_facebook(facebook_url, settings.APIFY_API_KEY)
+                if result.get("raw_text") or result.get("about"):
+                    scraped_data.append(result)
+                yield _step("Facebook content extracted", "done")
+            except Exception as exc:
+                logger.warning("Facebook scrape failed: %s", exc)
+                yield _step("Facebook scraping failed", "error", str(exc)[:120])
+
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
+    # -----------------------------------------------------------------------
+    # Step 4 — TikTok
+    # -----------------------------------------------------------------------
+    if tiktok_url:
+        yield _step("Scraping TikTok profile…", "running")
+
+        if not settings.APIFY_API_KEY:
+            yield _step("TikTok skipped", "skipped", "APIFY_API_KEY not configured")
+        else:
+            try:
+                result = await apify_client.scrape_tiktok(tiktok_url, settings.APIFY_API_KEY)
+                if result.get("raw_text") or result.get("bio"):
+                    scraped_data.append(result)
+                yield _step("TikTok content extracted", "done")
+            except Exception as exc:
+                logger.warning("TikTok scrape failed: %s", exc)
+                yield _step("TikTok scraping failed", "error", str(exc)[:120])
+
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
+    # -----------------------------------------------------------------------
+    # Step 5 — LinkedIn
+    # -----------------------------------------------------------------------
+    if linkedin_url:
+        yield _step("Scraping LinkedIn company…", "running")
+
+        if not settings.APIFY_API_KEY:
+            yield _step("LinkedIn skipped", "skipped", "APIFY_API_KEY not configured")
+        else:
+            try:
+                result = await apify_client.scrape_linkedin(linkedin_url, settings.APIFY_API_KEY)
+                if result.get("raw_text") or result.get("description"):
+                    scraped_data.append(result)
+                yield _step("LinkedIn content extracted", "done")
+            except Exception as exc:
+                logger.warning("LinkedIn scrape failed: %s", exc)
+                yield _step("LinkedIn scraping failed", "error", str(exc)[:120])
+
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
+    # -----------------------------------------------------------------------
+    # Step 6 — X / Twitter
+    # -----------------------------------------------------------------------
+    if x_url:
+        yield _step("Scraping X/Twitter profile…", "running")
+
+        if not settings.APIFY_API_KEY:
+            yield _step("X/Twitter skipped", "skipped", "APIFY_API_KEY not configured")
+        else:
+            try:
+                result = await apify_client.scrape_x(x_url, settings.APIFY_API_KEY)
+                if result.get("raw_text") or result.get("bio"):
+                    scraped_data.append(result)
+                yield _step("X/Twitter content extracted", "done")
+            except Exception as exc:
+                logger.warning("X/Twitter scrape failed: %s", exc)
+                yield _step("X/Twitter scraping failed", "error", str(exc)[:120])
+
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
+    # -----------------------------------------------------------------------
+    # Step 7 — YouTube
+    # -----------------------------------------------------------------------
+    if youtube_url:
+        yield _step("Scraping YouTube channel…", "running")
+
+        if not settings.APIFY_API_KEY:
+            yield _step("YouTube skipped", "skipped", "APIFY_API_KEY not configured")
+        else:
+            try:
+                result = await apify_client.scrape_youtube(youtube_url, settings.APIFY_API_KEY)
+                if result.get("raw_text") or result.get("description"):
+                    scraped_data.append(result)
+                yield _step("YouTube content extracted", "done")
+            except Exception as exc:
+                logger.warning("YouTube scrape failed: %s", exc)
+                yield _step("YouTube scraping failed", "error", str(exc)[:120])
+
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
+    # -----------------------------------------------------------------------
+    # Guard — bail if no data was collected
     # -----------------------------------------------------------------------
     if not scraped_data:
         firebase_service.update_project(project_id, {"ingestionStatus": "error"})
         yield _error(
             "No content could be scraped. "
-            "Check your URL/handle and ensure FIRECRAWL_API_KEY / APIFY_API_KEY are set."
+            "Check your URLs and ensure FIRECRAWL_API_KEY / APIFY_API_KEY are set."
         )
         return
 
     # -----------------------------------------------------------------------
-    # Step 3 — Brand Core extraction via Claude
+    # Step N+1 — Brand Core extraction via Claude
     # -----------------------------------------------------------------------
     if not settings.ANTHROPIC_API_KEY:
         firebase_service.update_project(project_id, {"ingestionStatus": "error"})
@@ -204,7 +306,7 @@ async def run(
         return
 
     # -----------------------------------------------------------------------
-    # Step 4 — Persist to Firestore
+    # Final — Persist to Firestore
     # -----------------------------------------------------------------------
     try:
         firebase_service.update_project(project_id, {

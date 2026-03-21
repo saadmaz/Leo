@@ -163,6 +163,69 @@ def _build_combined_content(scraped_data: list[dict]) -> str:
                 header += f"\nRecent captions:\n{captions[:4000]}\n"
             sections.append(header)
 
+        elif src_type == "facebook":
+            header = f"=== FACEBOOK: {source.get('url', '')} ===\n"
+            if source.get("name"):
+                header += f"Page name: {source['name']}\n"
+            if source.get("about"):
+                header += f"About: {source['about']}\n"
+            if source.get("category"):
+                header += f"Category: {source['category']}\n"
+            raw = source.get("raw_text", "")
+            if raw:
+                header += f"\nRecent posts:\n{raw[:3000]}\n"
+            sections.append(header)
+
+        elif src_type == "tiktok":
+            header = f"=== TIKTOK: {source.get('url', '')} ===\n"
+            if source.get("author"):
+                header += f"Creator: {source['author']}\n"
+            if source.get("bio"):
+                header += f"Bio: {source['bio']}\n"
+            if source.get("top_hashtags"):
+                header += f"Top hashtags: {', '.join(source['top_hashtags'][:15])}\n"
+            raw = source.get("raw_text", "")
+            if raw:
+                header += f"\nVideo descriptions:\n{raw[:3000]}\n"
+            sections.append(header)
+
+        elif src_type == "linkedin":
+            header = f"=== LINKEDIN: {source.get('url', '')} ===\n"
+            if source.get("name"):
+                header += f"Company: {source['name']}\n"
+            if source.get("tagline"):
+                header += f"Tagline: {source['tagline']}\n"
+            if source.get("description"):
+                header += f"Description: {source['description'][:800]}\n"
+            if source.get("industry"):
+                header += f"Industry: {source['industry']}\n"
+            raw = source.get("raw_text", "")
+            if raw:
+                header += f"\nRecent posts:\n{raw[:2500]}\n"
+            sections.append(header)
+
+        elif src_type == "x":
+            header = f"=== X/TWITTER: {source.get('url', '')} ===\n"
+            if source.get("display_name"):
+                header += f"Name: {source['display_name']}\n"
+            if source.get("bio"):
+                header += f"Bio: {source['bio']}\n"
+            raw = source.get("raw_text", "")
+            if raw:
+                header += f"\nRecent tweets:\n{raw[:3000]}\n"
+            sections.append(header)
+
+        elif src_type == "youtube":
+            header = f"=== YOUTUBE: {source.get('url', '')} ===\n"
+            if source.get("channel_name"):
+                header += f"Channel: {source['channel_name']}\n"
+            if source.get("description"):
+                header += f"Description: {source['description'][:600]}\n"
+            raw = source.get("raw_text", "")
+            if raw:
+                header += f"\nVideo titles & descriptions:\n{raw[:3000]}\n"
+            sections.append(header)
+
         else:
             logger.debug("Brand extractor: unknown source type %r — skipping", src_type)
 

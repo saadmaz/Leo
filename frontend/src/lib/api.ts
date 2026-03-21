@@ -272,7 +272,15 @@ export const api = {
    */
   async streamIngestion(
     projectId: string,
-    body: { websiteUrl?: string; instagramHandle?: string },
+    body: {
+      websiteUrl?: string
+      instagramHandle?: string
+      facebookUrl?: string
+      tiktokUrl?: string
+      linkedinUrl?: string
+      xUrl?: string
+      youtubeUrl?: string
+    },
     callbacks: {
       onStep: (step: import('@/types').IngestionStep) => void
       onProgress: (pct: number) => void
@@ -314,6 +322,25 @@ export const api = {
       },
       () => {/* ingestion done is signalled via the 'done' event type, not [DONE] sentinel */},
     )
+  },
+
+  // -------------------------------------------------------------------------
+  // Assets
+  // -------------------------------------------------------------------------
+
+  async uploadLogo(projectId: string, file: File): Promise<{ url: string }> {
+    const user = auth.currentUser
+    if (!user) throw new Error('Not authenticated')
+    const token = await user.getIdToken()
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${API}/projects/${projectId}/assets/logo`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+    return res.json()
   },
 
   // -------------------------------------------------------------------------

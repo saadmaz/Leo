@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Palette, Type, Hash, Users, Target, Zap,
-  ChevronDown, ChevronUp, Edit2, Check, Plus,
+  ChevronDown, ChevronUp, Edit2, Check, Plus, Upload, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/stores/app-store'
@@ -47,6 +47,7 @@ export function BrandCorePanel() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <LogoSection />
               {!bc ? <EmptyState /> : (
                 <>
                   <TaglineSection value={bc.tagline} onSave={(v) => handleSave({ tagline: v })} />
@@ -63,6 +64,82 @@ export function BrandCorePanel() {
         </>
       )}
     </AnimatePresence>
+  )
+}
+
+function LogoSection() {
+  const { activeProject, upsertProject } = useAppStore()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  if (!activeProject) return null
+  const logoUrl = activeProject.logoUrl
+
+  async function handleFile(file: File) {
+    if (!activeProject) return
+    setUploading(true)
+    try {
+      const { url } = await api.uploadLogo(activeProject.id, file)
+      upsertProject({ ...activeProject, logoUrl: url })
+      toast.success('Logo updated')
+    } catch (err) {
+      console.error('Logo upload failed:', err)
+      toast.error('Logo upload failed — please try again')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function onInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
+    e.target.value = ''
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Brand Logo</p>
+      <div
+        className="flex items-center gap-4"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+      >
+        {/* Logo preview */}
+        <div className="w-16 h-16 rounded-xl border border-border bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden">
+          {logoUrl
+            ? <img src={logoUrl} alt="Brand logo" className="w-full h-full object-contain" />
+            : <Upload className="w-5 h-5 text-muted-foreground/40" />}
+        </div>
+
+        {/* Upload controls */}
+        <div className="space-y-1.5 min-w-0">
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {uploading
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Uploading…</>
+              : <><Upload className="w-3.5 h-3.5" />{logoUrl ? 'Replace logo' : 'Upload logo'}</>}
+          </button>
+          <p className="text-[11px] text-muted-foreground">PNG, JPEG, SVG or WebP · max 5 MB</p>
+        </div>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+        className="hidden"
+        onChange={onInputChange}
+      />
+    </div>
   )
 }
 
