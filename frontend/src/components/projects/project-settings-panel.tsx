@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Trash2, AlertTriangle } from 'lucide-react'
+import { X, Loader2, Trash2, AlertTriangle, UserPlus, UserMinus, Crown, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import type { ProjectMember } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Model options (mirrors project-wizard.tsx)
@@ -74,6 +75,14 @@ export function ProjectSettingsPanel() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting]       = useState(false)
 
+  // Team members
+  const [members, setMembers]         = useState<ProjectMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole]   = useState<'editor' | 'viewer'>('editor')
+  const [inviting, setInviting]       = useState(false)
+  const [removingUid, setRemovingUid] = useState<string | null>(null)
+
   // Sync form from activeProject whenever panel opens
   useEffect(() => {
     if (!projectSettingsPanelOpen || !activeProject) return
@@ -96,6 +105,15 @@ export function ProjectSettingsPanel() {
     setVideoModel(activeProject.videoModel     ?? 'gemini-flash')
     setPromptModel(activeProject.promptModel   ?? 'claude-opus-4-6')
     setShowDeleteConfirm(false)
+    setInviteEmail('')
+    setInviteRole('editor')
+
+    // Load team members
+    setMembersLoading(true)
+    api.members.list(activeProject.id)
+      .then(setMembers)
+      .catch(() => toast.error('Failed to load team members'))
+      .finally(() => setMembersLoading(false))
   }, [projectSettingsPanelOpen, activeProject])
 
   function handleClose() {
@@ -143,6 +161,41 @@ export function ProjectSettingsPanel() {
       toast.error('Failed to delete project')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    if (!activeProject || !inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      const member = await api.members.invite(activeProject.id, inviteEmail.trim(), inviteRole)
+      setMembers((prev) => [...prev, member])
+      setInviteEmail('')
+      toast.success(`${member.displayName || member.email} added to project`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('404')) toast.error('No LEO account found for that email')
+      else if (msg.includes('409')) toast.error('User is already a member')
+      else toast.error('Failed to invite member')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleRemoveMember(uid: string) {
+    if (!activeProject) return
+    setRemovingUid(uid)
+    try {
+      await api.members.remove(activeProject.id, uid)
+      setMembers((prev) => prev.filter((m) => m.uid !== uid))
+      toast.success('Member removed')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('400')) toast.error('Cannot remove the last admin')
+      else toast.error('Failed to remove member')
+    } finally {
+      setRemovingUid(null)
     }
   }
 
@@ -225,6 +278,85 @@ export function ProjectSettingsPanel() {
                     </div>
                   ))}
                 </div>
+              </section>
+
+              {/* Team */}
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Team
+                </h3>
+
+                {/* Current members */}
+                {membersLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => <div key={i} className="h-10 rounded-lg bg-muted/40 animate-pulse" />)}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {members.map((m) => (
+                      <div key={m.uid} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{m.displayName || m.email}</p>
+                          {m.displayName && <p className="text-[11px] text-muted-foreground truncate">{m.email}</p>}
+                        </div>
+                        <span className={cn(
+                          'shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                          m.role === 'admin'
+                            ? 'bg-primary/10 text-primary'
+                            : m.role === 'editor'
+                            ? 'bg-muted text-muted-foreground'
+                            : 'bg-muted text-muted-foreground/60',
+                        )}>
+                          {m.role === 'admin' && <Crown className="w-2.5 h-2.5 inline mr-0.5" />}
+                          {m.role}
+                        </span>
+                        {m.role !== 'admin' && (
+                          <button
+                            onClick={() => handleRemoveMember(m.uid)}
+                            disabled={removingUid === m.uid}
+                            title="Remove member"
+                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-destructive disabled:opacity-40 transition-colors"
+                          >
+                            {removingUid === m.uid
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <UserMinus className="w-3 h-3" />}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Invite form */}
+                <form onSubmit={handleInvite} className="space-y-2">
+                  <label className="block text-xs font-medium text-muted-foreground">Invite by email</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="colleague@example.com"
+                      className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
+                    />
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as 'editor' | 'viewer')}
+                      className="rounded-lg border border-input bg-background px-2 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={inviting || !inviteEmail.trim()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted disabled:opacity-40 transition-colors"
+                  >
+                    {inviting ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
+                    {inviting ? 'Inviting…' : 'Invite'}
+                  </button>
+                </form>
               </section>
 
               {/* Danger zone */}

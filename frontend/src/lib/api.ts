@@ -23,6 +23,7 @@ import type {
   Message,
   Project,
   ProjectCreate,
+  ProjectMember,
   StreamEvent,
 } from '@/types'
 
@@ -424,6 +425,18 @@ export const api = {
       post<{ url: string }>('/billing/checkout', { plan }, signal),
     portal: (signal?: AbortSignal) =>
       post<{ url: string }>('/billing/portal', {}, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Team members
+  // -------------------------------------------------------------------------
+  members: {
+    list: (projectId: string, signal?: AbortSignal) =>
+      get<ProjectMember[]>(`/projects/${projectId}/members`, signal),
+    invite: (projectId: string, email: string, role: string, signal?: AbortSignal) =>
+      post<ProjectMember>(`/projects/${projectId}/members`, { email, role }, signal),
+    remove: (projectId: string, uid: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/members/${uid}`, signal),
   },
 
   // -------------------------------------------------------------------------

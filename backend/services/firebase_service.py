@@ -197,6 +197,38 @@ def get_user(uid: str) -> Optional[dict]:
     return doc.to_dict() if doc.exists else None
 
 
+def get_user_profile(uid: str) -> Optional[dict]:
+    """
+    Return {uid, email, displayName} from Firebase Auth for the given uid.
+    Returns None if the Auth record does not exist.
+    """
+    try:
+        user = auth.get_user(uid)
+        return {
+            "uid": uid,
+            "email": user.email or "",
+            "displayName": user.display_name or user.email or uid,
+        }
+    except auth.UserNotFoundError:
+        return None
+
+
+def get_user_by_email(email: str) -> Optional[dict]:
+    """
+    Look up a Firebase Auth user by email address.
+    Returns {uid, email, displayName} or None if no account exists.
+    """
+    try:
+        user = auth.get_user_by_email(email)
+        return {
+            "uid": user.uid,
+            "email": user.email or "",
+            "displayName": user.display_name or user.email or user.uid,
+        }
+    except auth.UserNotFoundError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Projects
 # ---------------------------------------------------------------------------

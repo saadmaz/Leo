@@ -99,3 +99,13 @@ def get_project_as_editor(project_id: str, uid: str) -> dict:
     project = get_project_or_404(project_id)
     assert_editor(project, uid)
     return project
+
+
+def get_project_as_admin(project_id: str, uid: str) -> dict:
+    """
+    Fetch a project and assert the user has admin role.
+    Used for sensitive operations like member management.
+    """
+    project = get_project_or_404(project_id)
+    assert_admin(project, uid)
+    return project
