@@ -24,6 +24,7 @@ import type {
   AppUser,
   BillingStatus,
   BrandCore,
+  Campaign,
   Chat,
   IngestionStep,
   OptimisticMessage,
@@ -127,6 +128,20 @@ interface AppState {
   // ---------------------------------------------------------------------------
   wizardOpen: boolean
   setWizardOpen: (v: boolean) => void
+
+  // ---------------------------------------------------------------------------
+  // Campaigns
+  // ---------------------------------------------------------------------------
+  campaigns: Campaign[]
+  setCampaigns: (campaigns: Campaign[]) => void
+  upsertCampaign: (campaign: Campaign) => void
+  removeCampaign: (id: string) => void
+  campaignPanelOpen: boolean
+  setCampaignPanelOpen: (v: boolean) => void
+  campaignGeneratorOpen: boolean
+  setCampaignGeneratorOpen: (v: boolean) => void
+  activeCampaign: Campaign | null
+  setActiveCampaign: (campaign: Campaign | null) => void
 
   // ---------------------------------------------------------------------------
   // Billing
@@ -268,6 +283,30 @@ export const useAppStore = create<AppState>((set) => ({
   // ---------------------------------------------------------------------------
   wizardOpen: false,
   setWizardOpen: (wizardOpen) => set({ wizardOpen }),
+
+  // ---------------------------------------------------------------------------
+  // Campaigns
+  // ---------------------------------------------------------------------------
+  campaigns: [],
+  setCampaigns: (campaigns) => set({ campaigns }),
+  upsertCampaign: (campaign) =>
+    set((s) => ({
+      campaigns: s.campaigns.some((c) => c.id === campaign.id)
+        ? s.campaigns.map((c) => (c.id === campaign.id ? campaign : c))
+        : [campaign, ...s.campaigns],
+      activeCampaign: s.activeCampaign?.id === campaign.id ? campaign : s.activeCampaign,
+    })),
+  removeCampaign: (id) =>
+    set((s) => ({
+      campaigns: s.campaigns.filter((c) => c.id !== id),
+      activeCampaign: s.activeCampaign?.id === id ? null : s.activeCampaign,
+    })),
+  campaignPanelOpen: false,
+  setCampaignPanelOpen: (campaignPanelOpen) => set({ campaignPanelOpen }),
+  campaignGeneratorOpen: false,
+  setCampaignGeneratorOpen: (campaignGeneratorOpen) => set({ campaignGeneratorOpen }),
+  activeCampaign: null,
+  setActiveCampaign: (activeCampaign) => set({ activeCampaign }),
 
   // ---------------------------------------------------------------------------
   // Billing

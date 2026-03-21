@@ -14,6 +14,9 @@ import { auth } from './firebase'
 import type {
   BillingStatus,
   BrandCore,
+  Campaign,
+  CampaignEvent,
+  CampaignGenerateRequest,
   Chat,
   ImageAttachment,
   IngestionEvent,
@@ -341,6 +344,64 @@ export const api = {
     })
     if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
     return res.json()
+  },
+
+  // -------------------------------------------------------------------------
+  // Campaigns
+  // -------------------------------------------------------------------------
+  campaigns: {
+    list: (projectId: string, signal?: AbortSignal) =>
+      get<Campaign[]>(`/projects/${projectId}/campaigns`, signal),
+    get: (projectId: string, campaignId: string, signal?: AbortSignal) =>
+      get<Campaign>(`/projects/${projectId}/campaigns/${campaignId}`, signal),
+    delete: (projectId: string, campaignId: string, signal?: AbortSignal) =>
+      del<void>(`/projects/${projectId}/campaigns/${campaignId}`, signal),
+  },
+
+  async streamCampaignGenerate(
+    projectId: string,
+    body: CampaignGenerateRequest,
+    callbacks: {
+      onStep: (step: import('@/types').IngestionStep) => void
+      onProgress: (pct: number) => void
+      onDone: (campaign: Campaign, campaignId: string) => void
+      onError: (message: string) => void
+    },
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const user = auth.currentUser
+    if (!user) { callbacks.onError('Not authenticated'); return }
+    const token = await user.getIdToken()
+
+    let res: Response
+    try {
+      res = await fetch(`${API}/projects/${projectId}/campaigns/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+        signal,
+      })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      callbacks.onError(String(err))
+      return
+    }
+
+    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+
+    const reader = res.body?.getReader()
+    if (!reader) { callbacks.onError('No stream'); return }
+
+    await readSSEStream<CampaignEvent>(
+      reader,
+      (event) => {
+        if (event.type === 'step')     callbacks.onStep(event)
+        if (event.type === 'progress') callbacks.onProgress(event.pct)
+        if (event.type === 'done')     callbacks.onDone(event.campaign, event.campaignId)
+        if (event.type === 'error')    callbacks.onError(event.message)
+      },
+      () => {},
+    )
   },
 
   // -------------------------------------------------------------------------

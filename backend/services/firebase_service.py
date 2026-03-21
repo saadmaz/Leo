@@ -422,6 +422,77 @@ def delete_chat(project_id: str, chat_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Campaigns   (subcollection: projects/{pid}/campaigns/{cid})
+# ---------------------------------------------------------------------------
+
+def create_campaign(project_id: str, data: dict) -> dict:
+    """Create a campaign document. Returns the full dict with 'id'."""
+    db = get_db()
+    now = _utcnow()
+    payload = {
+        **data,
+        "projectId": project_id,
+        "status": "generating",
+        "contentPacks": {},
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("campaigns").document()
+    )
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def get_campaign(project_id: str, campaign_id: str) -> Optional[dict]:
+    """Return a campaign dict (with 'id'), or None if not found."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("campaigns").document(campaign_id)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def list_campaigns(project_id: str, limit: int = 50) -> list[dict]:
+    """Return all campaigns for a project sorted by createdAt descending."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("campaigns")
+        .order_by("createdAt", direction="DESCENDING")
+        .limit(limit)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def update_campaign(project_id: str, campaign_id: str, data: dict) -> None:
+    """Partially update a campaign document. Bumps updatedAt."""
+    db = get_db()
+    data["updatedAt"] = _utcnow()
+    (
+        db.collection("projects").document(project_id)
+        .collection("campaigns").document(campaign_id)
+        .update(data)
+    )
+
+
+def delete_campaign(project_id: str, campaign_id: str) -> None:
+    """Delete a campaign document."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("campaigns").document(campaign_id)
+        .delete()
+    )
+
+
+# ---------------------------------------------------------------------------
 # Messages
 # ---------------------------------------------------------------------------
 

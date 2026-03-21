@@ -1,0 +1,405 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  X, Zap, Plus, Trash2, ChevronRight, ChevronLeft,
+  Copy, Check, Target, Users, Calendar, BarChart2,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { useAppStore } from '@/stores/app-store'
+import { api } from '@/lib/api'
+import type { Campaign, CampaignContentPack } from '@/types'
+import { cn } from '@/lib/utils'
+
+// ---------------------------------------------------------------------------
+// Channel display helpers
+// ---------------------------------------------------------------------------
+
+const CHANNEL_LABELS: Record<string, string> = {
+  instagram: 'Instagram', linkedin: 'LinkedIn', twitter: 'X / Twitter',
+  tiktok: 'TikTok', meta_ads: 'Meta Ads', google_ads: 'Google Ads', email: 'Email',
+}
+const CHANNEL_ICONS: Record<string, string> = {
+  instagram: '📸', linkedin: '💼', twitter: '𝕏', tiktok: '🎵',
+  meta_ads: '📢', google_ads: '🔍', email: '✉️',
+}
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
+
+export function CampaignPanel() {
+  const {
+    campaignPanelOpen, setCampaignPanelOpen,
+    campaigns, setCampaigns, upsertCampaign, removeCampaign,
+    activeCampaign, setActiveCampaign,
+    activeProject, setCampaignGeneratorOpen,
+  } = useAppStore()
+
+  const [loading, setLoading] = useState(false)
+
+  // Load campaigns when panel opens
+  useEffect(() => {
+    if (!campaignPanelOpen || !activeProject) return
+    setLoading(true)
+    api.campaigns.list(activeProject.id)
+      .then(setCampaigns)
+      .catch(() => toast.error('Failed to load campaigns'))
+      .finally(() => setLoading(false))
+  }, [campaignPanelOpen, activeProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleDelete(campaign: Campaign) {
+    if (!activeProject) return
+    try {
+      await api.campaigns.delete(activeProject.id, campaign.id)
+      removeCampaign(campaign.id)
+      toast.success('Campaign deleted')
+    } catch {
+      toast.error('Failed to delete campaign')
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      {campaignPanelOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={() => { setCampaignPanelOpen(false); setActiveCampaign(null) }}
+          />
+          <motion.aside
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            className="fixed right-0 top-0 h-full w-full max-w-md bg-card border-l border-border z-50 flex flex-col shadow-2xl"
+          >
+            {activeCampaign
+              ? <CampaignDetail campaign={activeCampaign} onBack={() => setActiveCampaign(null)} onDelete={handleDelete} />
+              : <CampaignList
+                  campaigns={campaigns}
+                  loading={loading}
+                  onSelect={setActiveCampaign}
+                  onDelete={handleDelete}
+                  onClose={() => setCampaignPanelOpen(false)}
+                  onNew={() => { setCampaignPanelOpen(false); setCampaignGeneratorOpen(true) }}
+                />
+            }
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Campaign list view
+// ---------------------------------------------------------------------------
+
+function CampaignList({
+  campaigns, loading, onSelect, onDelete, onClose, onNew,
+}: {
+  campaigns: Campaign[]
+  loading: boolean
+  onSelect: (c: Campaign) => void
+  onDelete: (c: Campaign) => void
+  onClose: () => void
+  onNew: () => void
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+        <div>
+          <h2 className="font-semibold text-sm">Campaigns</h2>
+          <p className="text-xs text-muted-foreground">{campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onNew}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-3 h-3" />
+            New
+          </button>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground ml-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {loading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 rounded-xl bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {!loading && campaigns.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+            <Zap className="w-8 h-8 text-muted-foreground/30" />
+            <p className="text-sm font-medium">No campaigns yet</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              Generate a full campaign brief and content packs in seconds.
+            </p>
+            <button
+              onClick={onNew}
+              className="mt-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              Generate first campaign
+            </button>
+          </div>
+        )}
+
+        {!loading && campaigns.map((campaign) => (
+          <div
+            key={campaign.id}
+            className="group relative rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-colors cursor-pointer"
+            onClick={() => onSelect(campaign)}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-medium truncate">{campaign.name}</p>
+                  <StatusBadge status={campaign.status} />
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2">{campaign.objective}</p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {campaign.channels?.slice(0, 4).map((ch) => (
+                    <span key={ch} className="text-xs bg-muted px-1.5 py-0.5 rounded-md">
+                      {CHANNEL_ICONS[ch] ?? '📄'} {CHANNEL_LABELS[ch] ?? ch}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(campaign) }}
+                  className="p-1 rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Campaign detail view
+// ---------------------------------------------------------------------------
+
+function CampaignDetail({ campaign, onBack, onDelete }: {
+  campaign: Campaign
+  onBack: () => void
+  onDelete: (c: Campaign) => void
+}) {
+  const [activeChannel, setActiveChannel] = useState<string | null>(
+    campaign.channels?.[0] ?? null
+  )
+
+  const brief = campaign.brief
+  const packs = campaign.contentPacks ?? {}
+  const channelsWithContent = Object.keys(packs).filter(
+    (ch) => (packs[ch]?.captions?.length ?? 0) > 0 || (packs[ch]?.adCopy?.length ?? 0) > 0
+  )
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
+        <button onClick={onBack} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-sm truncate">{campaign.name}</h2>
+          <StatusBadge status={campaign.status} />
+        </div>
+        <button
+          onClick={() => onDelete(campaign)}
+          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {/* Brief */}
+        {brief && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Brief</p>
+
+            <BriefRow icon={<Target className="w-3.5 h-3.5" />} label="Objective" value={brief.objective} />
+            <BriefRow icon={<Users className="w-3.5 h-3.5" />} label="Audience" value={brief.audience} />
+            <BriefRow icon={<Calendar className="w-3.5 h-3.5" />} label="Timeline" value={brief.timeline} />
+            {brief.budgetGuidance && (
+              <BriefRow icon={<BarChart2 className="w-3.5 h-3.5" />} label="Budget" value={brief.budgetGuidance} />
+            )}
+
+            {brief.keyMessages?.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5 font-medium">Key messages</p>
+                <ul className="space-y-1">
+                  {brief.keyMessages.map((m, i) => (
+                    <li key={i} className="text-xs flex gap-2">
+                      <span className="text-primary shrink-0">•</span>
+                      <span>{m}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {brief.kpis?.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5 font-medium">KPIs</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {brief.kpis.map((k) => (
+                    <span key={k} className="px-2 py-0.5 rounded-full bg-muted text-xs">{k}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Content packs */}
+        {channelsWithContent.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Content Packs</p>
+
+            {/* Channel tabs */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {channelsWithContent.map((ch) => (
+                <button
+                  key={ch}
+                  onClick={() => setActiveChannel(ch)}
+                  className={cn(
+                    'shrink-0 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors whitespace-nowrap',
+                    activeChannel === ch
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <span>{CHANNEL_ICONS[ch] ?? '📄'}</span>
+                  <span>{CHANNEL_LABELS[ch] ?? ch}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Pack content */}
+            {activeChannel && packs[activeChannel] && (
+              <ContentPackView channel={activeChannel} pack={packs[activeChannel]} />
+            )}
+          </div>
+        )}
+
+        {campaign.status === 'generating' && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            Generating…
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Content pack view
+// ---------------------------------------------------------------------------
+
+function ContentPackView({ channel, pack }: { channel: string; pack: CampaignContentPack }) {
+  const captions = pack.captions ?? []
+  const adCopy = pack.adCopy ?? []
+
+  return (
+    <div className="space-y-3">
+      {captions.map((cap, i) => (
+        <div key={i} className="group relative rounded-lg border border-border bg-background p-3">
+          <p className="text-sm leading-relaxed pr-8">{cap.text}</p>
+          {cap.hashtags.length > 0 && (
+            <p className="mt-1.5 text-xs text-primary/70">
+              {cap.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
+            </p>
+          )}
+          <CopyBtn text={cap.text + (cap.hashtags.length ? '\n\n' + cap.hashtags.map((h) => `#${h}`).join(' ') : '')} />
+        </div>
+      ))}
+
+      {adCopy.map((v, i) => (
+        <div key={i} className="group relative rounded-lg border border-border bg-background p-3 space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Headline</p>
+          <p className="text-sm font-medium pr-8">{v.headline}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Body</p>
+          <p className="text-sm leading-relaxed pr-8">{v.body}</p>
+          {v.cta && (
+            <>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">CTA</p>
+              <span className="inline-block px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">{v.cta}</span>
+            </>
+          )}
+          <CopyBtn text={`Headline: ${v.headline}\n\n${v.body}${v.cta ? `\n\nCTA: ${v.cta}` : ''}`} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function BriefRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  if (!value) return null
+  return (
+    <div className="flex gap-3">
+      <span className="text-muted-foreground shrink-0 mt-0.5">{icon}</span>
+      <div>
+        <p className="text-[11px] text-muted-foreground font-medium mb-0.5">{label}</p>
+        <p className="text-sm">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: Campaign['status'] }) {
+  if (status === 'ready') return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-medium">
+      Ready
+    </span>
+  )
+  if (status === 'generating') return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+      Generating…
+    </span>
+  )
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] font-medium">
+      Error
+    </span>
+  )
+}
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation()
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <button
+      onClick={copy}
+      className="absolute top-2.5 right-2.5 p-1.5 rounded-md opacity-0 group-hover:opacity-100 bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all"
+    >
+      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+    </button>
+  )
+}

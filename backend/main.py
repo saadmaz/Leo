@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets
+from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns
 from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
 # ---------------------------------------------------------------------------
@@ -103,6 +103,7 @@ app.include_router(ingestion.router)
 app.include_router(brand_core.router)
 app.include_router(billing.router)
 app.include_router(assets.router)
+app.include_router(campaigns.router)
 
 # ---------------------------------------------------------------------------
 # Health endpoints

@@ -182,6 +182,75 @@ export type IngestionEvent =
   | IngestionError
 
 // ---------------------------------------------------------------------------
+// Campaigns
+// ---------------------------------------------------------------------------
+
+export interface CampaignBrief {
+  name: string
+  objective: string
+  audience: string
+  channels: string[]
+  timeline: string
+  kpis: string[]
+  budgetGuidance: string
+  keyMessages: string[]
+}
+
+export interface CampaignCaption {
+  text: string
+  hashtags: string[]
+}
+
+export interface CampaignAdVariant {
+  headline: string
+  body: string
+  cta: string
+}
+
+export interface CampaignContentPack {
+  captions?: CampaignCaption[]
+  adCopy?: CampaignAdVariant[]
+}
+
+export interface Campaign {
+  id: string
+  projectId: string
+  name: string
+  objective: string
+  audience: string
+  channels: string[]
+  timeline: string
+  status: 'generating' | 'ready' | 'error'
+  brief?: CampaignBrief
+  contentPacks?: Record<string, CampaignContentPack>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CampaignGenerateRequest {
+  name: string
+  objective: string
+  audience: string
+  channels: string[]
+  timeline: string
+  kpis: string[]
+  budgetGuidance: string
+}
+
+// SSE events for campaign generation (same shape as ingestion events)
+export interface CampaignDone {
+  type: 'done'
+  campaignId: string
+  campaign: Campaign
+}
+
+export type CampaignEvent =
+  | IngestionStep
+  | IngestionProgress
+  | CampaignDone
+  | IngestionError
+
+// ---------------------------------------------------------------------------
 // Attachments
 // ---------------------------------------------------------------------------
 

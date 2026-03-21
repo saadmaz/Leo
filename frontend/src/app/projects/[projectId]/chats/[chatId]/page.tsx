@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Zap, ChevronRight, Cpu } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight, Cpu, Megaphone } from 'lucide-react'
 import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
@@ -37,6 +37,7 @@ export default function ChatPage() {
     setBrandCorePanelOpen, setIngestionOpen,
     upsertChat, openUpgradeModal,
     activeChannel, setActiveChannel,
+    setCampaignPanelOpen,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -181,6 +182,17 @@ export default function ChatPage() {
           <span className="font-semibold text-sm">{activeProject?.name ?? 'LEO'}</span>
 
           <div className="flex-1" />
+
+          {/* Campaigns shortcut */}
+          {activeProject && (
+            <button
+              onClick={() => setCampaignPanelOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border border-border text-muted-foreground text-xs hover:border-primary/40 hover:text-foreground transition-colors"
+            >
+              <Megaphone className="w-3 h-3" />
+              Campaigns
+            </button>
+          )}
 
           {/* Active model badge */}
           {activeProject?.contentModel && (

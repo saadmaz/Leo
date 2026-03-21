@@ -7,6 +7,8 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { UpgradeModal } from '@/components/billing/upgrade-modal'
 import { ProjectWizard } from '@/components/onboarding/project-wizard'
+import { CampaignGenerator } from '@/components/campaigns/campaign-generator'
+import { CampaignPanel } from '@/components/campaigns/campaign-panel'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAppStore((s) => s.setUser)
@@ -43,6 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         reason={upgradeModalReason}
       />
       <ProjectWizard />
+      <CampaignGenerator />
+      <CampaignPanel />
     </>
   )
 }

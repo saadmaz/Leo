@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
-  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu,
+  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -32,6 +32,7 @@ export function Sidebar() {
     upsertProject, removeProject, upsertChat, removeChat,
     sidebarOpen, setSidebarOpen,
     setWizardOpen,
+    setCampaignPanelOpen,
   } = useAppStore()
 
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -276,6 +277,17 @@ export function Sidebar() {
             {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
             <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
           </button>
+
+          {/* Campaigns */}
+          {activeProject && (
+            <button
+              onClick={() => setCampaignPanelOpen(true)}
+              className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Megaphone className="w-3.5 h-3.5" />
+              <span>Campaigns</span>
+            </button>
+          )}
 
           {/* Settings */}
           <button
