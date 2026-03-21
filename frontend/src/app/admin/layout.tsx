@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { isSuperAdmin } from '@/lib/admin-api'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -40,7 +40,6 @@ const NAV = [
 type AuthState = 'checking' | 'login' | 'forbidden' | 'ok'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const pathname = usePathname()
   const [authState, setAuthState] = useState<AuthState>('checking')
 
