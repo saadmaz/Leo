@@ -17,6 +17,7 @@ import {
   LogOut,
   Shield,
   ChevronRight,
+  Megaphone,
 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
@@ -30,6 +31,7 @@ const NAV = [
   { href: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
   { href: '/admin/feature-flags', label: 'Feature Flags', icon: ToggleLeft },
   { href: '/admin/system', label: 'System Health', icon: Activity },
+  { href: '/admin/communications', label: 'Communications', icon: Megaphone },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText },
 ]
 

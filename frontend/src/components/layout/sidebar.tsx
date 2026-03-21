@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
-  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal,
+  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
 import type { Project, Chat } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,8 @@ export function Sidebar() {
 
   const [projectsLoading, setProjectsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
+  const hasUnseenChangelog = useHasUnseenChangelog()
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -271,6 +274,20 @@ export function Sidebar() {
             </div>
           )}
 
+          {/* What's New */}
+          <button
+            onClick={() => setChangelogOpen(true)}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <span className="relative">
+              <Sparkles className="w-3.5 h-3.5" />
+              {hasUnseenChangelog && (
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
+            </span>
+            <span>What&apos;s New</span>
+          </button>
+
           {/* Theme toggle */}
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
@@ -319,6 +336,7 @@ export function Sidebar() {
           </button>
         </div>
       </aside>
+      <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
     </>
   )
 }

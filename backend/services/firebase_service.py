@@ -464,6 +464,90 @@ def get_moderation_stats() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Announcements
+# ---------------------------------------------------------------------------
+
+def create_announcement(data: dict) -> dict:
+    """Create an in-app announcement banner. Returns the doc with its ID."""
+    db = get_db()
+    now = _utcnow()
+    payload = {**data, "createdAt": now, "updatedAt": now}
+    ref = db.collection("announcements").document()
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def list_announcements(active_only: bool = False) -> list[dict]:
+    """Return all announcements, newest first. Pass active_only=True for public endpoint."""
+    db = get_db()
+    query = db.collection("announcements")
+    if active_only:
+        query = query.where("active", "==", True)
+    docs = list(query.stream())
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+
+    if active_only:
+        # Filter out expired ones (expiresAt is an ISO string or None)
+        now_iso = _utcnow()
+        results = [
+            a for a in results
+            if not a.get("expiresAt") or a["expiresAt"] > now_iso
+        ]
+
+    return sorted(results, key=lambda a: a.get("createdAt", ""), reverse=True)
+
+
+def update_announcement(announcement_id: str, data: dict) -> Optional[dict]:
+    """Partially update an announcement."""
+    db = get_db()
+    data["updatedAt"] = _utcnow()
+    ref = db.collection("announcements").document(announcement_id)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    doc = ref.get()
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def delete_announcement(announcement_id: str) -> None:
+    """Delete an announcement."""
+    db = get_db()
+    db.collection("announcements").document(announcement_id).delete()
+
+
+# ---------------------------------------------------------------------------
+# Changelog
+# ---------------------------------------------------------------------------
+
+def create_changelog_entry(data: dict) -> dict:
+    """Create a changelog/What's New entry."""
+    db = get_db()
+    now = _utcnow()
+    payload = {**data, "publishedAt": data.get("publishedAt") or now, "createdAt": now}
+    ref = db.collection("changelog").document()
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def list_changelog_entries(limit: int = 20) -> list[dict]:
+    """Return changelog entries newest first."""
+    db = get_db()
+    docs = (
+        db.collection("changelog")
+        .order_by("publishedAt", direction="DESCENDING")
+        .limit(limit)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def delete_changelog_entry(entry_id: str) -> None:
+    """Delete a changelog entry."""
+    db = get_db()
+    db.collection("changelog").document(entry_id).delete()
+
+
+# ---------------------------------------------------------------------------
 # Admin — feature flags
 # ---------------------------------------------------------------------------
 

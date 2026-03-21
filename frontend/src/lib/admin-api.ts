@@ -235,6 +235,33 @@ export const adminApi = {
     health: () => get<SystemHealth>('/system/health'),
   },
 
+  announcements: {
+    list: () => get<Announcement[]>('/communications/announcements'),
+    create: (body: Omit<Announcement, 'id' | 'createdAt' | 'updatedAt'>) =>
+      post<Announcement>('/communications/announcements', body),
+    update: (id: string, body: Partial<Omit<Announcement, 'id' | 'createdAt' | 'updatedAt'>>) =>
+      patch<Announcement>(`/communications/announcements/${id}`, body),
+    delete: (id: string) => del(`/communications/announcements/${id}`),
+  },
+
+  changelog: {
+    list: (limit?: number) => {
+      const qs = limit ? `?limit=${limit}` : ''
+      return get<ChangelogEntry[]>(`/communications/changelog${qs}`)
+    },
+    create: (body: Omit<ChangelogEntry, 'id' | 'createdAt'>) =>
+      post<ChangelogEntry>('/communications/changelog', body),
+    delete: (id: string) => del(`/communications/changelog/${id}`),
+  },
+
+  broadcast: {
+    send: (body: {
+      subject: string
+      html_body: string
+      segment: 'all' | 'free' | 'pro' | 'agency'
+    }) => post<BroadcastResult>('/communications/broadcast', body),
+  },
+
   moderation: {
     stats: () => get<ModerationStats>('/moderation/stats'),
 
@@ -311,6 +338,33 @@ export interface AbuseReport {
     messagesUsed: number
     threshold: number
   }[]
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  body: string
+  type: 'info' | 'warning' | 'success' | 'error'
+  active: boolean
+  expiresAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChangelogEntry {
+  id: string
+  version: string
+  title: string
+  body: string
+  tags: string[]
+  publishedAt: string
+  createdAt: string
+}
+
+export interface BroadcastResult {
+  sent: number
+  failed: number
+  errors: string[]
 }
 
 // ---------------------------------------------------------------------------

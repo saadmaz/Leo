@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
+import { AnnouncementBanner } from '@/components/layout/announcement-banner'
 import { OnboardingCard } from '@/components/onboarding/onboarding-card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowRight } from 'lucide-react'
@@ -41,6 +42,8 @@ export default function ProjectsPage() {
       <Sidebar />
 
       <main className="flex-1 flex flex-col overflow-hidden">
+        <AnnouncementBanner />
+
         {/* Mobile top bar */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border md:hidden">
           <SidebarToggle />

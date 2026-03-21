@@ -30,7 +30,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from backend.middleware.admin_auth import SuperAdminUser
-from backend.services import firebase_service, moderation_service, feature_flags_service
+from backend.services import firebase_service, moderation_service, feature_flags_service, email_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,28 @@ class FeatureFlagPatchRequest(BaseModel):
 class UserOverrideRequest(BaseModel):
     uid: str
     value: bool
+
+
+class AnnouncementRequest(BaseModel):
+    title: str
+    body: str
+    type: str = "info"            # "info" | "warning" | "success"
+    targetTiers: Optional[list[str]] = None
+    active: bool = True
+    expiresAt: Optional[str] = None
+
+
+class ChangelogRequest(BaseModel):
+    title: str
+    body: str
+    version: str = ""
+    publishedAt: Optional[str] = None
+
+
+class BroadcastRequest(BaseModel):
+    subject: str
+    htmlBody: str
+    targetTier: Optional[str] = None   # None = all users; "free"|"pro"|"agency" = segment
 
 
 # ---------------------------------------------------------------------------
@@ -528,6 +550,136 @@ def _ping_key(name: str, value: Optional[str]) -> str:
     if not value:
         raise ValueError(f"{name} not set")
     return "Key present"
+
+
+# ---------------------------------------------------------------------------
+# Announcements (admin CRUD)
+# ---------------------------------------------------------------------------
+
+@router.get("/announcements")
+def list_announcements(_user: SuperAdminUser):
+    """Return all announcements (active and inactive), newest first."""
+    return firebase_service.list_announcements(active_only=False)
+
+
+@router.post("/announcements")
+def create_announcement(body: AnnouncementRequest, user: SuperAdminUser):
+    """Create a new in-app announcement banner."""
+    data = body.model_dump()
+    data["createdBy"] = user["uid"]
+    result = firebase_service.create_announcement(data)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="announcement_create",
+        details={"title": body.title, "active": body.active},
+    )
+    return result
+
+
+@router.patch("/announcements/{announcement_id}")
+def update_announcement(announcement_id: str, body: dict, user: SuperAdminUser):
+    """Toggle active status or update any field on an announcement."""
+    result = firebase_service.update_announcement(announcement_id, body)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Announcement not found.")
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="announcement_update",
+        target_uid=announcement_id,
+        details=body,
+    )
+    return result
+
+
+@router.delete("/announcements/{announcement_id}")
+def delete_announcement(announcement_id: str, user: SuperAdminUser):
+    """Delete an announcement."""
+    firebase_service.delete_announcement(announcement_id)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="announcement_delete",
+        target_uid=announcement_id,
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Changelog (admin CRUD)
+# ---------------------------------------------------------------------------
+
+@router.get("/changelog")
+def list_changelog(_user: SuperAdminUser, limit: int = Query(50, ge=1, le=200)):
+    """Return changelog entries newest first."""
+    return firebase_service.list_changelog_entries(limit=limit)
+
+
+@router.post("/changelog")
+def create_changelog(body: ChangelogRequest, user: SuperAdminUser):
+    """Create a new What's New changelog entry."""
+    data = body.model_dump()
+    data["createdBy"] = user["uid"]
+    result = firebase_service.create_changelog_entry(data)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="changelog_create",
+        details={"title": body.title, "version": body.version},
+    )
+    return result
+
+
+@router.delete("/changelog/{entry_id}")
+def delete_changelog_entry(entry_id: str, user: SuperAdminUser):
+    """Delete a changelog entry."""
+    firebase_service.delete_changelog_entry(entry_id)
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="changelog_delete",
+        target_uid=entry_id,
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Email broadcast
+# ---------------------------------------------------------------------------
+
+@router.post("/communications/broadcast")
+async def send_broadcast(body: BroadcastRequest, user: SuperAdminUser):
+    """
+    Send a broadcast email to all users of a specific tier (or all users).
+    Collects email addresses from Firestore, then sends via Resend in batches.
+    """
+    import asyncio
+
+    all_users = firebase_service.list_all_users(limit=5000)
+
+    if body.targetTier:
+        recipients = [u["email"] for u in all_users if u.get("tier") == body.targetTier and u.get("email")]
+    else:
+        recipients = [u["email"] for u in all_users if u.get("email")]
+
+    if not recipients:
+        return {"sent": 0, "failed": 0, "errors": [], "recipientCount": 0}
+
+    result = await asyncio.to_thread(
+        email_service.send_broadcast,
+        recipients,
+        body.subject,
+        body.htmlBody,
+    )
+
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="email_broadcast",
+        details={
+            "subject": body.subject,
+            "targetTier": body.targetTier or "all",
+            "recipientCount": len(recipients),
+            "sent": result["sent"],
+            "failed": result["failed"],
+        },
+    )
+    return {**result, "recipientCount": len(recipients)}
 
 
 # ---------------------------------------------------------------------------
