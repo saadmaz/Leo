@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Square, ChevronDown, Paperclip, X } from 'lucide-react'
+import { ArrowUp, Loader2, Square, Paperclip, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChannelSelector, type ChannelKey } from './channel-selector'
 import { TemplateBar } from './template-bar'
@@ -27,7 +27,6 @@ function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result as string
-      // Strip the "data:image/...;base64," prefix
       resolve(result.split(',')[1])
     }
     reader.onerror = reject
@@ -47,7 +46,6 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [showChannels, setShowChannels] = useState(false)
   const [attachments, setAttachments] = useState<ImageAttachment[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
 
@@ -99,7 +97,6 @@ export function PromptComposer({
     }
 
     setAttachments((prev) => [...prev, ...newAttachments])
-    // Reset input so the same file can be re-attached if removed
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -120,24 +117,19 @@ export function PromptComposer({
   const isStreaming = disabled
   const canStop = isStreaming && !!onStop
   const canSend = !isStreaming && (!!value.trim() || attachments.length > 0)
-  const channelLabel = activeChannel
-    ? activeChannel.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    : null
 
   return (
     <div className="border-t border-border bg-background px-4 py-3 space-y-2">
       <div className="mx-auto max-w-3xl space-y-2">
-        {/* Template bar — always visible */}
+        {/* Template bar — changes with active channel */}
         <TemplateBar
           channel={activeChannel}
           brandName={brandName}
           onSelect={handleTemplateSelect}
         />
 
-        {/* Channel selector — collapsible */}
-        {showChannels && (
-          <ChannelSelector value={activeChannel} onChange={(ch) => { onChannelChange(ch); setShowChannels(false) }} />
-        )}
+        {/* Channel chip row — always visible */}
+        <ChannelSelector value={activeChannel} onChange={onChannelChange} />
 
         {/* Image attachment previews */}
         {attachments.length > 0 && (
@@ -145,11 +137,7 @@ export function PromptComposer({
             {attachments.map((att) => (
               <div key={att.id} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={att.previewUrl}
-                  alt={att.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={att.previewUrl} alt={att.name} className="w-full h-full object-cover" />
                 <button
                   onClick={() => removeAttachment(att.id)}
                   className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -176,23 +164,8 @@ export function PromptComposer({
             onKeyDown={handleKeyDown}
             placeholder="Message LEO…"
             rows={1}
-            disabled={false}
-            className="w-full resize-none bg-transparent px-4 py-3 pr-24 text-sm focus:outline-none placeholder:text-muted-foreground/50 leading-relaxed"
+            className="w-full resize-none bg-transparent px-4 py-3 pr-20 text-sm focus:outline-none placeholder:text-muted-foreground/50 leading-relaxed"
           />
-
-          {/* Channel pill inside composer */}
-          <button
-            onClick={() => setShowChannels((v) => !v)}
-            className={cn(
-              'absolute left-3 bottom-2.5 flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors',
-              activeChannel
-                ? 'bg-primary/10 text-primary font-medium'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {channelLabel ?? 'Channel'}
-            <ChevronDown className="w-2.5 h-2.5" />
-          </button>
 
           {/* Hidden file input */}
           <input

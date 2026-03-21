@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Zap, ChevronRight } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight, Cpu } from 'lucide-react'
 import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
@@ -142,6 +142,18 @@ export default function ChatPage() {
     )
   }
 
+  /** Re-send the last user message to get a fresh assistant response. */
+  async function handleRegenerate() {
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+    if (!lastUser || isStreaming) return
+    // Remove the last assistant message (the one being regenerated)
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
+    if (lastAssistant) {
+      setMessages(messages.filter((m) => m.id !== lastAssistant.id))
+    }
+    await handleSubmit(lastUser.content)
+  }
+
   /** Cancel the active SSE stream. The onDone/onError callbacks clean up state. */
   function handleStop() {
     streamController?.abort()
@@ -169,6 +181,14 @@ export default function ChatPage() {
           <span className="font-semibold text-sm">{activeProject?.name ?? 'LEO'}</span>
 
           <div className="flex-1" />
+
+          {/* Active model badge */}
+          {activeProject?.contentModel && (
+            <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-muted-foreground text-[11px] font-mono">
+              <Cpu className="w-3 h-3" />
+              {activeProject.contentModel.replace('claude-', '').replace('-latest', '')}
+            </div>
+          )}
 
           {/* Brand Core pill button */}
           {activeProject && (
@@ -260,14 +280,18 @@ export default function ChatPage() {
 
             {!messagesLoading && (
               <AnimatePresence initial={false}>
-                {messages.map((msg) => (
+                {messages.map((msg, idx) => (
                   <motion.div
                     key={msg.id}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <MessageCard message={msg} />
+                    <MessageCard
+                      message={msg}
+                      isLast={idx === messages.length - 1}
+                      onRegenerate={!isStreaming ? handleRegenerate : undefined}
+                    />
                   </motion.div>
                 ))}
               </AnimatePresence>

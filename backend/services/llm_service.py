@@ -274,6 +274,7 @@ async def stream_chat(
     user_message: str,
     channel: Optional[str] = None,
     images: Optional[list] = None,
+    model: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream a Claude response as SSE-formatted text chunks.
@@ -344,7 +345,7 @@ async def stream_chat(
 
     try:
         async with client.messages.stream(
-            model=settings.LLM_CHAT_MODEL,
+            model=model or settings.LLM_CHAT_MODEL,
             max_tokens=settings.LLM_MAX_TOKENS,
             system=system_prompt,
             messages=messages,

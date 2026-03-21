@@ -91,6 +91,7 @@ async def send_message(
                 user_message=body.content,
                 channel=body.channel,
                 images=images,
+                model=project.get("contentModel") or None,
             ):
                 yield chunk
 

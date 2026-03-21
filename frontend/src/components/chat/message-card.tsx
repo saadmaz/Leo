@@ -1,23 +1,33 @@
 'use client'
 
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Sparkles, User } from 'lucide-react'
+import { Sparkles, User, Copy, Check, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { OptimisticMessage } from '@/types'
 import { ArtifactCard, parseArtifacts } from './artifact-cards'
 
 interface MessageCardProps {
   message: OptimisticMessage
+  isLast?: boolean
+  onRegenerate?: () => void
 }
 
-export function MessageCard({ message }: MessageCardProps) {
+export function MessageCard({ message, isLast, onRegenerate }: MessageCardProps) {
   const isAssistant = message.role === 'assistant'
+  const [copied, setCopied] = useState(false)
 
   // For assistant messages: strip artifact blocks from text, collect cards
   const { clean, artifacts } = isAssistant
     ? parseArtifacts(message.content)
     : { clean: message.content, artifacts: [] }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(clean || message.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
     <div className="w-full py-3">
@@ -36,13 +46,12 @@ export function MessageCard({ message }: MessageCardProps) {
         <div className={cn('flex flex-col min-w-0 flex-1', !isAssistant && 'items-end')}>
           {isAssistant ? (
             /* --- Assistant: markdown + artifacts --- */
-            <div className="w-full">
+            <div className="w-full group/msg">
               {(clean || message.pending) && (
                 <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      // Inline code
                       code({ className, children, ...props }) {
                         const isBlock = className?.includes('language-')
                         return isBlock ? (
@@ -61,11 +70,9 @@ export function MessageCard({ message }: MessageCardProps) {
                           </code>
                         )
                       },
-                      // Paragraphs
                       p({ children }) {
                         return <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>
                       },
-                      // Lists
                       ul({ children }) {
                         return <ul className="mb-3 space-y-1 list-disc list-inside">{children}</ul>
                       },
@@ -75,7 +82,6 @@ export function MessageCard({ message }: MessageCardProps) {
                       li({ children }) {
                         return <li className="text-sm">{children}</li>
                       },
-                      // Headings
                       h1({ children }) {
                         return <h1 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h1>
                       },
@@ -85,7 +91,6 @@ export function MessageCard({ message }: MessageCardProps) {
                       h3({ children }) {
                         return <h3 className="text-sm font-semibold mb-1.5 mt-3 first:mt-0">{children}</h3>
                       },
-                      // Blockquote
                       blockquote({ children }) {
                         return (
                           <blockquote className="border-l-2 border-primary/40 pl-3 my-2 text-muted-foreground italic">
@@ -93,11 +98,9 @@ export function MessageCard({ message }: MessageCardProps) {
                           </blockquote>
                         )
                       },
-                      // Strong / em
                       strong({ children }) {
                         return <strong className="font-semibold text-foreground">{children}</strong>
                       },
-                      // Horizontal rule
                       hr() {
                         return <hr className="my-3 border-border" />
                       },
@@ -115,6 +118,34 @@ export function MessageCard({ message }: MessageCardProps) {
               {!message.pending && artifacts.map((artifact, i) => (
                 <ArtifactCard key={i} artifact={artifact} />
               ))}
+
+              {/* Action bar — copy + regenerate, visible on hover or when last */}
+              {!message.pending && (clean || artifacts.length > 0) && (
+                <div className={cn(
+                  'flex items-center gap-1 mt-2 transition-opacity',
+                  isLast ? 'opacity-100' : 'opacity-0 group-hover/msg:opacity-100',
+                )}>
+                  <button
+                    onClick={handleCopy}
+                    title="Copy response"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+
+                  {isLast && onRegenerate && (
+                    <button
+                      onClick={onRegenerate}
+                      title="Regenerate response"
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Regenerate</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             /* --- User: plain bubble --- */
