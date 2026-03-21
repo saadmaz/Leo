@@ -8,6 +8,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   LayoutDashboard,
   Users,
+  FolderOpen,
+  BarChart2,
+  ScrollText,
   LogOut,
   Shield,
   ChevronRight,
@@ -19,6 +22,9 @@ import { cn } from '@/lib/utils'
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/users', label: 'Users', icon: Users },
+  { href: '/admin/projects', label: 'Projects', icon: FolderOpen },
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

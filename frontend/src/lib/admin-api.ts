@@ -99,9 +99,55 @@ async function del(path: string): Promise<void> {
 // Public admin API surface
 // ---------------------------------------------------------------------------
 
+export interface AdminProject {
+  id: string
+  name: string
+  description: string
+  ownerId: string
+  memberCount: number
+  ingestionStatus: string | null
+  websiteUrl: string | null
+  hasBrandCore: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AnalyticsData {
+  signupsLast30d: { date: string; signups: number }[]
+  topUsersByMessages: {
+    uid: string
+    email: string
+    displayName: string
+    tier: string
+    messagesUsed: number
+  }[]
+  usageHistogram: { bucket: string; users: number }[]
+  totalMessagesThisMonth: number
+}
+
+export interface AuditLogEntry {
+  id: string
+  adminUid: string
+  action: string
+  targetUid: string
+  details: Record<string, unknown>
+  timestamp: string
+}
+
 export const adminApi = {
   dashboard: {
     stats: () => get<DashboardStats>('/dashboard'),
+  },
+
+  analytics: {
+    get: () => get<AnalyticsData>('/analytics'),
+  },
+
+  auditLog: {
+    list: (limit?: number) => {
+      const qs = limit ? `?limit=${limit}` : ''
+      return get<AuditLogEntry[]>(`/audit-log${qs}`)
+    },
   },
 
   users: {
@@ -141,6 +187,14 @@ export const adminApi = {
 
     revokeAdmin: (uid: string) =>
       post<{ ok: boolean }>(`/users/${uid}/revoke-admin`),
+  },
+
+  projects: {
+    list: (params?: { search?: string }) => {
+      const qs = params?.search ? `?search=${encodeURIComponent(params.search)}` : ''
+      return get<AdminProject[]>(`/projects${qs}`)
+    },
+    delete: (projectId: string) => del(`/projects/${projectId}`),
   },
 }
 

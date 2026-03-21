@@ -337,6 +337,130 @@ def override_user_limits(uid: str, overrides: dict) -> None:
     db.collection("users").document(uid).update(updates)
 
 
+# ---------------------------------------------------------------------------
+# Admin — projects
+# ---------------------------------------------------------------------------
+
+def list_all_projects(limit: int = 500) -> list[dict]:
+    """Return up to `limit` projects across all users, sorted by createdAt desc."""
+    db = get_db()
+    docs = db.collection("projects").limit(limit).stream()
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    return sorted(results, key=lambda p: p.get("createdAt", ""), reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# Admin — audit log
+# ---------------------------------------------------------------------------
+
+def write_audit_log(admin_uid: str, action: str, target_uid: str = "", details: dict | None = None) -> None:
+    """
+    Persist an admin action to the `adminAuditLogs` collection.
+    Non-fatal — errors are logged but never re-raised so they don't block the action.
+    """
+    try:
+        db = get_db()
+        db.collection("adminAuditLogs").document().set({
+            "adminUid": admin_uid,
+            "action": action,
+            "targetUid": target_uid,
+            "details": details or {},
+            "timestamp": _utcnow(),
+        })
+    except Exception as exc:
+        logger.warning("Failed to write audit log: %s", exc)
+
+
+def list_audit_logs(limit: int = 200) -> list[dict]:
+    """Return the most recent audit log entries, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("adminAuditLogs")
+        .order_by("timestamp", direction="DESCENDING")
+        .limit(limit)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Admin — analytics
+# ---------------------------------------------------------------------------
+
+def get_analytics() -> dict:
+    """
+    Return analytics data for the admin analytics page.
+    - User signups grouped by day (last 30 days)
+    - Top 10 users by messages_used this month
+    - Usage histogram (how many users in each message-count bucket)
+    """
+    from datetime import timedelta
+
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    cutoff_30d = (now - timedelta(days=30)).isoformat()
+
+    # Buckets for signup chart: one entry per day for last 30 days
+    day_buckets: dict[str, int] = {}
+    for i in range(30):
+        day = (now - timedelta(days=29 - i)).strftime("%Y-%m-%d")
+        day_buckets[day] = 0
+
+    top_users: list[dict] = []
+    usage_buckets = {"0": 0, "1-10": 0, "11-50": 0, "51-200": 0, "201+": 0}
+    total_messages = 0
+
+    for doc in db.collection("users").stream():
+        data = doc.to_dict() or {}
+        uid = doc.id
+
+        # Signup chart
+        created = data.get("createdAt", "")
+        if created >= cutoff_30d:
+            day = created[:10]  # "YYYY-MM-DD"
+            if day in day_buckets:
+                day_buckets[day] += 1
+
+        # Messages
+        billing = data.get("billing", {})
+        msgs = billing.get("messagesUsed", 0)
+        total_messages += msgs
+
+        top_users.append({
+            "uid": uid,
+            "email": data.get("email", ""),
+            "displayName": data.get("displayName", ""),
+            "tier": data.get("tier", "free"),
+            "messagesUsed": msgs,
+        })
+
+        # Usage histogram
+        if msgs == 0:
+            usage_buckets["0"] += 1
+        elif msgs <= 10:
+            usage_buckets["1-10"] += 1
+        elif msgs <= 50:
+            usage_buckets["11-50"] += 1
+        elif msgs <= 200:
+            usage_buckets["51-200"] += 1
+        else:
+            usage_buckets["201+"] += 1
+
+    # Top 10 by messages
+    top_users.sort(key=lambda u: u["messagesUsed"], reverse=True)
+    top_users = top_users[:10]
+
+    # Signups chart as a list
+    signups_chart = [{"date": d, "signups": c} for d, c in day_buckets.items()]
+
+    return {
+        "signupsLast30d": signups_chart,
+        "topUsersByMessages": top_users,
+        "usageHistogram": [{"bucket": k, "users": v} for k, v in usage_buckets.items()],
+        "totalMessagesThisMonth": total_messages,
+    }
+
+
 def get_platform_stats() -> dict:
     """
     Return aggregate platform statistics for the admin dashboard.
