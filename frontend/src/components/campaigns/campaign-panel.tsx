@@ -107,7 +107,7 @@ const CHANNEL_ICONS: Record<string, string> = {
 export function CampaignPanel() {
   const {
     campaignPanelOpen, setCampaignPanelOpen,
-    campaigns, setCampaigns, upsertCampaign, removeCampaign,
+    campaigns, setCampaigns, removeCampaign,
     activeCampaign, setActiveCampaign,
     activeProject, setCampaignGeneratorOpen,
   } = useAppStore()
@@ -401,7 +401,7 @@ function CampaignDetail({ campaign, onBack, onDelete }: {
 // Content pack view
 // ---------------------------------------------------------------------------
 
-function ContentPackView({ channel, pack }: { channel: string; pack: CampaignContentPack }) {
+function ContentPackView({ pack }: { channel: string; pack: CampaignContentPack }) {
   const captions = pack.captions ?? []
   const adCopy = pack.adCopy ?? []
 

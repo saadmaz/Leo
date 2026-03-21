@@ -7,7 +7,6 @@ import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { IngestionStep } from '@/types'
 import { cn } from '@/lib/utils'
-import type { ChannelKey } from '@/components/chat/channel-selector'
 import { CHANNELS } from '@/components/chat/channel-selector'
 
 // ---------------------------------------------------------------------------
@@ -120,7 +119,7 @@ export function CampaignGenerator() {
       {
         onStep: (step) => setSteps((prev) => [...prev.filter((s) => s.label !== step.label), step]),
         onProgress: (pct) => setProgress(pct),
-        onDone: (campaign, _id) => {
+        onDone: (campaign) => {
           upsertCampaign(campaign)
           setRunning(false)
           setDone(true)

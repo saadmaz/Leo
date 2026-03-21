@@ -212,6 +212,7 @@ function LogoSection() {
         {/* Logo preview */}
         <div className="w-16 h-16 rounded-xl border border-border bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden">
           {logoUrl
+            // eslint-disable-next-line @next/next/no-img-element
             ? <img src={logoUrl} alt="Brand logo" className="w-full h-full object-contain" />
             : <Upload className="w-5 h-5 text-muted-foreground/40" />}
         </div>
