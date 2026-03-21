@@ -106,7 +106,7 @@ export default function AdminFeatureFlagsPage() {
         </div>
       ) : flags.length === 0 ? (
         <p className="text-sm text-center text-muted-foreground py-12">
-          No feature flags yet. Click "New Flag" to create one.
+          No feature flags yet. Click &quot;New Flag&quot; to create one.
         </p>
       ) : (
         <div className="space-y-3">

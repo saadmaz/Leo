@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { adminApi, Announcement, ChangelogEntry, BroadcastResult } from '@/lib/admin-api'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,7 +42,7 @@ function BannersTab() {
     setLoading(true)
     try {
       setBanners(await adminApi.announcements.list())
-    } catch (e) {
+    } catch {
       toast.error('Failed to load banners')
     } finally {
       setLoading(false)
@@ -67,7 +67,7 @@ function BannersTab() {
       setForm({ title: '', body: '', type: 'info', active: true, expiresAt: '' })
       setShowForm(false)
       toast.success('Banner created')
-    } catch (e) {
+    } catch {
       toast.error('Failed to create banner')
     } finally {
       setSaving(false)
@@ -79,7 +79,7 @@ function BannersTab() {
       const updated = await adminApi.announcements.update(banner.id, { active: !banner.active })
       setBanners((prev) => prev.map((b) => (b.id === banner.id ? updated : b)))
       toast.success(updated.active ? 'Banner activated' : 'Banner deactivated')
-    } catch (e) {
+    } catch {
       toast.error('Failed to update banner')
     }
   }
@@ -90,7 +90,7 @@ function BannersTab() {
       await adminApi.announcements.delete(id)
       setBanners((prev) => prev.filter((b) => b.id !== id))
       toast.success('Banner deleted')
-    } catch (e) {
+    } catch {
       toast.error('Failed to delete banner')
     }
   }
@@ -276,7 +276,7 @@ function BroadcastTab() {
       })
       setResult(res)
       toast.success(`Broadcast sent — ${res.sent} delivered`)
-    } catch (e) {
+    } catch {
       toast.error('Broadcast failed')
     } finally {
       setSending(false)
@@ -431,7 +431,7 @@ function ChangelogTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Changelog entries appear in the "What's New" feed inside the app.
+          Changelog entries appear in the &quot;What&apos;s New&quot; feed inside the app.
         </p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={load}>
