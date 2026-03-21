@@ -29,7 +29,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from backend.middleware.admin_auth import SuperAdminUser
-from backend.services import firebase_service
+from backend.services import firebase_service, moderation_service
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,10 @@ class OverrideLimitsRequest(BaseModel):
     projectsLimit: Optional[int] = None
     ingestionsLimit: Optional[int] = None
     campaignsLimit: Optional[int] = None
+
+
+class ReviewFlagRequest(BaseModel):
+    note: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +339,117 @@ def _safe_user(user: dict) -> dict:
         },
         "adminOverrides": user.get("adminOverrides", {}),
     }
+
+
+# ---------------------------------------------------------------------------
+# Moderation — queue
+# ---------------------------------------------------------------------------
+
+@router.get("/moderation/stats")
+def get_moderation_stats(_user: SuperAdminUser):
+    """Return counts of flagged content by status (pending / actioned / dismissed)."""
+    return firebase_service.get_moderation_stats()
+
+
+@router.get("/moderation")
+def list_moderation(
+    _user: SuperAdminUser,
+    status_filter: Optional[str] = Query(None, alias="status",
+                                          description="pending | dismissed | actioned"),
+    limit: int = Query(200, ge=1, le=500),
+):
+    """List flagged content documents, newest first. Filter by status if provided."""
+    return firebase_service.list_flagged_content(
+        status_filter=status_filter, limit=limit
+    )
+
+
+@router.post("/moderation/{flag_id}/dismiss")
+def dismiss_flag(flag_id: str, body: ReviewFlagRequest, user: SuperAdminUser):
+    """Mark a flagged item as dismissed — content is acceptable, no action needed."""
+    if not firebase_service.get_flagged_item(flag_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+
+    firebase_service.update_flag_status(
+        flag_id=flag_id,
+        status="dismissed",
+        reviewed_by=user["uid"],
+        note=body.note,
+    )
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="moderation_dismiss",
+        target_uid=flag_id,
+        details={"note": body.note},
+    )
+    return {"ok": True}
+
+
+@router.post("/moderation/{flag_id}/action")
+def action_flag(flag_id: str, body: ReviewFlagRequest, user: SuperAdminUser):
+    """
+    Mark a flagged item as actioned and delete the original message from Firestore.
+    The flag document is kept for the audit trail.
+    """
+    flag = firebase_service.get_flagged_item(flag_id)
+    if not flag:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found.")
+
+    firebase_service.delete_flagged_message_content(flag_id=flag_id, reviewed_by=user["uid"])
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="moderation_action",
+        target_uid=flag.get("uid", ""),
+        details={"flagId": flag_id, "note": body.note, "patterns": flag.get("patterns", [])},
+    )
+    return {"ok": True}
+
+
+@router.post("/moderation/flag")
+def manual_flag(
+    body: dict,
+    user: SuperAdminUser,
+):
+    """
+    Manually flag a message for admin review.
+    Body: { uid, email, projectId, chatId, content, reason, messageId? }
+    """
+    flag_id = firebase_service.flag_content(
+        uid=body.get("uid", ""),
+        email=body.get("email", ""),
+        project_id=body.get("projectId", ""),
+        chat_id=body.get("chatId", ""),
+        content=body.get("content", ""),
+        reason="manual",
+        patterns=[body.get("reason", "Manual flag")],
+        message_id=body.get("messageId"),
+    )
+    firebase_service.write_audit_log(
+        admin_uid=user["uid"],
+        action="moderation_manual_flag",
+        target_uid=body.get("uid", ""),
+        details={"flagId": flag_id},
+    )
+    return {"ok": True, "flagId": flag_id}
+
+
+# ---------------------------------------------------------------------------
+# Moderation — abuse patterns
+# ---------------------------------------------------------------------------
+
+@router.get("/moderation/abuse")
+def get_abuse_suspects(_user: SuperAdminUser):
+    """
+    Return users whose message volume is ≥ 5× the platform average or ≥ 200 abs.
+    Useful for spotting API abuse, prompt-farming, or compromised accounts.
+    """
+    users = firebase_service.list_all_users(limit=500)
+    total_msgs = sum(
+        (u.get("billing") or {}).get("messagesUsed", 0) for u in users
+    )
+    avg = total_msgs / max(len(users), 1)
+    suspects = moderation_service.get_abuse_suspects(users, avg)
+    return {"platformAvg": round(avg, 1), "suspects": suspects}
 
 
 def _safe_project(project: dict) -> dict:

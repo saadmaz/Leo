@@ -338,6 +338,132 @@ def override_user_limits(uid: str, overrides: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Admin — content moderation
+# ---------------------------------------------------------------------------
+
+def flag_content(
+    uid: str,
+    email: str,
+    project_id: str,
+    chat_id: str,
+    content: str,
+    reason: str,
+    patterns: list[str],
+    message_id: Optional[str] = None,
+) -> str:
+    """
+    Persist a flagged-content document to the `flaggedContent` collection.
+    Returns the new document ID.
+    """
+    db = get_db()
+    now = _utcnow()
+    data = {
+        "uid": uid,
+        "email": email,
+        "projectId": project_id,
+        "chatId": chat_id,
+        "messageId": message_id,
+        "content": content,
+        "reason": reason,         # "auto_detected" | "manual"
+        "patterns": patterns,
+        "status": "pending",      # "pending" | "dismissed" | "actioned"
+        "flaggedAt": now,
+        "reviewedAt": None,
+        "reviewedBy": None,
+        "note": None,
+    }
+    ref = db.collection("flaggedContent").document()
+    ref.set(data)
+    logger.info("Flagged content from uid=%s, patterns=%s", uid, patterns)
+    return ref.id
+
+
+def list_flagged_content(status_filter: Optional[str] = None, limit: int = 200) -> list[dict]:
+    """
+    Return flagged content documents, newest first.
+    If status_filter is provided (e.g. "pending"), only matching docs are returned.
+    """
+    db = get_db()
+    query = db.collection("flaggedContent").order_by("flaggedAt", direction="DESCENDING").limit(limit)
+    if status_filter:
+        query = db.collection("flaggedContent").where("status", "==", status_filter).limit(limit)
+    return [{"id": d.id, **d.to_dict()} for d in query.stream()]
+
+
+def get_flagged_item(flag_id: str) -> Optional[dict]:
+    """Return a single flagged content document or None."""
+    db = get_db()
+    doc = db.collection("flaggedContent").document(flag_id).get()
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def update_flag_status(
+    flag_id: str,
+    status: str,
+    reviewed_by: str,
+    note: Optional[str] = None,
+) -> None:
+    """Update the review status of a flagged content document."""
+    db = get_db()
+    db.collection("flaggedContent").document(flag_id).update({
+        "status": status,
+        "reviewedAt": _utcnow(),
+        "reviewedBy": reviewed_by,
+        "note": note,
+    })
+
+
+def delete_flagged_message_content(flag_id: str, reviewed_by: str) -> None:
+    """
+    Mark a flag as actioned and delete the original message from Firestore.
+    The flag document is kept (with status=actioned) for the audit trail.
+    """
+    db = get_db()
+    flag_doc = db.collection("flaggedContent").document(flag_id).get()
+    if not flag_doc.exists:
+        return
+
+    flag = flag_doc.to_dict() or {}
+    project_id = flag.get("projectId", "")
+    chat_id = flag.get("chatId", "")
+    message_id = flag.get("messageId")
+
+    # Delete the original message if we have coordinates
+    if project_id and chat_id and message_id:
+        try:
+            (
+                db.collection("projects").document(project_id)
+                .collection("chats").document(chat_id)
+                .collection("messages").document(message_id)
+                .delete()
+            )
+        except Exception as exc:
+            logger.warning("Could not delete flagged message %s: %s", message_id, exc)
+
+    # Update flag status
+    db.collection("flaggedContent").document(flag_id).update({
+        "status": "actioned",
+        "reviewedAt": _utcnow(),
+        "reviewedBy": reviewed_by,
+    })
+
+
+def get_moderation_stats() -> dict:
+    """Return counts of flagged content by status."""
+    db = get_db()
+    pending = actioned = dismissed = 0
+    for doc in db.collection("flaggedContent").stream():
+        s = (doc.to_dict() or {}).get("status", "pending")
+        if s == "pending":
+            pending += 1
+        elif s == "actioned":
+            actioned += 1
+        elif s == "dismissed":
+            dismissed += 1
+    return {"pending": pending, "actioned": actioned, "dismissed": dismissed, "total": pending + actioned + dismissed}
+
+
+# ---------------------------------------------------------------------------
 # Admin — projects
 # ---------------------------------------------------------------------------
 

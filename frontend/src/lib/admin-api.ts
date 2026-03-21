@@ -196,6 +196,59 @@ export const adminApi = {
     },
     delete: (projectId: string) => del(`/projects/${projectId}`),
   },
+
+  moderation: {
+    stats: () => get<ModerationStats>('/moderation/stats'),
+
+    list: (params?: { status?: string }) => {
+      const qs = params?.status ? `?status=${params.status}` : ''
+      return get<FlaggedItem[]>(`/moderation${qs}`)
+    },
+
+    dismiss: (flagId: string, note?: string) =>
+      post<{ ok: boolean }>(`/moderation/${flagId}/dismiss`, { note }),
+
+    action: (flagId: string, note?: string) =>
+      post<{ ok: boolean }>(`/moderation/${flagId}/action`, { note }),
+
+    abuse: () => get<AbuseReport>('/moderation/abuse'),
+  },
+}
+
+export interface ModerationStats {
+  pending: number
+  actioned: number
+  dismissed: number
+  total: number
+}
+
+export interface FlaggedItem {
+  id: string
+  uid: string
+  email: string
+  projectId: string
+  chatId: string
+  messageId: string | null
+  content: string
+  reason: string
+  patterns: string[]
+  status: 'pending' | 'dismissed' | 'actioned'
+  flaggedAt: string
+  reviewedAt: string | null
+  reviewedBy: string | null
+  note: string | null
+}
+
+export interface AbuseReport {
+  platformAvg: number
+  suspects: {
+    uid: string
+    email: string
+    displayName: string
+    tier: string
+    messagesUsed: number
+    threshold: number
+  }[]
 }
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@ from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 from backend.schemas.message import MessageCreate
-from backend.services import billing_service, firebase_service, llm_service
+from backend.services import billing_service, firebase_service, llm_service, moderation_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,22 @@ async def send_message(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
 
     # Persist user message before streaming so it's saved even if stream fails.
-    firebase_service.save_message(project_id, chat_id, "user", body.content)
+    saved_msg = firebase_service.save_message(project_id, chat_id, "user", body.content)
+
+    # Run moderation check as a non-blocking background task — never delays the stream.
+    import asyncio
+    user_profile = firebase_service.get_user(user["uid"]) or {}
+    asyncio.create_task(
+        asyncio.to_thread(
+            moderation_service.check_and_flag,
+            body.content,
+            user["uid"],
+            user_profile.get("email", user.get("email", "")),
+            project_id,
+            chat_id,
+            saved_msg.get("id"),
+        )
+    )
 
     # Auto-name the chat on the first real message.
     if chat.get("name") == "New Chat":
