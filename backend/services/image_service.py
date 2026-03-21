@@ -1,28 +1,37 @@
 """
-Image generation service — wraps OpenAI's DALL-E 3 API.
+Image generation service — wraps Google Imagen 3 via the google-genai SDK.
 
-All public functions are async. The openai package is imported lazily so the
-server starts cleanly even if OPENAI_API_KEY is absent.
+Returns a data URL (data:image/png;base64,...) so the image can be rendered
+directly by the browser without requiring separate cloud storage.
+All public functions are async.
 """
 from __future__ import annotations
 
+import asyncio
+import base64
 import logging
 
 from backend.config import settings
+from backend.services.llm_service import get_gemini_client
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Size / style mappings
+# Aspect-ratio / style mappings
 # ---------------------------------------------------------------------------
 
-_SIZE_MAP: dict[str, str] = {
-    "square":    "1024x1024",
-    "landscape": "1792x1024",
-    "portrait":  "1024x1792",
+# Imagen 3 accepts these aspect ratio strings.
+_ASPECT_RATIO_MAP: dict[str, str] = {
+    "square":    "1:1",
+    "landscape": "16:9",
+    "portrait":  "9:16",
 }
 
-_VALID_STYLES = {"vivid", "natural"}
+# Style hints are appended to the prompt to steer the visual output.
+_STYLE_HINTS: dict[str, str] = {
+    "vivid":   "vibrant colours, dramatic lighting, high contrast, visually striking",
+    "natural": "natural lighting, photorealistic, subtle tones, balanced composition",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -35,48 +44,56 @@ async def generate_image(
     aspect_ratio: str = "square",
 ) -> str:
     """
-    Generate an image with DALL-E 3 and return its temporary URL.
+    Generate an image with Imagen 3 and return it as a base64 data URL.
 
     Args:
-        prompt:       The image generation prompt (baked-in brand context is
-                      expected from the caller).
-        style:        "vivid" (hyper-real, dramatic) or "natural" (photorealistic).
+        prompt:       The image generation prompt (brand context expected from caller).
+        style:        "vivid" or "natural".
         aspect_ratio: "square", "landscape", or "portrait".
 
     Returns:
-        A URL to the generated image (valid for ~1 hour from OpenAI).
+        A data URL string: "data:image/png;base64,<...>"
 
     Raises:
-        RuntimeError: If OPENAI_API_KEY is not configured.
-        ValueError:   If generation fails or returns no URL.
+        RuntimeError: If GEMINI_API_KEY is not configured.
+        ValueError:   If generation fails or returns no image.
     """
-    if not settings.OPENAI_API_KEY:
+    if not settings.GEMINI_API_KEY:
         raise RuntimeError(
-            "OPENAI_API_KEY is not configured. "
+            "GEMINI_API_KEY is not configured. "
             "Add it to backend/.env to enable image generation."
         )
 
-    size = _SIZE_MAP.get(aspect_ratio, "1024x1024")
-    dall_e_style = style if style in _VALID_STYLES else "vivid"
+    hint = _STYLE_HINTS.get(style, "")
+    enhanced_prompt = f"{prompt}. Style: {hint}" if hint else prompt
+    ar = _ASPECT_RATIO_MAP.get(aspect_ratio, "1:1")
 
     try:
-        import openai
-        client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        response = await client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size=size,       # type: ignore[arg-type]
-            style=dall_e_style,  # type: ignore[arg-type]
-            quality="standard",
-            n=1,
-        )
-        url = response.data[0].url
-        if not url:
-            raise ValueError("DALL-E returned an empty URL.")
-        logger.info("Generated image for prompt (first 80 chars): %.80s", prompt)
-        return url
+        from google.genai.types import GenerateImagesConfig
+
+        client = get_gemini_client()
+
+        def _generate() -> bytes:
+            response = client.models.generate_images(
+                model=settings.GEMINI_IMAGE_MODEL,
+                prompt=enhanced_prompt,
+                config=GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio=ar,
+                ),
+            )
+            images = response.generated_images
+            if not images:
+                raise ValueError("Imagen returned no images.")
+            return images[0].image.image_bytes
+
+        image_bytes = await asyncio.to_thread(_generate)
+        b64 = base64.b64encode(image_bytes).decode()
+        logger.info("Generated image via Imagen 3 for prompt (first 80 chars): %.80s", prompt)
+        return f"data:image/png;base64,{b64}"
+
     except RuntimeError:
         raise
     except Exception as exc:
-        logger.error("DALL-E image generation failed: %s", exc)
+        logger.error("Imagen 3 image generation failed: %s", exc)
         raise ValueError(f"Image generation failed: {exc}") from exc

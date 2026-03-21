@@ -1,9 +1,9 @@
 """
-Brand Core extractor — sends scraped content to Claude and parses back a
+Brand Core extractor — sends scraped content to Gemini and parses back a
 structured BrandCore JSON object.
 
-Uses the shared LLM client from llm_service so we maintain a single
-AsyncAnthropic instance per process (avoids connection pool fragmentation).
+Uses the shared Gemini client from llm_service so we maintain a single
+google-genai Client instance per process (avoids connection pool fragmentation).
 The extraction model is configured separately from the chat model because
 extraction is a one-shot, non-streamed call that can use a smaller/cheaper
 model without sacrificing quality.
@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from backend.config import settings
-from backend.services.llm_service import get_client
+from backend.services.llm_service import get_gemini_client
 
 logger = logging.getLogger(__name__)
 
@@ -76,41 +76,36 @@ async def extract_brand_core(scraped_data: list[dict], api_key: str) -> dict:
     Args:
         scraped_data: List of dicts produced by firecrawl_client and/or
                       apify_client. Each dict must have a 'source_type' key.
-        api_key:      Anthropic API key (passed explicitly so this module
-                      remains testable in isolation).
+        api_key:      Accepted for backwards-compatibility but ignored.
+                      The function always uses the shared Gemini client which
+                      reads GEMINI_API_KEY from settings.
 
     Returns:
         A BrandCore dict matching the schema in EXTRACTION_SYSTEM.
         On JSON parse failure, returns a minimal valid skeleton so callers
         always receive a usable dict (logged as an error).
-
-    Note:
-        api_key is accepted as a parameter for backwards-compatibility but
-        the function always uses the shared client from llm_service.get_client().
-        The parameter is ignored — the client reads its key from settings.
     """
     combined = _build_combined_content(scraped_data)
-    logger.info("Brand extractor: sending %d chars to Claude (%s)", len(combined), settings.LLM_EXTRACTION_MODEL)
+    logger.info("Brand extractor: sending %d chars to Gemini (%s)", len(combined), settings.LLM_EXTRACTION_MODEL)
+
+    from google.genai import types as genai_types
 
     # Re-use the shared singleton rather than spawning a new connection pool.
-    client = get_client()
+    client = get_gemini_client()
 
-    message = await client.messages.create(
+    response = await client.aio.models.generate_content(
         model=settings.LLM_EXTRACTION_MODEL,
-        max_tokens=2048,
-        system=EXTRACTION_SYSTEM,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    "Here is the brand content to analyse:\n\n"
-                    f"{combined[:_MAX_CONTENT_CHARS]}"
-                ),
-            }
-        ],
+        contents=(
+            "Here is the brand content to analyse:\n\n"
+            f"{combined[:_MAX_CONTENT_CHARS]}"
+        ),
+        config=genai_types.GenerateContentConfig(
+            system_instruction=EXTRACTION_SYSTEM,
+            max_output_tokens=2048,
+        ),
     )
 
-    raw = message.content[0].text.strip()
+    raw = response.text.strip()
     brand_core = _parse_json(raw)
     logger.info("Brand extractor: extraction complete")
     return brand_core

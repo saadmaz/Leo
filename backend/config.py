@@ -64,10 +64,12 @@ class Settings(BaseSettings):
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
 
     # --- LLM Runtime Config ---
-    # Model used for the conversational chat stream (streamed responses).
+    # Model used for the conversational chat stream (streamed responses) — Claude.
     LLM_CHAT_MODEL: str = "claude-sonnet-4-6"
-    # Model used for one-shot brand extraction (non-streamed, cheaper is fine).
-    LLM_EXTRACTION_MODEL: str = "claude-haiku-4-5-20251001"
+    # Model used for one-shot brand extraction and campaign generation — Gemini.
+    LLM_EXTRACTION_MODEL: str = "gemini-2.0-flash"
+    # Imagen model used for image generation.
+    GEMINI_IMAGE_MODEL: str = "imagen-3.0-generate-001"
     # Maximum tokens the LLM may generate in a single chat response.
     LLM_MAX_TOKENS: int = 4096
     # How many prior messages are included as context for each chat request.

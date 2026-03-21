@@ -15,7 +15,7 @@ import re
 from typing import AsyncIterator, Optional
 
 from backend.config import settings
-from backend.services.llm_service import get_client, build_brand_core_context
+from backend.services.llm_service import get_gemini_client, build_brand_core_context
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +122,8 @@ async def generate_campaign(
       90% — Saving to Firestore
      100% — Done
     """
-    if not settings.ANTHROPIC_API_KEY:
-        yield _error("ANTHROPIC_API_KEY is not set.")
+    if not settings.GEMINI_API_KEY:
+        yield _error("GEMINI_API_KEY is not set.")
         return
 
     # 1. Build brand context
@@ -148,27 +148,30 @@ async def generate_campaign(
         "Generate the full campaign package now."
     )
 
-    # 2. Call Claude
+    # 2. Call Gemini
     yield _step("Generating campaign brief…")
     yield _progress(25)
 
     try:
-        client = get_client()
-        message = await client.messages.create(
+        from google.genai import types as genai_types
+        client = get_gemini_client()
+        response = await client.aio.models.generate_content(
             model=project.get("promptModel") or settings.LLM_EXTRACTION_MODEL,
-            max_tokens=4096,
-            system=CAMPAIGN_SYSTEM,
-            messages=[{"role": "user", "content": user_prompt}],
+            contents=user_prompt,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=CAMPAIGN_SYSTEM,
+                max_output_tokens=4096,
+            ),
         )
     except Exception as exc:
-        logger.error("Claude call failed for campaign generation: %s", exc)
+        logger.error("Gemini call failed for campaign generation: %s", exc)
         yield _error(f"AI generation failed: {exc}")
         return
 
     yield _step("Generating channel content…")
     yield _progress(60)
 
-    raw = message.content[0].text.strip()
+    raw = response.text.strip()
     try:
         result = _parse_json(raw)
     except ValueError as exc:

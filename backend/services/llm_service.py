@@ -16,6 +16,7 @@ import logging
 from typing import AsyncGenerator, Optional
 
 import anthropic
+from google import genai as google_genai
 
 from backend.config import settings
 
@@ -106,8 +107,9 @@ CHANNEL_PRESETS: dict[str, dict] = {
 # Client singleton
 # ---------------------------------------------------------------------------
 
-# Module-level client; lazily initialised on first use.
+# Module-level clients; lazily initialised on first use.
 _client: Optional[anthropic.AsyncAnthropic] = None
+_gemini_client: Optional[google_genai.Client] = None
 
 
 def get_client() -> anthropic.AsyncAnthropic:
@@ -124,6 +126,23 @@ def get_client() -> anthropic.AsyncAnthropic:
             )
         _client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     return _client
+
+
+def get_gemini_client() -> google_genai.Client:
+    """
+    Return the shared google-genai Client, creating it on first call.
+    Used by campaign generation, brand extraction, and image generation.
+    Raises RuntimeError if GEMINI_API_KEY is not configured.
+    """
+    global _gemini_client
+    if _gemini_client is None:
+        if not settings.GEMINI_API_KEY:
+            raise RuntimeError(
+                "GEMINI_API_KEY is not set. "
+                "Add it to backend/.env to enable Gemini features."
+            )
+        _gemini_client = google_genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _gemini_client
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +299,7 @@ type="email_content"
 
 type="image_prompt"
 {
-  "prompt": "Detailed image generation prompt optimised for DALL-E 3",
+  "prompt": "Detailed image generation prompt optimised for Imagen 3",
   "style": "vivid" | "natural",
   "aspectRatio": "square" | "landscape" | "portrait",
   "context": "Brief explanation of how this image fits the brand or campaign"
