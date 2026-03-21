@@ -511,7 +511,7 @@ function ChangelogTab() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="text-xs font-mono">{entry.version}</Badge>
+                    <Badge variant="default" className="text-xs font-mono normal-case tracking-normal">{entry.version}</Badge>
                     {entry.tags.map((tag) => (
                       <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         {tag}
