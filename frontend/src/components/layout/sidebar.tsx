@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
-  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone,
+  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -33,6 +33,7 @@ export function Sidebar() {
     sidebarOpen, setSidebarOpen,
     setWizardOpen,
     setCampaignPanelOpen,
+    setProjectSettingsPanelOpen,
   } = useAppStore()
 
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -229,6 +230,7 @@ export function Sidebar() {
               onDelete={() => handleDeleteProject(project)}
               onRenameChat={handleRenameChat}
               onDeleteChat={handleDeleteChat}
+              onOpenSettings={() => { setActiveProject(project); setProjectSettingsPanelOpen(true) }}
               onSelect={() => {
                 setActiveProject(project)
                 if (activeProject?.id !== project.id) {
@@ -357,12 +359,14 @@ interface ProjectRowProps {
   onDelete: () => void
   onRenameChat: (chat: Chat, name: string) => void
   onDeleteChat: (chat: Chat) => void
+  onOpenSettings: () => void
 }
 
 function ProjectRow({
   project, isActive, activeChatId, chats,
   onSelect, onOpenChat, onNewChat,
   onRename, onDelete, onRenameChat, onDeleteChat,
+  onOpenSettings,
 }: ProjectRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(project.name)
@@ -443,6 +447,13 @@ function ProjectRow({
           </div>
         ) : !editing && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenSettings() }}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="Project settings"
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+            </button>
             <button
               onClick={startEdit}
               className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"

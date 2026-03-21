@@ -9,6 +9,7 @@ import { UpgradeModal } from '@/components/billing/upgrade-modal'
 import { ProjectWizard } from '@/components/onboarding/project-wizard'
 import { CampaignGenerator } from '@/components/campaigns/campaign-generator'
 import { CampaignPanel } from '@/components/campaigns/campaign-panel'
+import { ProjectSettingsPanel } from '@/components/projects/project-settings-panel'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAppStore((s) => s.setUser)
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <ProjectWizard />
       <CampaignGenerator />
       <CampaignPanel />
+      <ProjectSettingsPanel />
     </>
   )
 }

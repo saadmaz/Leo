@@ -130,6 +130,12 @@ interface AppState {
   setWizardOpen: (v: boolean) => void
 
   // ---------------------------------------------------------------------------
+  // Project Settings Panel
+  // ---------------------------------------------------------------------------
+  projectSettingsPanelOpen: boolean
+  setProjectSettingsPanelOpen: (v: boolean) => void
+
+  // ---------------------------------------------------------------------------
   // Campaigns
   // ---------------------------------------------------------------------------
   campaigns: Campaign[]
@@ -283,6 +289,12 @@ export const useAppStore = create<AppState>((set) => ({
   // ---------------------------------------------------------------------------
   wizardOpen: false,
   setWizardOpen: (wizardOpen) => set({ wizardOpen }),
+
+  // ---------------------------------------------------------------------------
+  // Project Settings Panel
+  // ---------------------------------------------------------------------------
+  projectSettingsPanelOpen: false,
+  setProjectSettingsPanelOpen: (projectSettingsPanelOpen) => set({ projectSettingsPanelOpen }),
 
   // ---------------------------------------------------------------------------
   // Campaigns
