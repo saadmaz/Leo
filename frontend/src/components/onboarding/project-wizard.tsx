@@ -137,8 +137,6 @@ const CONTENT_MODELS: ModelOption[] = [
 ]
 const IMAGE_MODELS: ModelOption[] = [
   { label: 'DALL-E 3', value: 'dall-e-3' },
-  { label: 'Flux',     value: 'flux' },
-  { label: 'Ideogram', value: 'ideogram' },
 ]
 const VIDEO_MODELS: ModelOption[] = [
   { label: 'Gemini Flash', value: 'gemini-flash' },

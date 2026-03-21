@@ -11,3 +11,4 @@ pydantic-settings==2.13.1
 python-dotenv==1.2.2
 stripe==14.4.1
 uvicorn[standard]==0.41.0
+slowapi==0.1.9

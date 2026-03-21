@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, field_validator
 
 from backend.api.deps import get_project_or_404, assert_member
 from backend.middleware.auth import CurrentUser
+from backend.middleware.rate_limit import limiter
 from backend.services import image_service
 
 logger = logging.getLogger(__name__)
@@ -28,13 +29,22 @@ class ImageGenerateRequest(BaseModel):
     style: str = "vivid"        # "vivid" | "natural"
     aspectRatio: str = "square" # "square" | "landscape" | "portrait"
 
+    @field_validator("prompt")
+    @classmethod
+    def check_prompt_length(cls, v: str) -> str:
+        if len(v) > 2000:
+            raise ValueError("Image prompt exceeds the 2,000-character limit.")
+        return v
+
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/generate/image")
+@limiter.limit("10/minute")
 async def generate_image(
+    request: Request,
     project_id: str,
     body: ImageGenerateRequest,
     user: CurrentUser,

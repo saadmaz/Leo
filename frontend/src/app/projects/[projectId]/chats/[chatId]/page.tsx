@@ -28,6 +28,10 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [hintsOpen, setHintsOpen] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [loadingEarlier, setLoadingEarlier] = useState(false)
+
+  const MESSAGES_PAGE_SIZE = 50
 
   const {
     user,
@@ -53,21 +57,47 @@ export default function ChatPage() {
   useEffect(() => {
     if (!params.projectId || !params.chatId) return
     setMessages([])
+    setHasMoreMessages(false)
     setMessagesLoading(true)
     api.chats
       .messages(params.projectId, params.chatId)
-      .then((msgs) =>
+      .then((msgs) => {
+        setHasMoreMessages(msgs.length >= MESSAGES_PAGE_SIZE)
         setMessages(
           msgs.map((m): OptimisticMessage => ({
             id: m.id,
             role: m.role,
             content: m.content,
+            createdAt: m.createdAt,
           }))
         )
-      )
+      })
       .catch(console.error)
       .finally(() => setMessagesLoading(false))
-  }, [params.projectId, params.chatId, setMessages])
+  }, [params.projectId, params.chatId, setMessages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleLoadEarlier() {
+    const oldest = useAppStore.getState().messages[0]
+    if (!oldest?.createdAt || !params.projectId || !params.chatId) return
+    setLoadingEarlier(true)
+    try {
+      const older = await api.chats.messages(params.projectId, params.chatId, oldest.createdAt)
+      setHasMoreMessages(older.length >= MESSAGES_PAGE_SIZE)
+      setMessages([
+        ...older.map((m): OptimisticMessage => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt,
+        })),
+        ...useAppStore.getState().messages,
+      ])
+    } catch (err) {
+      console.error('Failed to load earlier messages:', err)
+    } finally {
+      setLoadingEarlier(false)
+    }
+  }
 
   // Abort any in-flight stream when navigating away from this chat.
   useEffect(() => {
@@ -348,6 +378,21 @@ export default function ChatPage() {
                   </AnimatePresence>
                 </div>
               </motion.div>
+            )}
+
+            {/* Load earlier button — shown when there are more messages above */}
+            {!messagesLoading && hasMoreMessages && messages.length > 0 && (
+              <div className="flex justify-center py-2">
+                <button
+                  onClick={handleLoadEarlier}
+                  disabled={loadingEarlier}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors disabled:opacity-40"
+                >
+                  {loadingEarlier
+                    ? <><span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />Loading…</>
+                    : 'Load earlier messages'}
+                </button>
+              </div>
             )}
 
             {!messagesLoading && (

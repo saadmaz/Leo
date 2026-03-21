@@ -21,8 +21,6 @@ const CONTENT_MODELS = [
 ]
 const IMAGE_MODELS = [
   { label: 'DALL-E 3', value: 'dall-e-3' },
-  { label: 'Flux',     value: 'flux' },
-  { label: 'Ideogram', value: 'ideogram' },
 ]
 const VIDEO_MODELS = [
   { label: 'Gemini Flash', value: 'gemini-flash' },

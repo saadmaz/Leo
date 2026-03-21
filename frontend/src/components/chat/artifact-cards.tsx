@@ -461,7 +461,13 @@ function ImagePromptCard({ artifact }: { artifact: ImagePromptArtifact }) {
       setImageUrl(url)
       setStatus('done')
     } catch (err) {
-      setErrorMsg(String(err))
+      const msg = String(err)
+      // 503 = OPENAI_API_KEY not configured server-side
+      if (msg.includes('503') || msg.includes('RuntimeError')) {
+        setErrorMsg('Image generation isn\'t configured for this workspace.')
+      } else {
+        setErrorMsg('Image generation failed — please try again.')
+      }
       setStatus('error')
     }
   }

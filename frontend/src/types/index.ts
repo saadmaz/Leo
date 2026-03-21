@@ -142,6 +142,7 @@ export interface OptimisticMessage {
   role: MessageRole
   content: string
   pending?: boolean
+  createdAt?: string  // ISO timestamp — used as pagination cursor for "Load earlier"
 }
 
 // ---------------------------------------------------------------------------

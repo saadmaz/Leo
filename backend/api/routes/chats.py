@@ -4,7 +4,8 @@ Chat CRUD + message listing routes.
 Auth is delegated to backend.api.deps — no inline membership checks here.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
+from typing import Optional
 
 from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
@@ -58,7 +59,21 @@ async def delete_chat(project_id: str, chat_id: str, user: CurrentUser):
 
 
 @router.get("/{chat_id}/messages", response_model=list[Message])
-async def list_messages(project_id: str, chat_id: str, user: CurrentUser):
-    """Return messages for a chat in chronological order. Any member may read."""
+async def list_messages(
+    project_id: str,
+    chat_id: str,
+    user: CurrentUser,
+    before: Optional[str] = Query(
+        default=None,
+        description="ISO 8601 createdAt timestamp — return only messages older than this (pagination cursor).",
+    ),
+):
+    """
+    Return the most recent 50 messages in chronological order.
+    Pass `?before=<ISO timestamp>` to page back through older messages.
+    """
+    from backend.config import settings
     get_project_as_member(project_id, user["uid"])
-    return firebase_service.list_messages(project_id, chat_id)
+    return firebase_service.list_messages(
+        project_id, chat_id, limit=settings.MESSAGES_LOAD_LIMIT, before=before
+    )

@@ -184,8 +184,11 @@ export const api = {
       patch<Chat>(`/projects/${projectId}/chats/${chatId}`, { name }, signal),
     delete: (projectId: string, chatId: string, signal?: AbortSignal) =>
       del(`/projects/${projectId}/chats/${chatId}`, signal),
-    messages: (projectId: string, chatId: string, signal?: AbortSignal) =>
-      get<Message[]>(`/projects/${projectId}/chats/${chatId}/messages`, signal),
+    messages: (projectId: string, chatId: string, before?: string, signal?: AbortSignal) =>
+      get<Message[]>(
+        `/projects/${projectId}/chats/${chatId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`,
+        signal,
+      ),
   },
 
   // -------------------------------------------------------------------------

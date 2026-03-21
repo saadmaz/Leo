@@ -64,12 +64,32 @@ def assert_can_send_message(uid: str) -> None:
 
     # Auto-reset message counter when the billing period rolls over.
     reset_at = billing.get("messagesResetAt")
-    if reset_at and int(reset_at) < int(time.time()):
+
+    if reset_at is None:
+        # Free user never went through Stripe — bootstrap a 30-day reset window.
+        next_reset = int(time.time()) + 30 * 24 * 3600
         try:
-            firebase_service.reset_messages_used(uid)
-            billing["messagesUsed"] = 0
+            firebase_service.update_user_billing(uid, {"messagesResetAt": next_reset})
+            billing["messagesResetAt"] = next_reset
         except Exception as exc:
-            logger.warning("Failed to reset message counter for %s: %s", uid, exc)
+            logger.warning("Failed to bootstrap messagesResetAt for %s: %s", uid, exc)
+    else:
+        try:
+            if int(reset_at) < int(time.time()):
+                firebase_service.reset_messages_used(uid)
+                billing["messagesUsed"] = 0
+        except (ValueError, TypeError):
+            # Legacy ISO string stored by old upsert_user — migrate to Unix timestamp.
+            logger.info("Migrating messagesResetAt ISO→Unix for %s", uid)
+            next_reset = int(time.time()) + 30 * 24 * 3600
+            try:
+                firebase_service.update_user_billing(uid, {
+                    "messagesResetAt": next_reset,
+                    "messagesUsed": 0,
+                })
+                billing["messagesUsed"] = 0
+            except Exception as exc:
+                logger.warning("Failed to migrate messagesResetAt for %s: %s", uid, exc)
 
     used = billing.get("messagesUsed", 0)
 

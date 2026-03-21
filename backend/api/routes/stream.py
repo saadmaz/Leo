@@ -14,11 +14,12 @@ stream and persisted to Firestore once the stream completes.
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
+from backend.middleware.rate_limit import limiter
 from backend.schemas.message import MessageCreate
 from backend.services import billing_service, firebase_service, llm_service
 
@@ -28,7 +29,9 @@ router = APIRouter(prefix="/projects/{project_id}/chats/{chat_id}", tags=["strea
 
 
 @router.post("/messages")
+@limiter.limit("10/minute")
 async def send_message(
+    request: Request,
     project_id: str,
     chat_id: str,
     body: MessageCreate,

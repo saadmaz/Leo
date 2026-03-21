@@ -127,6 +127,7 @@ def upsert_user(uid: str, email: str, display_name: str = "") -> None:
     db = get_db()
     ref = db.collection("users").document(uid)
     if not ref.get().exists:
+        import time as _time
         ref.set({
             "uid": uid,
             "email": email,
@@ -135,7 +136,9 @@ def upsert_user(uid: str, email: str, display_name: str = "") -> None:
             "billing": {
                 "messagesUsed": 0,
                 "ingestionsUsed": 0,
-                "messagesResetAt": _utcnow(),
+                # Unix timestamp 30 days from now so billing_service auto-reset works
+                # for free users who never go through Stripe.
+                "messagesResetAt": int(_time.time()) + 30 * 24 * 3600,
             },
             "createdAt": _utcnow(),
         })
@@ -174,11 +177,17 @@ def increment_ingestions_used(uid: str) -> None:
 
 
 def reset_messages_used(uid: str) -> None:
-    """Reset the monthly message counter when the billing period rolls over."""
+    """
+    Reset the monthly message counter and schedule the next reset 30 days out.
+    Used by billing_service when a free-user reset period expires.
+    (Paid users get their next period from the Stripe webhook instead.)
+    """
+    import time as _time
     db = get_db()
-    db.collection("users").document(uid).update(
-        {"billing.messagesUsed": 0, "billing.messagesResetAt": None}
-    )
+    db.collection("users").document(uid).update({
+        "billing.messagesUsed": 0,
+        "billing.messagesResetAt": int(_time.time()) + 30 * 24 * 3600,
+    })
 
 
 def reset_monthly_usage(uid: str) -> None:
@@ -578,22 +587,32 @@ def save_message(project_id: str, chat_id: str, role: str, content: str) -> dict
     return {"id": ref.id, **data}
 
 
-def list_messages(project_id: str, chat_id: str, limit: int = 50) -> list[dict]:
+def list_messages(
+    project_id: str,
+    chat_id: str,
+    limit: int = 50,
+    before: Optional[str] = None,
+) -> list[dict]:
     """
-    Return messages for a chat, sorted by createdAt ascending (oldest first).
+    Return the most recent `limit` messages for a chat in chronological order.
 
-    limit controls how many messages are returned. The default (50) is
-    intentionally conservative; pass a smaller value when building LLM
-    context windows to control token cost.
+    If `before` is supplied (an ISO 8601 createdAt timestamp), only messages
+    older than that timestamp are returned — used for "Load earlier" pagination.
+
+    The query fetches the newest `limit` docs descending, then reverses them
+    so callers always receive messages in chronological (oldest-first) order.
     """
     db = get_db()
-    docs = (
+    query = (
         db.collection("projects").document(project_id)
         .collection("chats").document(chat_id)
         .collection("messages")
+        .order_by("createdAt", direction=firestore.Query.DESCENDING)
         .limit(limit)
-        .stream()
     )
-    results = [{"id": d.id, **d.to_dict()} for d in docs]
-    # Sort ascending so the LLM receives messages in chronological order.
-    return sorted(results, key=lambda m: m.get("createdAt", ""))
+    if before:
+        query = query.where("createdAt", "<", before)
+
+    docs = list(query.stream())
+    docs.reverse()  # Back to chronological order for display and LLM context
+    return [{"id": d.id, **d.to_dict()} for d in docs]
