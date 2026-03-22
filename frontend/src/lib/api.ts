@@ -16,11 +16,14 @@ import type {
   BrandCore,
   BrandDriftResult,
   BrandVoiceScore,
+  BulkGenerateEvent,
+  CalendarEntry,
   Campaign,
   CampaignEvent,
   CampaignGenerateRequest,
   Chat,
   CompetitorSnapshot,
+  ContentLibraryItem,
   ContentPrediction,
   ImageAttachment,
   IngestionEvent,
@@ -30,6 +33,7 @@ import type {
   ProjectCreate,
   ProjectMember,
   StreamEvent,
+  TransformResult,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -535,5 +539,198 @@ export const api = {
         { own_content: ownContent },
         signal,
       ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Content Library
+  // -------------------------------------------------------------------------
+  contentLibrary: {
+    list: (
+      projectId: string,
+      filters?: { platform?: string; status?: string; type?: string; limit?: number },
+      signal?: AbortSignal,
+    ) => {
+      const params = new URLSearchParams()
+      if (filters?.platform) params.set('platform', filters.platform)
+      if (filters?.status) params.set('status', filters.status)
+      if (filters?.type) params.set('type', filters.type)
+      if (filters?.limit) params.set('limit', String(filters.limit))
+      const qs = params.toString()
+      return get<{ items: ContentLibraryItem[] }>(
+        `/projects/${projectId}/content-library${qs ? `?${qs}` : ''}`,
+        signal,
+      )
+    },
+    save: (
+      projectId: string,
+      item: {
+        platform: string
+        type: string
+        content: string
+        hashtags?: string[]
+        metadata?: Record<string, unknown>
+        status?: string
+        tags?: string[]
+      },
+      signal?: AbortSignal,
+    ) => post<ContentLibraryItem>(`/projects/${projectId}/content-library`, item, signal),
+
+    update: (
+      projectId: string,
+      itemId: string,
+      updates: { status?: string; content?: string; tags?: string[]; scheduledAt?: string },
+      signal?: AbortSignal,
+    ) => patch<ContentLibraryItem>(`/projects/${projectId}/content-library/${itemId}`, updates, signal),
+
+    delete: (projectId: string, itemId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/content-library/${itemId}`, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Content Operations
+  // -------------------------------------------------------------------------
+  contentOps: {
+    recycle: (
+      projectId: string,
+      content: string,
+      platform: string,
+      count?: number,
+      signal?: AbortSignal,
+    ) =>
+      post<{ variants: { content: string; hashtags: string[]; angle: string; hook: string }[] }>(
+        `/projects/${projectId}/content/recycle`,
+        { content, platform, count: count ?? 3 },
+        signal,
+      ),
+
+    transform: (
+      projectId: string,
+      content: string,
+      targetPlatforms: string[],
+      signal?: AbortSignal,
+    ) =>
+      post<TransformResult>(
+        `/projects/${projectId}/content/transform`,
+        { content, target_platforms: targetPlatforms },
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Bulk Content Generation (SSE)
+  // -------------------------------------------------------------------------
+  async streamBulkGenerate(
+    projectId: string,
+    body: {
+      platforms: string[]
+      count_per_platform?: number
+      themes?: string[]
+      period?: string
+      goal?: string
+    },
+    callbacks: {
+      onItem: (item: BulkGenerateEvent & { type: 'item' }) => void
+      onProgress: (done: number, total: number) => void
+      onDone: (total: number) => void
+      onError: (err: string) => void
+    },
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const user = auth.currentUser
+    if (!user) { callbacks.onError('Not authenticated'); return }
+    const token = await user.getIdToken()
+
+    let res: Response
+    try {
+      res = await fetch(`${API}/projects/${projectId}/content/bulk-generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+        signal,
+      })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      callbacks.onError(String(err))
+      return
+    }
+
+    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+
+    const reader = res.body?.getReader()
+    if (!reader) { callbacks.onError('No stream'); return }
+
+    await readSSEStream<BulkGenerateEvent>(
+      reader,
+      (event) => {
+        if (event.type === 'item') callbacks.onItem(event as BulkGenerateEvent & { type: 'item' })
+        if (event.type === 'progress') callbacks.onProgress(event.done, event.total)
+        if (event.type === 'done') callbacks.onDone(event.total)
+        if (event.type === 'error') callbacks.onError(event.error)
+      },
+      () => {},
+    )
+  },
+
+  // -------------------------------------------------------------------------
+  // Calendar
+  // -------------------------------------------------------------------------
+  calendar: {
+    get: (
+      projectId: string,
+      fromDate?: string,
+      toDate?: string,
+      signal?: AbortSignal,
+    ) => {
+      const params = new URLSearchParams()
+      if (fromDate) params.set('from_date', fromDate)
+      if (toDate) params.set('to_date', toDate)
+      const qs = params.toString()
+      return get<{ entries: CalendarEntry[] }>(
+        `/projects/${projectId}/calendar${qs ? `?${qs}` : ''}`,
+        signal,
+      )
+    },
+
+    generate: (
+      projectId: string,
+      body: {
+        platforms: string[]
+        period?: string
+        goals?: string
+        posts_per_week?: number
+      },
+      signal?: AbortSignal,
+    ) =>
+      post<{ entries: CalendarEntry[]; count: number }>(
+        `/projects/${projectId}/calendar/generate`,
+        body,
+        signal,
+      ),
+
+    createEntry: (
+      projectId: string,
+      entry: {
+        date: string
+        platform: string
+        content: string
+        time?: string
+        hashtags?: string[]
+        type?: string
+        status?: string
+      },
+      signal?: AbortSignal,
+    ) =>
+      post<CalendarEntry>(`/projects/${projectId}/calendar/entries`, entry, signal),
+
+    updateEntry: (
+      projectId: string,
+      entryId: string,
+      updates: { content?: string; date?: string; time?: string; status?: string },
+      signal?: AbortSignal,
+    ) =>
+      patch<CalendarEntry>(`/projects/${projectId}/calendar/entries/${entryId}`, updates, signal),
+
+    deleteEntry: (projectId: string, entryId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/calendar/entries/${entryId}`, signal),
   },
 }

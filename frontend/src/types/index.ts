@@ -371,3 +371,69 @@ export interface BrandDriftResult {
   recommendations: string[]
   positive_observations: string[]
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 Content Operations Types
+// ---------------------------------------------------------------------------
+
+export type ContentLibraryStatus = 'draft' | 'approved' | 'scheduled' | 'posted'
+export type ContentLibraryType = 'caption' | 'ad_copy' | 'video_script' | 'email' | 'image_prompt'
+
+export interface ContentLibraryItem {
+  id: string
+  projectId: string
+  platform: string
+  type: ContentLibraryType
+  content: string
+  hashtags: string[]
+  metadata: Record<string, unknown>
+  status: ContentLibraryStatus
+  tags: string[]
+  scheduledAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CalendarEntry {
+  id: string
+  projectId: string
+  date: string           // YYYY-MM-DD
+  time?: string          // HH:MM
+  platform: string
+  content: string
+  hashtags: string[]
+  type: string           // educational | brand_story | product | engagement
+  content_format: string // post | story | reel | carousel
+  status: string         // planned | drafted | approved | scheduled | posted
+  contentLibraryItemId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BulkGenerateItem {
+  platform: string
+  content: string
+  hashtags: string[]
+  type: string
+  hook?: string
+  headline?: string
+  cta?: string
+  status: 'draft'
+}
+
+export type BulkGenerateEvent =
+  | { type: 'item'; item: BulkGenerateItem }
+  | { type: 'progress'; done: number; total: number }
+  | { type: 'done'; total: number }
+  | { type: 'error'; error: string }
+
+export interface RecycleVariant {
+  content: string
+  hashtags: string[]
+  angle: string
+  hook: string
+}
+
+export interface TransformResult {
+  results: Record<string, { content: string; hashtags: string[]; notes: string }>
+}

@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, ShieldCheck,
+  BarChart2, ShieldCheck, Library, CalendarDays, Zap,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -324,6 +324,30 @@ export function Sidebar() {
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>Voice Scorer</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/library`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Library className="w-3.5 h-3.5" />
+                <span>Content Library</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/bulk`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Bulk Generate</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/calendar`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>Calendar</span>
               </button>
             </>
           )}

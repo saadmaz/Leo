@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink } from 'lucide-react'
+import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink, BookmarkPlus, BookmarkCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 
@@ -147,8 +148,15 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
 // ---------------------------------------------------------------------------
 
 function CaptionsCard({ artifact }: { artifact: CaptionsArtifact }) {
+  const allText = artifact.captions.map((c) => c.text).join('\n\n---\n\n')
+  const allHashtags = [...new Set(artifact.captions.flatMap((c) => c.hashtags))]
   return (
-    <Card icon={<Instagram className="w-3.5 h-3.5" />} title={`${artifact.platform} Captions`} count={artifact.captions.length}>
+    <Card
+      icon={<Instagram className="w-3.5 h-3.5" />}
+      title={`${artifact.platform} Captions`}
+      count={artifact.captions.length}
+      saveProps={{ platform: artifact.platform, type: 'caption', content: allText, hashtags: allHashtags }}
+    >
       <div className="space-y-3">
         {artifact.captions.map((cap, i) => (
           <div key={i} className="group relative rounded-lg border border-border bg-background p-3">
@@ -171,8 +179,14 @@ function CaptionsCard({ artifact }: { artifact: CaptionsArtifact }) {
 // ---------------------------------------------------------------------------
 
 function AdCopyCard({ artifact }: { artifact: AdCopyArtifact }) {
+  const allText = artifact.variants.map((v) => `Headline: ${v.headline}\n\n${v.body}${v.cta ? `\n\nCTA: ${v.cta}` : ''}`).join('\n\n---\n\n')
   return (
-    <Card icon={<Megaphone className="w-3.5 h-3.5" />} title={`${artifact.platform} Ad Copy`} count={artifact.variants.length}>
+    <Card
+      icon={<Megaphone className="w-3.5 h-3.5" />}
+      title={`${artifact.platform} Ad Copy`}
+      count={artifact.variants.length}
+      saveProps={{ platform: artifact.platform, type: 'ad_copy', content: allText, metadata: { variants: artifact.variants } }}
+    >
       <div className="space-y-3">
         {artifact.variants.map((v, i) => (
           <div key={i} className="group relative rounded-lg border border-border bg-background p-3">
@@ -352,7 +366,12 @@ function VideoScriptCard({ artifact }: { artifact: VideoScriptArtifact }) {
     + (artifact.hashtags?.length ? '\n\n' + artifact.hashtags.map((h) => `#${h}`).join(' ') : '')
 
   return (
-    <Card icon={<Video className="w-3.5 h-3.5" />} title={`${artifact.platform} Script`} copyText={copyText}>
+    <Card
+      icon={<Video className="w-3.5 h-3.5" />}
+      title={`${artifact.platform} Script`}
+      copyText={copyText}
+      saveProps={{ platform: artifact.platform, type: 'video_script', content: copyText, hashtags: artifact.hashtags ?? [], metadata: { duration: artifact.duration, scenes: artifact.scenes } }}
+    >
       <div className="space-y-0.5 mb-3">
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
           {artifact.duration}
@@ -402,7 +421,12 @@ function EmailContentCard({ artifact }: { artifact: EmailContentArtifact }) {
   ].filter(Boolean).join('\n')
 
   return (
-    <Card icon={<Mail className="w-3.5 h-3.5" />} title="Email" copyText={copyText}>
+    <Card
+      icon={<Mail className="w-3.5 h-3.5" />}
+      title="Email"
+      copyText={copyText}
+      saveProps={{ platform: 'Email', type: 'email', content: artifact.body, metadata: { subject: artifact.subject, previewText: artifact.previewText, cta: artifact.cta } }}
+    >
       <div className="space-y-3">
         <div className="rounded-lg border border-border bg-background p-3 space-y-2">
           <div>
@@ -562,16 +586,79 @@ function ImagePromptCard({ artifact }: { artifact: ImagePromptArtifact }) {
 
 
 // ---------------------------------------------------------------------------
+// Save to Library button
+// ---------------------------------------------------------------------------
+
+function SaveToLibraryButton({
+  platform,
+  type,
+  content,
+  hashtags = [],
+  metadata = {},
+}: {
+  platform: string
+  type: string
+  content: string
+  hashtags?: string[]
+  metadata?: Record<string, unknown>
+}) {
+  const { activeProject } = useAppStore()
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!activeProject || saved) return
+    setSaving(true)
+    try {
+      await api.contentLibrary.save(activeProject.id, { platform, type, content, hashtags, metadata })
+      setSaved(true)
+      toast.success('Saved to Content Library')
+    } catch {
+      toast.error('Failed to save to library')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!activeProject) return null
+
+  return (
+    <button
+      onClick={handleSave}
+      disabled={saving || saved}
+      title={saved ? 'Saved to library' : 'Save to Content Library'}
+      className={cn(
+        'flex items-center gap-1 text-xs transition-colors',
+        saved
+          ? 'text-green-600'
+          : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {saving ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : saved ? (
+        <BookmarkCheck className="w-3 h-3" />
+      ) : (
+        <BookmarkPlus className="w-3 h-3" />
+      )}
+      <span>{saved ? 'Saved' : 'Save'}</span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Shared card shell
 // ---------------------------------------------------------------------------
 
 function Card({
-  icon, title, count, copyText, children,
+  icon, title, count, copyText, saveProps, children,
 }: {
   icon: React.ReactNode
   title: string
   count?: number
   copyText?: string
+  saveProps?: Parameters<typeof SaveToLibraryButton>[0]
   children: React.ReactNode
 }) {
   return (
@@ -585,7 +672,10 @@ function Card({
             <span className="text-xs text-muted-foreground">({count})</span>
           )}
         </div>
-        {copyText && <CopyButton text={copyText} inline />}
+        <div className="flex items-center gap-3">
+          {saveProps && <SaveToLibraryButton {...saveProps} />}
+          {copyText && <CopyButton text={copyText} inline />}
+        </div>
       </div>
 
       <div className="p-4">{children}</div>

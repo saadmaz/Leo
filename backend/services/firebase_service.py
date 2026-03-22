@@ -1240,3 +1240,145 @@ def get_competitor_snapshots(project_id: str) -> list[dict]:
         .stream()
     )
     return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Content Library
+# ---------------------------------------------------------------------------
+
+def save_content_library_item(project_id: str, data: dict) -> dict:
+    """
+    Save a content item to the project's content library.
+    data: platform, type, content, hashtags, metadata, status, tags
+    """
+    db = get_db()
+    now = _utcnow()
+    item = {**data, "projectId": project_id, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document()
+    )
+    ref.set(item)
+    return {"id": ref.id, **item}
+
+
+def list_content_library_items(
+    project_id: str,
+    platform: Optional[str] = None,
+    status: Optional[str] = None,
+    item_type: Optional[str] = None,
+    limit: int = 50,
+) -> list[dict]:
+    """
+    List content library items with optional filters.
+    """
+    db = get_db()
+    query = (
+        db.collection("projects").document(project_id)
+        .collection("content_library")
+        .order_by("createdAt", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+    )
+    if platform:
+        query = query.where("platform", "==", platform)
+    if status:
+        query = query.where("status", "==", status)
+    if item_type:
+        query = query.where("type", "==", item_type)
+
+    docs = list(query.stream())
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def update_content_library_item(project_id: str, item_id: str, updates: dict) -> dict:
+    """Update fields on a content library item."""
+    db = get_db()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+    )
+    updates["updatedAt"] = _utcnow()
+    ref.update(updates)
+    doc = ref.get()
+    if not doc.exists:
+        raise ValueError(f"Content library item {item_id} not found.")
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def delete_content_library_item(project_id: str, item_id: str) -> None:
+    """Delete a content library item."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+        .delete()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Calendar
+# ---------------------------------------------------------------------------
+
+def save_calendar_entry(project_id: str, data: dict) -> dict:
+    """
+    Save a calendar entry under projects/{id}/calendar_entries.
+    data: date (YYYY-MM-DD), platform, content, time, hashtags, type, status
+    """
+    db = get_db()
+    now = _utcnow()
+    entry = {**data, "projectId": project_id, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("calendar_entries").document()
+    )
+    ref.set(entry)
+    return {"id": ref.id, **entry}
+
+
+def list_calendar_entries(
+    project_id: str,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+) -> list[dict]:
+    """
+    Return calendar entries ordered by date ascending.
+    Optionally filter by from_date and to_date (YYYY-MM-DD strings).
+    """
+    db = get_db()
+    query = (
+        db.collection("projects").document(project_id)
+        .collection("calendar_entries")
+        .order_by("date", direction=firestore.Query.ASCENDING)
+    )
+    if from_date:
+        query = query.where("date", ">=", from_date)
+    if to_date:
+        query = query.where("date", "<=", to_date)
+
+    docs = list(query.stream())
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def update_calendar_entry(project_id: str, entry_id: str, updates: dict) -> dict:
+    """Update a calendar entry."""
+    db = get_db()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("calendar_entries").document(entry_id)
+    )
+    updates["updatedAt"] = _utcnow()
+    ref.update(updates)
+    doc = ref.get()
+    if not doc.exists:
+        raise ValueError(f"Calendar entry {entry_id} not found.")
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def delete_calendar_entry(project_id: str, entry_id: str) -> None:
+    """Delete a calendar entry."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("calendar_entries").document(entry_id)
+        .delete()
+    )
