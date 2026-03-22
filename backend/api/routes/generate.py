@@ -2,7 +2,11 @@
 Generation routes — AI media generation beyond text.
 
 Endpoints:
-  POST /projects/{id}/generate/image  — DALL-E 3 image generation
+  POST /projects/{id}/generate/image         — Imagen 3 image generation
+  POST /projects/{id}/generate/ai-prompt     — Claude generates brand-aligned image prompt
+  GET  /projects/{id}/images                 — List saved images
+  POST /projects/{id}/images                 — Save a generated image
+  DELETE /projects/{id}/images/{image_id}    — Delete a saved image
 """
 from __future__ import annotations
 
@@ -14,7 +18,8 @@ from pydantic import BaseModel, field_validator
 from backend.api.deps import get_project_or_404, assert_member
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
-from backend.services import image_service
+from backend.services import image_service, firebase_service
+from backend.services.llm_service import get_client, build_brand_core_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["generate"])
@@ -37,6 +42,20 @@ class ImageGenerateRequest(BaseModel):
         return v
 
 
+class AiPromptRequest(BaseModel):
+    brief: str              # What the image should convey
+    platform: str = "instagram"
+    style: str = "vivid"
+
+
+class SaveImageRequest(BaseModel):
+    dataUrl: str            # base64 data URL
+    prompt: str
+    aspectRatio: str = "square"
+    style: str = "vivid"
+    platform: str = "instagram"
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -49,16 +68,7 @@ async def generate_image(
     body: ImageGenerateRequest,
     user: CurrentUser,
 ) -> dict:
-    """
-    Generate an image via DALL-E 3 and return its URL.
-
-    The caller (typically the frontend's ImagePromptCard) is responsible for
-    supplying a fully-formed prompt. Brand context should already be baked in
-    by Claude when it produced the image_prompt artifact.
-
-    Returns:
-        { "url": "https://..." }  — URL valid for ~1 hour from OpenAI.
-    """
+    """Generate an image via Imagen 3 and return a base64 data URL."""
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt is required.")
 
@@ -72,9 +82,96 @@ async def generate_image(
             aspect_ratio=body.aspectRatio,
         )
     except RuntimeError as exc:
-        # OPENAI_API_KEY missing
         raise HTTPException(status_code=503, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
     return {"url": url}
+
+
+@router.post("/{project_id}/generate/ai-prompt")
+@limiter.limit("20/minute")
+async def generate_ai_prompt(
+    request: Request,
+    project_id: str,
+    body: AiPromptRequest,
+    user: CurrentUser,
+) -> dict:
+    """Use Claude to generate a brand-aligned image prompt from a plain brief."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+
+    brand_core = project.get("brandCore") or {}
+    brand_context = build_brand_core_context(brand_core)
+    project_name = project.get("name", "the brand")
+
+    client = get_client()
+    system = (
+        "You are an expert creative director specialising in brand-consistent visual content. "
+        "Generate a single, detailed image generation prompt that is highly visual, specific, "
+        "and consistent with the brand's identity. Output ONLY the prompt text — no explanations, "
+        "no quotes, no preamble."
+    )
+    user_msg = (
+        f"BRAND: {project_name}\n"
+        f"{brand_context}\n\n"
+        f"PLATFORM: {body.platform}\n"
+        f"STYLE: {body.style}\n"
+        f"BRIEF: {body.brief}\n\n"
+        "Write a single detailed image generation prompt (max 400 characters) that brings this brief "
+        "to life with the brand's visual identity, colours, and tone."
+    )
+
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=300,
+        system=system,
+        messages=[{"role": "user", "content": user_msg}],
+    )
+    prompt = response.content[0].text.strip()
+    return {"prompt": prompt}
+
+
+@router.get("/{project_id}/images")
+async def list_images(
+    project_id: str,
+    user: CurrentUser,
+) -> dict:
+    """Return all saved generated images for this project."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    images = firebase_service.list_generated_images(project_id)
+    return {"images": images, "count": len(images)}
+
+
+@router.post("/{project_id}/images")
+async def save_image(
+    project_id: str,
+    body: SaveImageRequest,
+    user: CurrentUser,
+) -> dict:
+    """Save a generated image to Firestore."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    image = firebase_service.save_generated_image(project_id, {
+        "dataUrl": body.dataUrl,
+        "prompt": body.prompt,
+        "aspectRatio": body.aspectRatio,
+        "style": body.style,
+        "platform": body.platform,
+        "savedBy": user["uid"],
+    })
+    return image
+
+
+@router.delete("/{project_id}/images/{image_id}")
+async def delete_image(
+    project_id: str,
+    image_id: str,
+    user: CurrentUser,
+) -> dict:
+    """Delete a saved image."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    firebase_service.delete_generated_image(project_id, image_id)
+    return {"ok": True}

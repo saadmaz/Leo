@@ -569,6 +569,32 @@ export interface ReviewHistoryEntry {
   timestamp: string
 }
 
+// ---------------------------------------------------------------------------
+// Phase 7 — Image Studio + AI Content Planner
+// ---------------------------------------------------------------------------
+
+export interface GeneratedImage {
+  id: string
+  dataUrl: string
+  prompt: string
+  aspectRatio: 'square' | 'landscape' | 'portrait'
+  style: 'vivid' | 'natural'
+  platform: string
+  savedBy: string
+  createdAt: string
+}
+
+export interface ContentPlanItem {
+  date: string
+  platform: string
+  contentType: string
+  topic: string
+  contentAngle: string
+  suggestedContent: string
+  hashtags: string[]
+  postingTime: string
+}
+
 export interface PerformanceRecord {
   likes?: number
   comments?: number

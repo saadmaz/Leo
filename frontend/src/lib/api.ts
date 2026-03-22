@@ -41,6 +41,8 @@ import type {
   PublishQueueDay,
   ProjectMember,
   ContentTemplate,
+  ContentPlanItem,
+  GeneratedImage,
   ReviewDecision,
   ReviewHistoryEntry,
   StreamEvent,
@@ -439,6 +441,55 @@ export const api = {
       body: { prompt: string; style?: string; aspectRatio?: string },
       signal?: AbortSignal,
     ) => post<{ url: string }>(`/projects/${projectId}/generate/image`, body, signal),
+
+    aiPrompt: (
+      projectId: string,
+      body: { brief: string; platform?: string; style?: string },
+      signal?: AbortSignal,
+    ) => post<{ prompt: string }>(`/projects/${projectId}/generate/ai-prompt`, body, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  images: {
+    list: (projectId: string, signal?: AbortSignal) =>
+      get<{ images: GeneratedImage[]; count: number }>(
+        `/projects/${projectId}/images`,
+        signal,
+      ),
+
+    save: (
+      projectId: string,
+      body: { dataUrl: string; prompt: string; aspectRatio?: string; style?: string; platform?: string },
+      signal?: AbortSignal,
+    ) => post<GeneratedImage>(`/projects/${projectId}/images`, body, signal),
+
+    delete: (projectId: string, imageId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/images/${imageId}`, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  planner: {
+    generate: (
+      projectId: string,
+      body: { duration?: string; platforms?: string[]; goal?: string; postsPerWeek?: number },
+      signal?: AbortSignal,
+    ) =>
+      post<{ items: ContentPlanItem[]; count: number }>(
+        `/projects/${projectId}/planner/generate`,
+        body,
+        signal,
+      ),
+
+    apply: (
+      projectId: string,
+      items: ContentPlanItem[],
+      signal?: AbortSignal,
+    ) =>
+      post<{ saved: number; total: number }>(
+        `/projects/${projectId}/planner/apply`,
+        { items },
+        signal,
+      ),
   },
 
   // -------------------------------------------------------------------------

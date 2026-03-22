@@ -1669,3 +1669,42 @@ def get_review_history(project_id: str, item_id: str) -> list[dict]:
     )
     return [{"id": d.id, **d.to_dict()} for d in docs]
 
+
+# ---------------------------------------------------------------------------
+# Phase 7 — Generated Images
+# ---------------------------------------------------------------------------
+
+def save_generated_image(project_id: str, data: dict) -> dict:
+    """Save a generated image record to Firestore."""
+    db = get_db()
+    now = _utcnow()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("generated_images").document()
+    )
+    payload = {**data, "createdAt": now}
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def list_generated_images(project_id: str) -> list[dict]:
+    """Return all saved generated images, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("generated_images")
+        .order_by("createdAt", direction="DESCENDING")
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def delete_generated_image(project_id: str, image_id: str) -> None:
+    """Delete a saved generated image."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("generated_images").document(image_id)
+        .delete()
+    )
+

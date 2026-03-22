@@ -430,3 +430,82 @@ Return ONLY valid JSON:
         return _parse_json(response.content[0].text)
     except Exception:
         return {"summary": "", "sections": []}
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 — AI Content Planner
+# ---------------------------------------------------------------------------
+
+async def generate_content_plan(
+    project_name: str,
+    brand_core: dict,
+    duration: str,
+    platforms: list[str],
+    goal: str,
+    posts_per_week: int = 5,
+) -> list[dict]:
+    """
+    Generate a structured content plan as a list of post blueprints.
+
+    Each item: { date, platform, contentType, topic, contentAngle,
+                 suggestedContent, hashtags, postingTime }
+    """
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+
+    duration_label = {
+        "1_week": "1 week (7 days)",
+        "2_weeks": "2 weeks (14 days)",
+        "1_month": "4 weeks (28 days)",
+    }.get(duration, "2 weeks (14 days)")
+
+    platforms_str = ", ".join(platforms)
+    goal_line = f"CAMPAIGN GOAL: {goal}" if goal else ""
+
+    prompt = f"""You are a social media strategist. Create a detailed content calendar.
+
+BRAND: {project_name}
+{brand_context}
+PLATFORMS: {platforms_str}
+DURATION: {duration_label}
+POSTS PER WEEK: {posts_per_week}
+{goal_line}
+
+Generate a content plan. Return a JSON array where each item is:
+{{
+  "date": "YYYY-MM-DD",          // start from tomorrow, spread across duration
+  "platform": "<platform>",
+  "contentType": "caption|video_script|ad_copy|email|image_prompt",
+  "topic": "<short topic title>",
+  "contentAngle": "<hook/angle for this specific post>",
+  "suggestedContent": "<50-120 word draft of the post content>",
+  "hashtags": ["tag1", "tag2", "tag3"],
+  "postingTime": "HH:MM"         // optimal posting time for the platform
+}}
+
+Balance content types across: educational, behind-the-scenes, product/service spotlight, engagement questions, user-generated content prompts, and promotional.
+Return ONLY the JSON array, no other text."""
+
+    from datetime import date, timedelta
+    today = date.today()
+    # Inject today's date so the model can use real dates
+    prompt = prompt.replace(
+        "// start from tomorrow, spread across duration",
+        f"// today is {today.isoformat()}, start from tomorrow",
+    )
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=6000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    try:
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
+    except Exception:
+        return []
