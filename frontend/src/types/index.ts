@@ -488,6 +488,59 @@ export interface ProjectInsight {
   priority: 'high' | 'medium' | 'low'
 }
 
+// ---------------------------------------------------------------------------
+// Phase 5 — SEO Studio, Email Studio, Brand Style Guide
+// ---------------------------------------------------------------------------
+
+export interface BlogPostMeta {
+  title: string
+  description: string
+  slug: string
+  outline: string[]
+}
+
+export interface MetaTagsResult {
+  tags: {
+    title: string
+    description: string
+    og_title: string
+    og_description: string
+    og_type: string
+    twitter_title: string
+    twitter_description: string
+    canonical_hint: string
+    schema_type: string
+    focus_keyword: string
+  }
+}
+
+export interface WebsiteCopySection {
+  name: string
+  headline: string
+  subheadline?: string
+  body: string
+  cta: string
+}
+
+export interface EmailItem {
+  number: number
+  send_day: number
+  subject: string
+  preview_text: string
+  body: string
+  cta_text: string
+}
+
+export interface StyleGuideSection {
+  title: string
+  content: string
+}
+
+export interface StyleGuide {
+  summary: string
+  sections: StyleGuideSection[]
+}
+
 export interface PerformanceRecord {
   likes?: number
   comments?: number

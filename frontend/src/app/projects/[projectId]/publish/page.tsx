@@ -164,7 +164,6 @@ export default function PublishPage() {
                 onToggle={() => toggleDay(day.date)}
                 onMarkPosted={markPosted}
                 markingPosted={markingPosted}
-                projectId={params.projectId}
               />
             ))}
           </div>
@@ -195,14 +194,13 @@ export default function PublishPage() {
 // ---------------------------------------------------------------------------
 
 function DaySection({
-  day, expanded, onToggle, onMarkPosted, markingPosted, projectId,
+  day, expanded, onToggle, onMarkPosted, markingPosted,
 }: {
   day: PublishQueueDay
   expanded: boolean
   onToggle: () => void
   onMarkPosted: (e: PublishQueueEntry) => void
   markingPosted: Set<string>
-  projectId: string
 }) {
   const isToday = day.label === 'Today'
   const allPosted = day.entries.length > 0 && day.entries.every((e) => e.status === 'posted')

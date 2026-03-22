@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash,
+  BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -373,6 +373,30 @@ export function Sidebar() {
               >
                 <Hash className="w-3.5 h-3.5" />
                 <span>Hashtag Research</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/seo`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>SEO Studio</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/emails`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Email Studio</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/style-guide`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Style Guide</span>
               </button>
             </>
           )}

@@ -15,7 +15,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops
+from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio
 from backend.middleware.rate_limit import limiter
 from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
@@ -123,6 +123,7 @@ app.include_router(admin.router)
 app.include_router(announcements.router)
 app.include_router(intelligence.router)
 app.include_router(content_ops.router)
+app.include_router(content_studio.router)
 
 # ---------------------------------------------------------------------------
 # Health endpoints

@@ -30,7 +30,10 @@ import type {
   MemoryFeedbackItem,
   Message,
   Project,
+  BlogPostMeta,
+  EmailItem,
   HashtagResult,
+  MetaTagsResult,
   PerformanceRecord,
   ProjectAnalytics,
   ProjectCreate,
@@ -38,7 +41,9 @@ import type {
   PublishQueueDay,
   ProjectMember,
   StreamEvent,
+  StyleGuide,
   TransformResult,
+  WebsiteCopySection,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -796,5 +801,118 @@ export const api = {
   insights: {
     get: (projectId: string, signal?: AbortSignal) =>
       get<{ insights: ProjectInsight[] }>(`/projects/${projectId}/insights`, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // SEO Studio (Phase 5)
+  // -------------------------------------------------------------------------
+  seo: {
+    metaTags: (
+      projectId: string,
+      pageTitle: string,
+      pageDescription: string,
+      pageType: string,
+      signal?: AbortSignal,
+    ) =>
+      post<MetaTagsResult>(
+        `/projects/${projectId}/seo/meta-tags`,
+        { page_title: pageTitle, page_description: pageDescription, page_type: pageType },
+        signal,
+      ),
+
+    websiteCopy: (
+      projectId: string,
+      pageType: string,
+      context?: string,
+      signal?: AbortSignal,
+    ) =>
+      post<{ sections: WebsiteCopySection[] }>(
+        `/projects/${projectId}/seo/website-copy`,
+        { page_type: pageType, context },
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Email Studio (Phase 5)
+  // -------------------------------------------------------------------------
+  emails: {
+    sequence: (
+      projectId: string,
+      sequenceType: string,
+      goal: string,
+      productOrService: string,
+      signal?: AbortSignal,
+    ) =>
+      post<{ sequence: EmailItem[] }>(
+        `/projects/${projectId}/emails/sequence`,
+        { sequence_type: sequenceType, goal, product_or_service: productOrService },
+        signal,
+      ),
+
+    single: (
+      projectId: string,
+      emailType: string,
+      context: string,
+      signal?: AbortSignal,
+    ) =>
+      post<EmailItem>(
+        `/projects/${projectId}/emails/single`,
+        { email_type: emailType, context },
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Brand Style Guide (Phase 5)
+  // -------------------------------------------------------------------------
+  styleGuide: {
+    generate: (projectId: string, signal?: AbortSignal) =>
+      post<StyleGuide>(`/projects/${projectId}/brand/style-guide`, {}, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Blog Post SSE stream (Phase 5)
+  // -------------------------------------------------------------------------
+  async streamBlogPost(
+    projectId: string,
+    body: {
+      topic: string
+      keywords?: string[]
+      tone?: string
+      word_count?: number
+    },
+    onMeta: (meta: BlogPostMeta) => void,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const headers = await authHeaders()
+    const res = await fetch(`${API}/projects/${projectId}/seo/blog-post`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    })
+    if (!res.ok) throw new Error(`Blog post stream failed: ${res.status}`)
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue
+        const raw = line.slice(5).trim()
+        if (!raw || raw === '[DONE]') continue
+        try {
+          const evt = JSON.parse(raw)
+          if (evt.type === 'meta') onMeta(evt as BlogPostMeta)
+          else if (evt.type === 'chunk') onChunk(evt.text)
+        } catch { /* skip malformed */ }
+      }
+    }
   },
 }
