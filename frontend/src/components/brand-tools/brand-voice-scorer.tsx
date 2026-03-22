@@ -38,7 +38,12 @@ export function BrandVoiceScorer({ projectId, onClose }: BrandVoiceScorerProps) 
       const score = await api.brandVoice.score(projectId, text.trim())
       setResult(score)
     } catch (err) {
-      toast.error('Scoring failed. Make sure Brand Core is set up.')
+      const msg = String(err)
+      if (msg.includes('Brand Core not set up') || msg.includes('400')) {
+        toast.error('Brand Core not set up yet. Run brand ingestion first to use the Voice Scorer.', { duration: 5000 })
+      } else {
+        toast.error('Scoring failed. Try again.')
+      }
       console.error(err)
     } finally {
       setLoading(false)
