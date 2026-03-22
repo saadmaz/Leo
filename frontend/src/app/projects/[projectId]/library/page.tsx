@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Library, Search, Filter, Trash2, Check, RefreshCw, Loader2,
+  Library, Search, Trash2, Check, RefreshCw, Loader2,
   Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -113,7 +113,7 @@ export default function LibraryPage() {
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
+      if (s.has(id)) { s.delete(id) } else { s.add(id) }
       return s
     })
   }

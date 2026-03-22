@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Loader2, Sparkles, Plus, X, Check,
+  CalendarDays, ChevronLeft, ChevronRight, Loader2, Sparkles, X, Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'

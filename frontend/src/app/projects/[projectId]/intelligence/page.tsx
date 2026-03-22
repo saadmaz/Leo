@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import {
   BarChart2, RefreshCw, Plus, X, Loader2, ChevronDown, ChevronUp,
   TrendingUp, AlertTriangle, Lightbulb, Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
@@ -19,7 +18,6 @@ import type { CompetitorSnapshot } from '@/types'
 
 export default function IntelligencePage() {
   const params = useParams<{ projectId: string }>()
-  const router = useRouter()
   const { activeProject } = useAppStore()
 
   const [snapshots, setSnapshots] = useState<CompetitorSnapshot[]>([])
@@ -32,12 +30,7 @@ export default function IntelligencePage() {
     { name: string; instagram: string; facebook: string; tiktok: string }[]
   >([{ name: '', instagram: '', facebook: '', tiktok: '' }])
 
-  useEffect(() => {
-    if (!params.projectId) return
-    loadSnapshots()
-  }, [params.projectId])
-
-  async function loadSnapshots() {
+  const loadSnapshots = useCallback(async () => {
     setLoading(true)
     try {
       const data = await api.intelligence.get(params.projectId)
@@ -47,7 +40,11 @@ export default function IntelligencePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.projectId])
+
+  useEffect(() => {
+    if (params.projectId) loadSnapshots()
+  }, [params.projectId, loadSnapshots])
 
   async function handleRefresh() {
     const valid = competitors.filter((c) => c.name.trim())
