@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { BulkGenerateItem } from '@/types'
 
 const PLATFORM_OPTIONS = ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'X', 'Email']
@@ -103,6 +104,7 @@ export default function BulkGeneratePage() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <Zap className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Bulk Content Generator</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}

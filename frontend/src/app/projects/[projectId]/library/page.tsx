@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { ContentLibraryItem, ContentLibraryStatus } from '@/types'
 import { RecycleModal } from '@/components/content-ops/recycle-modal'
 import { TransformModal } from '@/components/content-ops/transform-modal'
@@ -136,6 +137,7 @@ export default function LibraryPage() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <Library className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Content Library</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}

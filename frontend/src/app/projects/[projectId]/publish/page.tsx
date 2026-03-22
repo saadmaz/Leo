@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { PublishQueueDay, PublishQueueEntry } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -121,6 +122,7 @@ export default function PublishPage() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <Send className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Publishing Queue</span>
         {activeProject && (

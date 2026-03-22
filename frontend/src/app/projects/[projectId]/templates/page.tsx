@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { ContentTemplate } from '@/types'
 
 const CATEGORIES = ['all', 'caption', 'email', 'ad_copy', 'blog_post', 'video_script', 'website_copy', 'other']
@@ -70,6 +71,7 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <LayoutTemplate className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Content Templates</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}

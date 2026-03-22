@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { CompetitorSnapshot } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -82,6 +83,7 @@ export default function IntelligencePage() {
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <div className="flex items-center gap-2">
           <BarChart2 className="w-4 h-4 text-primary" />
           <span className="text-sm font-semibold">Competitive Intelligence</span>

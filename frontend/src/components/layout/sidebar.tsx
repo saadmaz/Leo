@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
-  PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
+  PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
   BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange,
@@ -249,6 +249,39 @@ export function Sidebar() {
               }}
             />
           ))}
+
+          {/* Project-scoped tool groups */}
+          {!projectsLoading && activeProject && (
+            <div className="mt-1 border-t border-border/50 pt-1">
+              <NavGroup label="Content" storageKey="nav_content">
+                <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)} />
+                <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => router.push(`/projects/${activeProject.id}/library`)} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => router.push(`/projects/${activeProject.id}/bulk`)} />
+                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => router.push(`/projects/${activeProject.id}/planner`)} />
+                <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}       label="Image Studio"    onClick={() => router.push(`/projects/${activeProject.id}/images`)} />
+                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}       label="Campaigns"       onClick={() => setCampaignPanelOpen(true)} />
+              </NavGroup>
+
+              <NavGroup label="Schedule" storageKey="nav_schedule">
+                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />} label="Calendar"      onClick={() => router.push(`/projects/${activeProject.id}/calendar`)} />
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}         label="Publish Queue" onClick={() => router.push(`/projects/${activeProject.id}/publish`)} />
+              </NavGroup>
+
+              <NavGroup label="Intelligence" storageKey="nav_intelligence">
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Intelligence"     onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
+                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Voice Scorer"     onClick={() => setBrandVoiceScorerOpen(true)} />
+                <NavItem icon={<Hash className="w-3.5 h-3.5" />}        label="Hashtag Research" onClick={() => setHashtagPanelOpen(true)} />
+              </NavGroup>
+
+              <NavGroup label="Studio" storageKey="nav_studio">
+                <NavItem icon={<Globe className="w-3.5 h-3.5" />}         label="SEO Studio"    onClick={() => router.push(`/projects/${activeProject.id}/seo`)} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}          label="Email Studio"  onClick={() => router.push(`/projects/${activeProject.id}/emails`)} />
+                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}      label="Style Guide"   onClick={() => router.push(`/projects/${activeProject.id}/style-guide`)} />
+                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"    onClick={() => router.push(`/projects/${activeProject.id}/templates`)} />
+                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue" onClick={() => router.push(`/projects/${activeProject.id}/review`)} />
+              </NavGroup>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -301,138 +334,6 @@ export function Sidebar() {
             <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
           </button>
 
-          {/* Project-scoped tools */}
-          {activeProject && (
-            <>
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <LayoutDashboard className="w-3.5 h-3.5" />
-                <span>Dashboard</span>
-              </button>
-
-              <button
-                onClick={() => setCampaignPanelOpen(true)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Megaphone className="w-3.5 h-3.5" />
-                <span>Campaigns</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <BarChart2 className="w-3.5 h-3.5" />
-                <span>Intelligence</span>
-              </button>
-
-              <button
-                onClick={() => setBrandVoiceScorerOpen(true)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Voice Scorer</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/library`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Library className="w-3.5 h-3.5" />
-                <span>Content Library</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/bulk`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Bulk Generate</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/calendar`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <CalendarDays className="w-3.5 h-3.5" />
-                <span>Calendar</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/publish`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Publish Queue</span>
-              </button>
-
-              <button
-                onClick={() => setHashtagPanelOpen(true)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Hash className="w-3.5 h-3.5" />
-                <span>Hashtag Research</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/seo`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span>SEO Studio</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/emails`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Email Studio</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/style-guide`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Style Guide</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/templates`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <LayoutTemplate className="w-3.5 h-3.5" />
-                <span>Templates</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/review`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <ClipboardCheck className="w-3.5 h-3.5" />
-                <span>Review Queue</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/images`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <ImageIcon className="w-3.5 h-3.5" />
-                <span>Image Studio</span>
-              </button>
-
-              <button
-                onClick={() => router.push(`/projects/${activeProject.id}/planner`)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <CalendarRange className="w-3.5 h-3.5" />
-                <span>Content Planner</span>
-              </button>
-            </>
-          )}
 
           {/* Settings */}
           <button
@@ -464,6 +365,61 @@ export function Sidebar() {
       </aside>
       <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NavGroup — collapsible section with localStorage persistence
+// ---------------------------------------------------------------------------
+
+function NavGroup({ label, storageKey, children }: {
+  label: string
+  storageKey: string
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(storageKey) === 'true'
+  })
+
+  function toggle() {
+    setOpen((v) => {
+      const next = !v
+      localStorage.setItem(storageKey, String(next))
+      return next
+    })
+  }
+
+  return (
+    <div>
+      <button
+        onClick={toggle}
+        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+      >
+        {open
+          ? <ChevronDown className="w-2.5 h-2.5" />
+          : <ChevronRight className="w-2.5 h-2.5" />
+        }
+        {label}
+      </button>
+      {open && <div className="pb-1">{children}</div>}
+    </div>
+  )
+}
+
+function NavItem({ icon, label, onClick }: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 w-full pl-6 pr-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span>{label}</span>
+    </button>
   )
 }
 

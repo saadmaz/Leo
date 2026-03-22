@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { EmailItem } from '@/types'
 
 const SEQUENCE_TYPES = [
@@ -34,6 +35,7 @@ export default function EmailsPage() {
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <Mail className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Email Studio</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { BackButton } from '@/components/layout/back-button'
 import type { StyleGuide, StyleGuideSection } from '@/types'
 
 const SECTION_ICONS: Record<string, string> = {
@@ -79,6 +80,7 @@ export default function StyleGuidePage() {
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
+        <BackButton />
         <BookOpen className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Brand Style Guide</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}
