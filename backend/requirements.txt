@@ -12,3 +12,4 @@ python-dotenv==1.2.2
 stripe==14.4.1
 uvicorn[standard]==0.41.0
 slowapi==0.1.9
+boto3==1.38.0
