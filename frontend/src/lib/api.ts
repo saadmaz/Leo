@@ -30,6 +30,8 @@ import type {
   MemoryFeedbackItem,
   Message,
   Project,
+  PerformanceRecord,
+  ProjectAnalytics,
   ProjectCreate,
   ProjectMember,
   StreamEvent,
@@ -732,5 +734,27 @@ export const api = {
 
     deleteEntry: (projectId: string, entryId: string, signal?: AbortSignal) =>
       del(`/projects/${projectId}/calendar/entries/${entryId}`, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Analytics & Performance (Phase 3)
+  // -------------------------------------------------------------------------
+  analytics: {
+    get: (projectId: string, signal?: AbortSignal) =>
+      get<ProjectAnalytics>(`/projects/${projectId}/analytics`, signal),
+  },
+
+  performance: {
+    record: (
+      projectId: string,
+      itemId: string,
+      data: PerformanceRecord,
+      signal?: AbortSignal,
+    ) =>
+      post<{ id: string }>(
+        `/projects/${projectId}/content-library/${itemId}/performance`,
+        data,
+        signal,
+      ),
   },
 }

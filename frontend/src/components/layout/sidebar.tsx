@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, ShieldCheck, Library, CalendarDays, Zap,
+  BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -302,6 +302,14 @@ export function Sidebar() {
           {/* Project-scoped tools */}
           {activeProject && (
             <>
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </button>
+
               <button
                 onClick={() => setCampaignPanelOpen(true)}
                 className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

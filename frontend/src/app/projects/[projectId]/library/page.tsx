@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Library, Search, Trash2, Check, RefreshCw, Loader2,
+  Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp,
   Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import { SidebarToggle } from '@/components/layout/sidebar'
 import type { ContentLibraryItem, ContentLibraryStatus } from '@/types'
 import { RecycleModal } from '@/components/content-ops/recycle-modal'
 import { TransformModal } from '@/components/content-ops/transform-modal'
+import { PerformanceModal } from '@/components/content-ops/performance-modal'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -59,6 +60,7 @@ export default function LibraryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [recycleItem, setRecycleItem] = useState<ContentLibraryItem | null>(null)
   const [transformItem, setTransformItem] = useState<ContentLibraryItem | null>(null)
+  const [performanceItem, setPerformanceItem] = useState<ContentLibraryItem | null>(null)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -213,6 +215,7 @@ export default function LibraryPage() {
                 onDelete={() => handleDelete(item.id)}
                 onRecycle={() => setRecycleItem(item)}
                 onTransform={() => setTransformItem(item)}
+                onPerformance={() => setPerformanceItem(item)}
               />
             ))}
           </div>
@@ -236,6 +239,14 @@ export default function LibraryPage() {
           onSaved={loadItems}
         />
       )}
+      {performanceItem && (
+        <PerformanceModal
+          item={performanceItem}
+          projectId={params.projectId}
+          onClose={() => setPerformanceItem(null)}
+          onSaved={loadItems}
+        />
+      )}
     </div>
   )
 }
@@ -245,7 +256,7 @@ export default function LibraryPage() {
 // ---------------------------------------------------------------------------
 
 function LibraryCard({
-  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform,
+  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onPerformance,
 }: {
   item: ContentLibraryItem
   selected: boolean
@@ -254,6 +265,7 @@ function LibraryCard({
   onDelete: () => void
   onRecycle: () => void
   onTransform: () => void
+  onPerformance: () => void
 }) {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.draft
@@ -329,6 +341,14 @@ function LibraryCard({
         >
           <Shuffle className="w-3 h-3" />
           <span>Transform</span>
+        </button>
+        <button
+          onClick={onPerformance}
+          title="Log performance metrics"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-green-600 hover:bg-muted transition-colors"
+        >
+          <TrendingUp className="w-3 h-3" />
+          <span>Log</span>
         </button>
         <button
           onClick={onDelete}

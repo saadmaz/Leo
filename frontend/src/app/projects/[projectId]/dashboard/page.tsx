@@ -1,0 +1,339 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import {
+  LayoutDashboard, Loader2, Library, CalendarDays, BarChart2,
+  Brain, TrendingUp, Zap, ChevronRight, RefreshCw,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
+import { useAppStore } from '@/stores/app-store'
+import { SidebarToggle } from '@/components/layout/sidebar'
+import type { ProjectAnalytics } from '@/types'
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const PLATFORM_COLORS: Record<string, string> = {
+  instagram: 'bg-pink-500',
+  facebook: 'bg-blue-600',
+  tiktok: 'bg-neutral-900',
+  linkedin: 'bg-blue-700',
+  x: 'bg-neutral-700',
+  email: 'bg-violet-500',
+}
+
+const STATUS_STYLES: Record<string, { bg: string; label: string }> = {
+  draft:     { bg: 'bg-muted',             label: 'Draft' },
+  approved:  { bg: 'bg-green-500/80',      label: 'Approved' },
+  scheduled: { bg: 'bg-blue-500/80',       label: 'Scheduled' },
+  posted:    { bg: 'bg-purple-500/80',     label: 'Posted' },
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const days = Math.floor(diff / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return `${days}d ago`
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default function DashboardPage() {
+  const params = useParams<{ projectId: string }>()
+  const router = useRouter()
+  const { activeProject } = useAppStore()
+
+  const [data, setData] = useState<ProjectAnalytics | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await api.analytics.get(params.projectId)
+      setData(result)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load analytics')
+    } finally {
+      setLoading(false)
+    }
+  }, [params.projectId])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  const lib = data?.library
+  const cal = data?.calendar
+  const mem = data?.memory
+  const comp = data?.competitors
+  const topPerformers = data?.top_performers ?? []
+
+  // Pipeline funnel values
+  const pipeline = [
+    { key: 'draft',     ...STATUS_STYLES['draft'],     count: lib?.by_status['draft'] ?? 0 },
+    { key: 'approved',  ...STATUS_STYLES['approved'],  count: lib?.by_status['approved'] ?? 0 },
+    { key: 'scheduled', ...STATUS_STYLES['scheduled'], count: lib?.by_status['scheduled'] ?? 0 },
+    { key: 'posted',    ...STATUS_STYLES['posted'],     count: lib?.by_status['posted'] ?? 0 },
+  ]
+  const pipelineMax = Math.max(...pipeline.map((p) => p.count), 1)
+
+  // Top platform by volume
+  const byPlatform = Object.entries(lib?.by_platform ?? {}).sort((a, b) => b[1] - a[1])
+
+  return (
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+        <SidebarToggle />
+        <LayoutDashboard className="w-4 h-4 text-primary" />
+        <span className="text-sm font-semibold">Brand Dashboard</span>
+        {activeProject && (
+          <span className="text-xs text-muted-foreground">— {activeProject.name}</span>
+        )}
+        <button
+          onClick={load}
+          className="ml-auto p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+        {/* Top stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard
+            icon={<Library className="w-4 h-4" />}
+            label="Library Items"
+            value={lib?.total ?? 0}
+            sub={`${lib?.by_status['posted'] ?? 0} posted`}
+            onClick={() => router.push(`/projects/${params.projectId}/library`)}
+          />
+          <StatCard
+            icon={<CalendarDays className="w-4 h-4" />}
+            label="Upcoming Posts"
+            value={cal?.upcoming_count ?? 0}
+            sub="next 30 days"
+            onClick={() => router.push(`/projects/${params.projectId}/calendar`)}
+          />
+          <StatCard
+            icon={<Brain className="w-4 h-4" />}
+            label="Brand Memory"
+            value={mem?.count ?? 0}
+            sub="signals learned"
+            onClick={() => router.push(`/projects/${params.projectId}/intelligence`)}
+          />
+          <StatCard
+            icon={<BarChart2 className="w-4 h-4" />}
+            label="Competitors"
+            value={comp?.count ?? 0}
+            sub={comp?.last_analysis ? `Last: ${timeAgo(comp.last_analysis)}` : 'Not analysed'}
+            onClick={() => router.push(`/projects/${params.projectId}/intelligence`)}
+          />
+        </div>
+
+        {/* Middle row: Pipeline + Platform breakdown */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Content Pipeline */}
+          <div className="border border-border rounded-xl bg-card p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Content Pipeline</h3>
+              <button
+                onClick={() => router.push(`/projects/${params.projectId}/library`)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+              >
+                View all <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              {pipeline.map((stage) => (
+                <div key={stage.key} className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{stage.label}</span>
+                  <div className="flex-1 h-5 rounded-md bg-muted overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-md transition-all', stage.bg)}
+                      style={{ width: `${(stage.count / pipelineMax) * 100}%`, minWidth: stage.count > 0 ? '1.5rem' : 0 }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium w-6 text-right shrink-0">{stage.count}</span>
+                </div>
+              ))}
+            </div>
+            {lib?.total === 0 && (
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                Save content to the library to start tracking your pipeline.
+              </p>
+            )}
+          </div>
+
+          {/* Platform breakdown */}
+          <div className="border border-border rounded-xl bg-card p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Content by Platform</h3>
+              <button
+                onClick={() => router.push(`/projects/${params.projectId}/bulk`)}
+                className="text-xs text-primary flex items-center gap-1 hover:opacity-80 transition-opacity"
+              >
+                <Zap className="w-3 h-3" /> Generate more
+              </button>
+            </div>
+            {byPlatform.length === 0 ? (
+              <div className="flex items-center justify-center h-24">
+                <p className="text-xs text-muted-foreground text-center">No content yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {byPlatform.map(([platform, count]) => {
+                  const pct = Math.round((count / (lib?.total || 1)) * 100)
+                  return (
+                    <div key={platform} className="flex items-center gap-3">
+                      <div className={cn('w-2 h-2 rounded-full shrink-0', PLATFORM_COLORS[platform.toLowerCase()] ?? 'bg-muted-foreground')} />
+                      <span className="text-xs text-muted-foreground capitalize w-20 shrink-0">{platform}</span>
+                      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full', PLATFORM_COLORS[platform.toLowerCase()] ?? 'bg-primary')}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium w-6 text-right shrink-0">{count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom row: Upcoming calendar + Top performers */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Upcoming calendar entries */}
+          <div className="border border-border rounded-xl bg-card p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Upcoming Posts</h3>
+              <button
+                onClick={() => router.push(`/projects/${params.projectId}/calendar`)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+              >
+                Full calendar <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+            {cal?.upcoming.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-24 gap-2">
+                <p className="text-xs text-muted-foreground text-center">No upcoming posts scheduled.</p>
+                <button
+                  onClick={() => router.push(`/projects/${params.projectId}/calendar`)}
+                  className="text-xs text-primary hover:opacity-80"
+                >
+                  Generate a calendar →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {cal?.upcoming.slice(0, 6).map((entry) => (
+                  <div key={entry.id} className="flex items-start gap-3 py-1.5 border-b border-border last:border-0">
+                    <div className="text-xs text-muted-foreground w-14 shrink-0 pt-0.5">
+                      {formatDate(entry.date)}
+                    </div>
+                    <div className={cn('w-1.5 h-1.5 rounded-full mt-1.5 shrink-0', PLATFORM_COLORS[entry.platform?.toLowerCase()] ?? 'bg-muted-foreground')} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-foreground/80 truncate">{entry.content}</p>
+                      <span className="text-[10px] text-muted-foreground capitalize">{entry.platform}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top performers */}
+          <div className="border border-border rounded-xl bg-card p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Top Performers</h3>
+              <TrendingUp className="w-3.5 h-3.5 text-green-500" />
+            </div>
+            {topPerformers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-24 gap-2">
+                <p className="text-xs text-muted-foreground text-center">
+                  Log performance data on your posted content to see top performers here.
+                </p>
+                <button
+                  onClick={() => router.push(`/projects/${params.projectId}/library`)}
+                  className="text-xs text-primary hover:opacity-80"
+                >
+                  Go to library →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topPerformers.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 py-1.5 border-b border-border last:border-0">
+                    <div className={cn('w-1.5 h-1.5 rounded-full mt-1.5 shrink-0', PLATFORM_COLORS[item.platform?.toLowerCase()] ?? 'bg-muted-foreground')} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-foreground/80 truncate">{item.content}</p>
+                      <span className="text-[10px] text-muted-foreground capitalize">{item.platform}</span>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="text-xs font-semibold text-green-600">{item.engagement_rate.toFixed(1)}%</span>
+                      <p className="text-[10px] text-muted-foreground">engagement</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// StatCard
+// ---------------------------------------------------------------------------
+
+function StatCard({
+  icon, label, value, sub, onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+  sub: string
+  onClick?: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="border border-border rounded-xl bg-card p-4 text-left hover:bg-muted/30 transition-colors group w-full"
+    >
+      <div className="flex items-center gap-2 text-muted-foreground mb-2 group-hover:text-foreground transition-colors">
+        {icon}
+        <span className="text-xs font-medium">{label}</span>
+      </div>
+      <p className="text-2xl font-bold tabular-nums">{value}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+    </button>
+  )
+}

@@ -437,3 +437,45 @@ export interface RecycleVariant {
 export interface TransformResult {
   results: Record<string, { content: string; hashtags: string[]; notes: string }>
 }
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Analytics & Performance
+// ---------------------------------------------------------------------------
+
+export interface PerformanceRecord {
+  likes?: number
+  comments?: number
+  shares?: number
+  reach?: number
+  saves?: number
+  engagement_rate?: number
+  notes?: string
+  platform_post_id?: string
+}
+
+export interface ProjectAnalytics {
+  library: {
+    total: number
+    by_status: Record<string, number>
+    by_platform: Record<string, number>
+  }
+  calendar: {
+    upcoming_count: number
+    upcoming: CalendarEntry[]
+  }
+  memory: {
+    count: number
+  }
+  competitors: {
+    count: number
+    last_analysis: string | null
+  }
+  top_performers: {
+    id: string
+    platform: string
+    content: string
+    engagement_rate: number
+    likes: number
+    reach: number
+  }[]
+}

@@ -347,3 +347,75 @@ async def delete_calendar_entry(
     """Delete a calendar entry."""
     get_project_as_editor(project_id, user["uid"])
     await asyncio.to_thread(firebase_service.delete_calendar_entry, project_id, entry_id)
+
+
+# ---------------------------------------------------------------------------
+# Project Analytics Dashboard
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics")
+async def get_analytics(
+    project_id: str,
+    user: CurrentUser,
+):
+    """Return aggregate analytics for the project dashboard."""
+    get_project_as_member(project_id, user["uid"])
+    data = await asyncio.to_thread(firebase_service.get_project_analytics, project_id)
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Content Performance Tracking
+# ---------------------------------------------------------------------------
+
+class PerformanceRecord(BaseModel):
+    likes: Optional[int] = None
+    comments: Optional[int] = None
+    shares: Optional[int] = None
+    reach: Optional[int] = None
+    saves: Optional[int] = None
+    engagement_rate: Optional[float] = None
+    notes: Optional[str] = Field(None, max_length=500)
+    platform_post_id: Optional[str] = Field(None, max_length=200)
+
+
+@router.post("/content-library/{item_id}/performance")
+async def record_performance(
+    project_id: str,
+    item_id: str,
+    body: PerformanceRecord,
+    user: CurrentUser,
+):
+    """
+    Log real-world performance data for a posted content item.
+    Automatically marks the item as 'posted' and saves metrics.
+    High-performing items (engagement_rate > 3%) are auto-saved as positive brand memory.
+    """
+    get_project_as_member(project_id, user["uid"])
+
+    record = await asyncio.to_thread(
+        firebase_service.save_performance_record,
+        project_id, item_id, body.model_dump(exclude_none=True),
+    )
+
+    # Auto-save to brand memory if engagement rate is strong
+    er = body.engagement_rate or 0
+    if er >= 3.0:
+        try:
+            item_doc = await asyncio.to_thread(
+                firebase_service.update_content_library_item, project_id, item_id, {}
+            )
+            content_preview = (item_doc.get("content") or "")[:300]
+            platform = item_doc.get("platform", "unknown")
+            memory_data = {
+                "type": "approve",
+                "original": content_preview,
+                "context": f"High performer on {platform} — {er:.1f}% engagement rate",
+                "platform": platform,
+                "userId": user["uid"],
+            }
+            await asyncio.to_thread(firebase_service.save_memory_feedback, project_id, memory_data)
+        except Exception as exc:
+            logger.warning("Failed to auto-save performance memory: %s", exc)
+
+    return record

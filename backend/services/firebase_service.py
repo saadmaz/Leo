@@ -1382,3 +1382,131 @@ def delete_calendar_entry(project_id: str, entry_id: str) -> None:
         .collection("calendar_entries").document(entry_id)
         .delete()
     )
+
+
+# ---------------------------------------------------------------------------
+# Performance Tracking
+# ---------------------------------------------------------------------------
+
+def save_performance_record(project_id: str, item_id: str, data: dict) -> dict:
+    """
+    Save a performance record for a content library item.
+    Also marks the item status as 'posted' and persists the performance data on the item.
+    """
+    db = get_db()
+    now = _utcnow()
+    record = {**data, "projectId": project_id, "itemId": item_id, "createdAt": now}
+    # Write to subcollection for history
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+        .collection("performance").document()
+    )
+    ref.set(record)
+    # Update the library item with latest performance snapshot + mark as posted
+    item_ref = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+    )
+    item_ref.update({
+        "status": "posted",
+        "performance": data,
+        "updatedAt": now,
+    })
+    return {"id": ref.id, **record}
+
+
+def get_project_analytics(project_id: str) -> dict:
+    """
+    Aggregate analytics for the project dashboard.
+    Returns library stats, calendar stats, memory count, competitor count,
+    and top-performing content.
+    """
+    db = get_db()
+
+    # Content library counts
+    library_docs = list(
+        db.collection("projects").document(project_id)
+        .collection("content_library").stream()
+    )
+    library_total = len(library_docs)
+    by_status: dict[str, int] = {"draft": 0, "approved": 0, "scheduled": 0, "posted": 0}
+    by_platform: dict[str, int] = {}
+    top_performers: list[dict] = []
+
+    for doc in library_docs:
+        d = doc.to_dict() or {}
+        s = d.get("status", "draft")
+        by_status[s] = by_status.get(s, 0) + 1
+        p = d.get("platform", "unknown")
+        by_platform[p] = by_platform.get(p, 0) + 1
+        # Collect items that have performance data
+        perf = d.get("performance")
+        if perf:
+            er = perf.get("engagement_rate", 0) or 0
+            top_performers.append({
+                "id": doc.id,
+                "platform": p,
+                "content": (d.get("content") or "")[:120],
+                "engagement_rate": er,
+                "likes": perf.get("likes", 0),
+                "reach": perf.get("reach", 0),
+            })
+
+    top_performers.sort(key=lambda x: x["engagement_rate"], reverse=True)
+
+    # Calendar: upcoming entries (next 30 days)
+    today = _utcnow()[:10]
+    from datetime import date, timedelta
+    in_30 = (date.today() + timedelta(days=30)).isoformat()
+
+    calendar_docs = list(
+        db.collection("projects").document(project_id)
+        .collection("calendar_entries")
+        .where("date", ">=", today)
+        .where("date", "<=", in_30)
+        .order_by("date")
+        .limit(10)
+        .stream()
+    )
+    upcoming = [{"id": d.id, **d.to_dict()} for d in calendar_docs]
+
+    # Memory count
+    memory_docs = list(
+        db.collection("projects").document(project_id)
+        .collection("brand_memory").stream()
+    )
+    memory_count = len(memory_docs)
+
+    # Competitor snapshot count
+    competitor_docs = list(
+        db.collection("projects").document(project_id)
+        .collection("competitor_snapshots").stream()
+    )
+    competitor_count = len(competitor_docs)
+    # Most recent competitor analysis date
+    last_analysis: Optional[str] = None
+    for doc in competitor_docs:
+        sa = (doc.to_dict() or {}).get("scrapedAt")
+        if sa and (last_analysis is None or sa > last_analysis):
+            last_analysis = sa
+
+    return {
+        "library": {
+            "total": library_total,
+            "by_status": by_status,
+            "by_platform": by_platform,
+        },
+        "calendar": {
+            "upcoming_count": len(upcoming),
+            "upcoming": upcoming,
+        },
+        "memory": {
+            "count": memory_count,
+        },
+        "competitors": {
+            "count": competitor_count,
+            "last_analysis": last_analysis,
+        },
+        "top_performers": top_performers[:5],
+    }
