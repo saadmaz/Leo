@@ -11,6 +11,7 @@ import { PromptComposer } from '@/components/chat/prompt-composer'
 import { BrandCorePanel } from '@/components/brand-core/brand-core-panel'
 import { IngestionOverlay } from '@/components/brand-core/ingestion-overlay'
 import { BrandVoiceScorerPanel } from '@/components/brand-tools/brand-voice-scorer-panel'
+import { HashtagPanel } from '@/components/brand-tools/hashtag-panel'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/stores/app-store'
@@ -439,6 +440,7 @@ export default function ChatPage() {
       <BrandCorePanel />
       <IngestionOverlay />
       <BrandVoiceScorerPanel projectId={params.projectId} />
+      <HashtagPanel />
     </div>
   )
 }

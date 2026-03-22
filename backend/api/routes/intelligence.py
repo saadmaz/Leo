@@ -223,3 +223,71 @@ async def check_drift(
     except Exception as exc:
         logger.error("Brand drift check failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Hashtag Research
+# ---------------------------------------------------------------------------
+
+class HashtagResearchRequest(BaseModel):
+    topic: str = Field(..., min_length=2, max_length=300)
+    platform: str = Field(..., min_length=1, max_length=64)
+    content: Optional[str] = Field(None, max_length=2000)
+
+
+@router.post("/hashtags/suggest")
+async def suggest_hashtags(
+    project_id: str,
+    body: HashtagResearchRequest,
+    user: CurrentUser,
+):
+    """
+    Generate a tiered hashtag strategy for the given topic and platform.
+    Returns hashtags grouped by tier: mega (1M+), large (100k-1M), medium (10k-100k), niche (<10k).
+    """
+    project = get_project_as_member(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+
+    try:
+        result = await intelligence_service.research_hashtags(
+            body.topic, body.platform, body.content or "", brand_core
+        )
+        return result
+    except Exception as exc:
+        logger.error("Hashtag research failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# AI Proactive Insights
+# ---------------------------------------------------------------------------
+
+@router.get("/insights")
+async def get_insights(
+    project_id: str,
+    user: CurrentUser,
+):
+    """
+    Generate 3-5 proactive AI insights by analysing brand memory, performance data,
+    competitor snapshots, calendar, and library. Returns actionable recommendations.
+    """
+    project = get_project_as_member(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+
+    # Gather context from Firestore
+    memory_items = await asyncio.to_thread(firebase_service.get_memory_feedback, project_id, 20)
+    competitor_snapshots = await asyncio.to_thread(firebase_service.get_competitor_snapshots, project_id)
+    analytics = await asyncio.to_thread(firebase_service.get_project_analytics, project_id)
+
+    try:
+        result = await intelligence_service.generate_insights(
+            project_name=project.get("name", ""),
+            brand_core=brand_core,
+            memory_items=memory_items,
+            competitor_snapshots=competitor_snapshots,
+            analytics=analytics,
+        )
+        return result
+    except Exception as exc:
+        logger.error("Insights generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))

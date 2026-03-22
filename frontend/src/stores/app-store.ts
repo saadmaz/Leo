@@ -164,6 +164,11 @@ interface AppState {
   // ---------------------------------------------------------------------------
   brandVoiceScorerOpen: boolean
   setBrandVoiceScorerOpen: (v: boolean) => void
+  // ---------------------------------------------------------------------------
+  // Hashtag Research panel
+  // ---------------------------------------------------------------------------
+  hashtagPanelOpen: boolean
+  setHashtagPanelOpen: (v: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -341,4 +346,6 @@ export const useAppStore = create<AppState>((set) => ({
   // ---------------------------------------------------------------------------
   brandVoiceScorerOpen: false,
   setBrandVoiceScorerOpen: (brandVoiceScorerOpen) => set({ brandVoiceScorerOpen }),
+  hashtagPanelOpen: false,
+  setHashtagPanelOpen: (hashtagPanelOpen) => set({ hashtagPanelOpen }),
 }))

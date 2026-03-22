@@ -419,3 +419,46 @@ async def record_performance(
             logger.warning("Failed to auto-save performance memory: %s", exc)
 
     return record
+
+
+# ---------------------------------------------------------------------------
+# Publishing Queue
+# ---------------------------------------------------------------------------
+
+@router.get("/publish-queue")
+async def get_publish_queue(
+    project_id: str,
+    user: CurrentUser,
+):
+    """
+    Return calendar entries for today and the next 7 days, grouped by day,
+    with content formatted ready for copy-paste publishing.
+    """
+    get_project_as_member(project_id, user["uid"])
+
+    from datetime import date, timedelta
+    today = date.today().isoformat()
+    end = (date.today() + timedelta(days=7)).isoformat()
+
+    entries = await asyncio.to_thread(
+        firebase_service.list_calendar_entries, project_id, today, end
+    )
+
+    # Group by date
+    groups: dict[str, list] = {}
+    for entry in entries:
+        d = entry.get("date", "")
+        if d not in groups:
+            groups[d] = []
+        groups[d].append(entry)
+
+    days = []
+    for i in range(8):
+        d = (date.today() + timedelta(days=i)).isoformat()
+        days.append({
+            "date": d,
+            "label": "Today" if i == 0 else "Tomorrow" if i == 1 else d,
+            "entries": groups.get(d, []),
+        })
+
+    return {"days": days, "total": len(entries)}

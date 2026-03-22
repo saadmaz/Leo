@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard,
+  BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -37,6 +37,7 @@ export function Sidebar() {
     setCampaignPanelOpen,
     setProjectSettingsPanelOpen,
     setBrandVoiceScorerOpen,
+    setHashtagPanelOpen,
   } = useAppStore()
 
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -356,6 +357,22 @@ export function Sidebar() {
               >
                 <CalendarDays className="w-3.5 h-3.5" />
                 <span>Calendar</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/publish`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Publish Queue</span>
+              </button>
+
+              <button
+                onClick={() => setHashtagPanelOpen(true)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Hash className="w-3.5 h-3.5" />
+                <span>Hashtag Research</span>
               </button>
             </>
           )}

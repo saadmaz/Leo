@@ -357,3 +357,177 @@ def build_memory_context(memory_items: list[dict]) -> str:
         "Reinforce approved ones."
     )
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Hashtag Research (Phase 4)
+# ---------------------------------------------------------------------------
+
+async def research_hashtags(
+    topic: str,
+    platform: str,
+    content: str,
+    brand_core: dict,
+) -> dict:
+    """
+    Generate a tiered hashtag strategy for a given topic and platform.
+
+    Returns:
+    {
+      "tiers": {
+        "mega":   [{"tag": "#...", "approx_posts": "50M+"}],
+        "large":  [...],
+        "medium": [...],
+        "niche":  [...]
+      },
+      "strategy": "<brief posting strategy note>",
+      "recommended_mix": "<e.g. 2 mega + 5 large + 8 medium + 5 niche>"
+    }
+    """
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+
+    content_section = f"\nCONTENT TO HASHTAG:\n{content[:500]}" if content else ""
+
+    prompt = f"""You are a social media hashtag strategist.
+
+BRAND:
+{brand_context}
+
+PLATFORM: {platform}
+TOPIC: {topic}{content_section}
+
+Generate a comprehensive hashtag strategy with 4 tiers:
+- mega: 5-10M+ posts (broad, high visibility, very competitive)
+- large: 500k-5M posts (strong reach, moderate competition)
+- medium: 50k-500k posts (good engagement, relevant audience)
+- niche: <50k posts (highly targeted, your core audience)
+
+For {platform}, recommend the ideal total number and mix.
+
+Return ONLY valid JSON:
+{{
+  "tiers": {{
+    "mega":   [{{"tag": "#tag", "approx_posts": "10M+"}}],
+    "large":  [{{"tag": "#tag", "approx_posts": "800k"}}],
+    "medium": [{{"tag": "#tag", "approx_posts": "120k"}}],
+    "niche":  [{{"tag": "#tag", "approx_posts": "8k"}}]
+  }},
+  "strategy": "<one sentence on why this mix works for this topic on {platform}>",
+  "recommended_mix": "<e.g. 3 mega + 6 large + 8 medium + 5 niche = 22 total>"
+}}
+
+Aim for: 5+ per tier. Make tags specific and relevant to the topic."""
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=1500,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    try:
+        return _parse_json_response(response.content[0].text)
+    except Exception:
+        return {"tiers": {"mega": [], "large": [], "medium": [], "niche": []}, "strategy": "", "recommended_mix": ""}
+
+
+# ---------------------------------------------------------------------------
+# AI Proactive Insights (Phase 4)
+# ---------------------------------------------------------------------------
+
+async def generate_insights(
+    project_name: str,
+    brand_core: dict,
+    memory_items: list,
+    competitor_snapshots: list,
+    analytics: dict,
+) -> dict:
+    """
+    Analyse all available project data and generate 3-5 proactive insights.
+
+    Each insight has:
+      type: "warning" | "opportunity" | "tip" | "achievement"
+      title: short headline
+      body: 1-2 sentence explanation
+      action: suggested next step
+      priority: "high" | "medium" | "low"
+    """
+    client = get_client()
+
+    # Build data summary for Claude
+    lib = analytics.get("library", {})
+    cal = analytics.get("calendar", {})
+    mem = analytics.get("memory", {})
+    comp = analytics.get("competitors", {})
+    top_performers = analytics.get("top_performers", [])
+
+    memory_summary = ""
+    if memory_items:
+        approvals = sum(1 for m in memory_items if m.get("type") == "approve")
+        rejections = sum(1 for m in memory_items if m.get("type") == "reject")
+        memory_summary = f"{len(memory_items)} memory signals ({approvals} approvals, {rejections} rejections)"
+
+    competitor_summary = ""
+    if competitor_snapshots:
+        names = [s.get("name", "?") for s in competitor_snapshots[:3]]
+        competitor_summary = f"Tracking: {', '.join(names)}"
+        # Include any content gaps as opportunities
+        all_gaps = []
+        for snap in competitor_snapshots[:3]:
+            gaps = (snap.get("analysis") or {}).get("content_gaps", [])
+            all_gaps.extend(gaps[:2])
+        if all_gaps:
+            competitor_summary += f"\nTop content gaps they're missing: {'; '.join(all_gaps[:4])}"
+
+    top_perf_summary = ""
+    if top_performers:
+        best = top_performers[0]
+        top_perf_summary = f"Best performer: {best['platform']} content with {best['engagement_rate']:.1f}% engagement"
+
+    prompt = f"""You are LEO, an AI brand marketing co-pilot. Analyse this brand's data and generate proactive insights.
+
+BRAND: {project_name}
+
+DATA SUMMARY:
+- Content Library: {lib.get('total', 0)} items total | {lib.get('by_status', {}).get('draft', 0)} draft, {lib.get('by_status', {}).get('approved', 0)} approved, {lib.get('by_status', {}).get('posted', 0)} posted
+- Calendar: {cal.get('upcoming_count', 0)} posts scheduled in next 30 days
+- Brand Memory: {memory_summary or "No signals yet"}
+- Competitors: {comp.get('count', 0)} tracked | Last analysis: {comp.get('last_analysis', 'Never')}
+- {competitor_summary}
+- Performance: {top_perf_summary or "No performance data logged yet"}
+
+Platform breakdown: {lib.get('by_platform', {})}
+
+Generate 3-5 sharp, actionable insights that would genuinely help this brand. Be specific — reference actual numbers from the data.
+
+Types:
+- "warning": something that needs attention (brand drift, low posting cadence, stale competitor data)
+- "opportunity": something they should capitalise on (competitor gaps, top-performing content patterns)
+- "tip": a tactical improvement (posting timing, content mix, platform balance)
+- "achievement": something going well worth acknowledging
+
+Return ONLY valid JSON:
+{{
+  "insights": [
+    {{
+      "type": "warning",
+      "title": "<short punchy headline, max 8 words>",
+      "body": "<1-2 sentences with specific data references>",
+      "action": "<one concrete next step>",
+      "priority": "high"
+    }}
+  ]
+}}
+
+Be honest and data-driven. Don't be generic. If data is sparse, focus on what they should do first."""
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=1500,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    try:
+        return _parse_json_response(response.content[0].text)
+    except Exception:
+        return {"insights": []}

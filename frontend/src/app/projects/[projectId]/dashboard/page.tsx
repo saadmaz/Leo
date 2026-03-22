@@ -5,13 +5,14 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Loader2, Library, CalendarDays, BarChart2,
   Brain, TrendingUp, Zap, ChevronRight, RefreshCw,
+  AlertTriangle, Lightbulb, Star, Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
-import type { ProjectAnalytics } from '@/types'
+import type { ProjectAnalytics, ProjectInsight } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,6 +57,8 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<ProjectAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [insights, setInsights] = useState<ProjectInsight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -70,7 +73,20 @@ export default function DashboardPage() {
     }
   }, [params.projectId])
 
+  const loadInsights = useCallback(async () => {
+    setInsightsLoading(true)
+    try {
+      const result = await api.insights.get(params.projectId)
+      setInsights(result.insights)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setInsightsLoading(false)
+    }
+  }, [params.projectId])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadInsights() }, [loadInsights])
 
   if (loading) {
     return (
@@ -305,7 +321,87 @@ export default function DashboardPage() {
           </div>
 
         </div>
+
+        {/* AI Insights Feed */}
+        <div className="border border-border rounded-xl bg-card p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-semibold">LEO&apos;s Insights</h3>
+            </div>
+            <button
+              onClick={loadInsights}
+              disabled={insightsLoading}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              title="Refresh insights"
+            >
+              {insightsLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RefreshCw className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {insightsLoading && insights.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : insights.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              Click refresh to generate AI insights for this project.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {insights.map((insight, i) => (
+                <InsightCard key={i} insight={insight} />
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// InsightCard
+// ---------------------------------------------------------------------------
+
+const INSIGHT_CONFIG: Record<string, { icon: React.ReactNode; border: string; iconBg: string }> = {
+  warning:     { icon: <AlertTriangle className="w-3.5 h-3.5" />, border: 'border-amber-500/30',  iconBg: 'bg-amber-500/10 text-amber-600' },
+  opportunity: { icon: <Lightbulb className="w-3.5 h-3.5" />,    border: 'border-primary/30',     iconBg: 'bg-primary/10 text-primary' },
+  tip:         { icon: <Info className="w-3.5 h-3.5" />,          border: 'border-blue-500/30',    iconBg: 'bg-blue-500/10 text-blue-600' },
+  achievement: { icon: <Star className="w-3.5 h-3.5" />,          border: 'border-green-500/30',   iconBg: 'bg-green-500/10 text-green-600' },
+}
+
+const PRIORITY_DOT: Record<string, string> = {
+  high:   'bg-red-500',
+  medium: 'bg-amber-500',
+  low:    'bg-muted-foreground',
+}
+
+function InsightCard({ insight }: { insight: ProjectInsight }) {
+  const config = INSIGHT_CONFIG[insight.type] ?? INSIGHT_CONFIG.tip
+
+  return (
+    <div className={cn('rounded-xl border p-3.5 space-y-2', config.border)}>
+      <div className="flex items-start gap-2">
+        <div className={cn('p-1.5 rounded-md shrink-0 mt-0.5', config.iconBg)}>
+          {config.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold leading-tight">{insight.title}</span>
+            <div className={cn('w-1.5 h-1.5 rounded-full shrink-0', PRIORITY_DOT[insight.priority] ?? PRIORITY_DOT.low)} />
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-foreground/70 leading-relaxed">{insight.body}</p>
+      {insight.action && (
+        <p className="text-[10px] font-medium text-primary border-t border-border/50 pt-2">
+          → {insight.action}
+        </p>
+      )}
     </div>
   )
 }

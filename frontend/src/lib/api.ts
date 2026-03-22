@@ -30,9 +30,12 @@ import type {
   MemoryFeedbackItem,
   Message,
   Project,
+  HashtagResult,
   PerformanceRecord,
   ProjectAnalytics,
   ProjectCreate,
+  ProjectInsight,
+  PublishQueueDay,
   ProjectMember,
   StreamEvent,
   TransformResult,
@@ -756,5 +759,42 @@ export const api = {
         data,
         signal,
       ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Publishing Queue (Phase 4)
+  // -------------------------------------------------------------------------
+  publishQueue: {
+    get: (projectId: string, signal?: AbortSignal) =>
+      get<{ days: PublishQueueDay[]; total: number }>(
+        `/projects/${projectId}/publish-queue`,
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Hashtag Research (Phase 4)
+  // -------------------------------------------------------------------------
+  hashtags: {
+    suggest: (
+      projectId: string,
+      topic: string,
+      platform: string,
+      content?: string,
+      signal?: AbortSignal,
+    ) =>
+      post<HashtagResult>(
+        `/projects/${projectId}/hashtags/suggest`,
+        { topic, platform, content },
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // AI Proactive Insights (Phase 4)
+  // -------------------------------------------------------------------------
+  insights: {
+    get: (projectId: string, signal?: AbortSignal) =>
+      get<{ insights: ProjectInsight[] }>(`/projects/${projectId}/insights`, signal),
   },
 }

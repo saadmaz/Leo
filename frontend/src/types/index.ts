@@ -442,6 +442,52 @@ export interface TransformResult {
 // Phase 3 — Analytics & Performance
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Phase 4 — Publishing Queue, Hashtags, Insights
+// ---------------------------------------------------------------------------
+
+export interface PublishQueueEntry {
+  id: string
+  date: string
+  platform: string
+  content: string
+  hashtags: string[]
+  time?: string
+  status: string
+  type?: string
+  content_format?: string
+}
+
+export interface PublishQueueDay {
+  date: string
+  label: string
+  entries: PublishQueueEntry[]
+}
+
+export interface HashtagTier {
+  tag: string
+  approx_posts: string
+}
+
+export interface HashtagResult {
+  tiers: {
+    mega: HashtagTier[]
+    large: HashtagTier[]
+    medium: HashtagTier[]
+    niche: HashtagTier[]
+  }
+  strategy: string
+  recommended_mix: string
+}
+
+export interface ProjectInsight {
+  type: 'warning' | 'opportunity' | 'tip' | 'achievement'
+  title: string
+  body: string
+  action: string
+  priority: 'high' | 'medium' | 'low'
+}
+
 export interface PerformanceRecord {
   likes?: number
   comments?: number
