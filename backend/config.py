@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     # Model used for the conversational chat stream (streamed responses) — Claude.
     LLM_CHAT_MODEL: str = "claude-sonnet-4-6"
     # Model used for one-shot brand extraction and campaign generation — Gemini.
-    LLM_EXTRACTION_MODEL: str = "gemini-2.0-flash"
+    LLM_EXTRACTION_MODEL: str = "gemini-2.5-flash"
     # Imagen model used for image generation.
     GEMINI_IMAGE_MODEL: str = "imagen-3.0-generate-001"
     # Maximum tokens the LLM may generate in a single chat response.
