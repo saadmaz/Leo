@@ -149,7 +149,7 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
 
 function CaptionsCard({ artifact }: { artifact: CaptionsArtifact }) {
   const allText = artifact.captions.map((c) => c.text).join('\n\n---\n\n')
-  const allHashtags = [...new Set(artifact.captions.flatMap((c) => c.hashtags))]
+  const allHashtags = artifact.captions.flatMap((c) => c.hashtags).filter((h, i, arr) => arr.indexOf(h) === i)
   return (
     <Card
       icon={<Instagram className="w-3.5 h-3.5" />}
