@@ -13,14 +13,17 @@ interface TransformModalProps {
   onSaved: () => void
 }
 
+// Backend returns lowercase keys — map both cases
 const PLATFORM_LABELS: Record<string, string> = {
-  Instagram: 'Instagram',
-  Facebook: 'Facebook',
-  TikTok: 'TikTok',
-  LinkedIn: 'LinkedIn',
-  X: 'X (Twitter)',
-  Email: 'Email',
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  linkedin: 'LinkedIn',
+  x: 'X (Twitter)',
+  email: 'Email',
 }
+
+const ALL_TARGET_PLATFORMS = ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'X', 'Email']
 
 export function TransformModal({ item, projectId, onClose, onSaved }: TransformModalProps) {
   const [loading, setLoading] = useState(false)
@@ -32,7 +35,11 @@ export function TransformModal({ item, projectId, onClose, onSaved }: TransformM
     setLoading(true)
     setResults(null)
     try {
-      const result = await api.contentOps.transform(projectId, item.content, item.platform)
+      // Transform to all platforms except the source platform
+      const targets = ALL_TARGET_PLATFORMS.filter(
+        (p) => p.toLowerCase() !== item.platform.toLowerCase(),
+      )
+      const result = await api.contentOps.transform(projectId, item.content, targets)
       setResults(result.results)
     } catch (err) {
       toast.error('Transform failed. Try again.')
