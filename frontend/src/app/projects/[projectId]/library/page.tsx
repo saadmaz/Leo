@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp,
-  Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle,
+  Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,7 @@ const STATUSES: { value: ContentLibraryStatus | 'all'; label: string }[] = [
 
 const STATUS_STYLES: Record<ContentLibraryStatus, string> = {
   draft: 'bg-muted text-muted-foreground',
+  in_review: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
   approved: 'bg-green-500/10 text-green-600 border-green-500/20',
   scheduled: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   posted: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
@@ -110,6 +111,16 @@ export default function LibraryPage() {
     setItems((prev) => prev.map((i) => selectedIds.has(i.id) ? { ...i, status: 'approved' } : i))
     setSelectedIds(new Set())
     toast.success(`${ids.length} items approved`)
+  }
+
+  async function handleSubmitReview(id: string) {
+    try {
+      await api.approval.submitForReview(params.projectId, id)
+      setItems((prev) => prev.map((i) => i.id === id ? { ...i, status: 'in_review' as ContentLibraryStatus } : i))
+      toast.success('Submitted for review')
+    } catch {
+      toast.error('Failed to submit for review')
+    }
   }
 
   function toggleSelect(id: string) {
@@ -216,6 +227,7 @@ export default function LibraryPage() {
                 onRecycle={() => setRecycleItem(item)}
                 onTransform={() => setTransformItem(item)}
                 onPerformance={() => setPerformanceItem(item)}
+                onSubmitReview={() => handleSubmitReview(item.id)}
               />
             ))}
           </div>
@@ -256,7 +268,7 @@ export default function LibraryPage() {
 // ---------------------------------------------------------------------------
 
 function LibraryCard({
-  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onPerformance,
+  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onPerformance, onSubmitReview,
 }: {
   item: ContentLibraryItem
   selected: boolean
@@ -266,6 +278,7 @@ function LibraryCard({
   onRecycle: () => void
   onTransform: () => void
   onPerformance: () => void
+  onSubmitReview: () => void
 }) {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.draft
@@ -350,6 +363,16 @@ function LibraryCard({
           <TrendingUp className="w-3 h-3" />
           <span>Log</span>
         </button>
+        {item.status === 'draft' && (
+          <button
+            onClick={onSubmitReview}
+            title="Submit for team review"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-amber-600 hover:bg-muted transition-colors"
+          >
+            <ClipboardCheck className="w-3 h-3" />
+            <span>Review</span>
+          </button>
+        )}
         <button
           onClick={onDelete}
           className="ml-auto p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"

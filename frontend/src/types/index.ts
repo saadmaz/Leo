@@ -376,7 +376,7 @@ export interface BrandDriftResult {
 // Phase 2 Content Operations Types
 // ---------------------------------------------------------------------------
 
-export type ContentLibraryStatus = 'draft' | 'approved' | 'scheduled' | 'posted'
+export type ContentLibraryStatus = 'draft' | 'approved' | 'scheduled' | 'posted' | 'in_review'
 export type ContentLibraryType = 'caption' | 'ad_copy' | 'video_script' | 'email' | 'image_prompt'
 
 export interface ContentLibraryItem {
@@ -539,6 +539,34 @@ export interface StyleGuideSection {
 export interface StyleGuide {
   summary: string
   sections: StyleGuideSection[]
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Templates + Approval Workflow
+// ---------------------------------------------------------------------------
+
+export interface ContentTemplate {
+  id: string
+  name: string
+  category: string
+  platform?: string
+  description?: string
+  body: string
+  placeholders: string[]
+  hashtags: string[]
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type ReviewDecision = 'approved' | 'rejected' | 'changes_requested'
+
+export interface ReviewHistoryEntry {
+  id: string
+  action: ReviewDecision | 'submitted'
+  by: string
+  note: string
+  timestamp: string
 }
 
 export interface PerformanceRecord {

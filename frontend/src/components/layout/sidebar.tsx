@@ -7,6 +7,7 @@ import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
   BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen,
+  LayoutTemplate, ClipboardCheck,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -397,6 +398,22 @@ export function Sidebar() {
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>Style Guide</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/templates`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <LayoutTemplate className="w-3.5 h-3.5" />
+                <span>Templates</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/review`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                <span>Review Queue</span>
               </button>
             </>
           )}

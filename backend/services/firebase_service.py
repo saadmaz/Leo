@@ -1510,3 +1510,162 @@ def get_project_analytics(project_id: str) -> dict:
         },
         "top_performers": top_performers[:5],
     }
+
+
+# ---------------------------------------------------------------------------
+# Content Templates (Phase 6)
+# ---------------------------------------------------------------------------
+
+def save_template(project_id: str, data: dict) -> dict:
+    """Save a content template under projects/{id}/templates."""
+    db = get_db()
+    now = _utcnow()
+    payload = {**data, "projectId": project_id, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("templates").document()
+    )
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def list_templates(project_id: str, category: Optional[str] = None) -> list[dict]:
+    """Return templates for a project, newest first. Optionally filter by category."""
+    db = get_db()
+    query = (
+        db.collection("projects").document(project_id)
+        .collection("templates")
+        .order_by("createdAt", direction="DESCENDING")
+    )
+    if category:
+        query = query.where("category", "==", category)
+    return [{"id": d.id, **d.to_dict()} for d in query.stream()]
+
+
+def get_template(project_id: str, template_id: str) -> Optional[dict]:
+    """Return a single template or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("templates").document(template_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def update_template(project_id: str, template_id: str, updates: dict) -> dict:
+    """Update a template."""
+    db = get_db()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("templates").document(template_id)
+    )
+    updates["updatedAt"] = _utcnow()
+    ref.update(updates)
+    doc = ref.get()
+    if not doc.exists:
+        raise ValueError(f"Template {template_id} not found.")
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def delete_template(project_id: str, template_id: str) -> None:
+    """Delete a template."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("templates").document(template_id)
+        .delete()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Approval Workflow (Phase 6)
+# ---------------------------------------------------------------------------
+
+def submit_for_review(project_id: str, item_id: str, submitted_by: str, note: str = "") -> dict:
+    """Change a library item status to in_review and record the submission."""
+    db = get_db()
+    now = _utcnow()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+    )
+    ref.update({"status": "in_review", "submittedAt": now, "submittedBy": submitted_by, "updatedAt": now})
+
+    # Record in review_history subcollection
+    ref.collection("review_history").document().set({
+        "action": "submitted",
+        "by": submitted_by,
+        "note": note,
+        "timestamp": now,
+    })
+
+    doc = ref.get()
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def record_review_decision(
+    project_id: str,
+    item_id: str,
+    decision: str,          # "approved" | "rejected" | "changes_requested"
+    reviewed_by: str,
+    note: str = "",
+) -> dict:
+    """Apply a review decision to a library item and record it in history."""
+    db = get_db()
+    now = _utcnow()
+
+    new_status = {
+        "approved": "approved",
+        "rejected": "rejected",
+        "changes_requested": "draft",   # send back to draft for editing
+    }.get(decision, "draft")
+
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+    )
+    ref.update({
+        "status": new_status,
+        "reviewedAt": now,
+        "reviewedBy": reviewed_by,
+        "reviewNote": note,
+        "updatedAt": now,
+    })
+
+    ref.collection("review_history").document().set({
+        "action": decision,
+        "by": reviewed_by,
+        "note": note,
+        "timestamp": now,
+    })
+
+    doc = ref.get()
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def list_review_queue(project_id: str) -> list[dict]:
+    """Return all content library items with status = in_review, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("content_library")
+        .where("status", "==", "in_review")
+        .order_by("submittedAt", direction="DESCENDING")
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def get_review_history(project_id: str, item_id: str) -> list[dict]:
+    """Return review history for a single library item, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+        .collection("review_history")
+        .order_by("timestamp", direction="DESCENDING")
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+

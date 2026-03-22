@@ -422,6 +422,82 @@ async def record_performance(
 
 
 # ---------------------------------------------------------------------------
+# Approval Workflow (Phase 6)
+# ---------------------------------------------------------------------------
+
+class SubmitReviewRequest(BaseModel):
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class ReviewDecisionRequest(BaseModel):
+    decision: str = Field(..., pattern="^(approved|rejected|changes_requested)$")
+    note: Optional[str] = Field(None, max_length=500)
+
+
+@router.post("/content-library/{item_id}/submit-review")
+async def submit_for_review(
+    project_id: str,
+    item_id: str,
+    body: SubmitReviewRequest,
+    user: CurrentUser,
+):
+    """Submit a content library item for team review (changes status to in_review)."""
+    get_project_as_editor(project_id, user["uid"])
+    try:
+        item = await asyncio.to_thread(
+            firebase_service.submit_for_review,
+            project_id, item_id, user["uid"], body.note or "",
+        )
+        return item
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/content-library/{item_id}/review")
+async def record_review(
+    project_id: str,
+    item_id: str,
+    body: ReviewDecisionRequest,
+    user: CurrentUser,
+):
+    """Record an approve / reject / changes_requested decision on an item."""
+    get_project_as_editor(project_id, user["uid"])
+    try:
+        item = await asyncio.to_thread(
+            firebase_service.record_review_decision,
+            project_id, item_id, body.decision, user["uid"], body.note or "",
+        )
+        return item
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/review-queue")
+async def get_review_queue(
+    project_id: str,
+    user: CurrentUser,
+):
+    """Return all content library items currently in review."""
+    get_project_as_member(project_id, user["uid"])
+    items = await asyncio.to_thread(firebase_service.list_review_queue, project_id)
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/content-library/{item_id}/review-history")
+async def get_review_history(
+    project_id: str,
+    item_id: str,
+    user: CurrentUser,
+):
+    """Return the review history for a single library item."""
+    get_project_as_member(project_id, user["uid"])
+    history = await asyncio.to_thread(
+        firebase_service.get_review_history, project_id, item_id
+    )
+    return {"history": history}
+
+
+# ---------------------------------------------------------------------------
 # Publishing Queue
 # ---------------------------------------------------------------------------
 

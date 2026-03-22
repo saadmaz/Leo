@@ -40,6 +40,9 @@ import type {
   ProjectInsight,
   PublishQueueDay,
   ProjectMember,
+  ContentTemplate,
+  ReviewDecision,
+  ReviewHistoryEntry,
   StreamEvent,
   StyleGuide,
   TransformResult,
@@ -869,6 +872,72 @@ export const api = {
   styleGuide: {
     generate: (projectId: string, signal?: AbortSignal) =>
       post<StyleGuide>(`/projects/${projectId}/brand/style-guide`, {}, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Content Templates (Phase 6)
+  // -------------------------------------------------------------------------
+  templates: {
+    list: (projectId: string, category?: string, signal?: AbortSignal) =>
+      get<{ templates: ContentTemplate[] }>(
+        `/projects/${projectId}/templates${category ? `?category=${category}` : ''}`,
+        signal,
+      ),
+
+    create: (
+      projectId: string,
+      data: Omit<ContentTemplate, 'id' | 'createdAt' | 'updatedAt'>,
+      signal?: AbortSignal,
+    ) =>
+      post<ContentTemplate>(`/projects/${projectId}/templates`, data, signal),
+
+    update: (
+      projectId: string,
+      templateId: string,
+      data: Partial<Pick<ContentTemplate, 'name' | 'description' | 'body' | 'placeholders' | 'hashtags' | 'tags'>>,
+      signal?: AbortSignal,
+    ) =>
+      patch<ContentTemplate>(`/projects/${projectId}/templates/${templateId}`, data, signal),
+
+    delete: (projectId: string, templateId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/templates/${templateId}`, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Approval Workflow (Phase 6)
+  // -------------------------------------------------------------------------
+  approval: {
+    submitForReview: (projectId: string, itemId: string, note?: string, signal?: AbortSignal) =>
+      post<ContentLibraryItem>(
+        `/projects/${projectId}/content-library/${itemId}/submit-review`,
+        { note },
+        signal,
+      ),
+
+    decide: (
+      projectId: string,
+      itemId: string,
+      decision: ReviewDecision,
+      note?: string,
+      signal?: AbortSignal,
+    ) =>
+      post<ContentLibraryItem>(
+        `/projects/${projectId}/content-library/${itemId}/review`,
+        { decision, note },
+        signal,
+      ),
+
+    queue: (projectId: string, signal?: AbortSignal) =>
+      get<{ items: ContentLibraryItem[]; count: number }>(
+        `/projects/${projectId}/review-queue`,
+        signal,
+      ),
+
+    history: (projectId: string, itemId: string, signal?: AbortSignal) =>
+      get<{ history: ReviewHistoryEntry[] }>(
+        `/projects/${projectId}/content-library/${itemId}/review-history`,
+        signal,
+      ),
   },
 
   // -------------------------------------------------------------------------
