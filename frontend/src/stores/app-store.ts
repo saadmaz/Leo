@@ -158,6 +158,12 @@ interface AppState {
   upgradeModalReason: string
   openUpgradeModal: (reason?: string) => void
   closeUpgradeModal: () => void
+
+  // ---------------------------------------------------------------------------
+  // Brand Voice Scorer panel
+  // ---------------------------------------------------------------------------
+  brandVoiceScorerOpen: boolean
+  setBrandVoiceScorerOpen: (v: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -329,4 +335,10 @@ export const useAppStore = create<AppState>((set) => ({
   upgradeModalReason: '',
   openUpgradeModal: (reason = '') => set({ upgradeModalOpen: true, upgradeModalReason: reason }),
   closeUpgradeModal: () => set({ upgradeModalOpen: false, upgradeModalReason: '' }),
+
+  // ---------------------------------------------------------------------------
+  // Brand Voice Scorer panel
+  // ---------------------------------------------------------------------------
+  brandVoiceScorerOpen: false,
+  setBrandVoiceScorerOpen: (brandVoiceScorerOpen) => set({ brandVoiceScorerOpen }),
 }))

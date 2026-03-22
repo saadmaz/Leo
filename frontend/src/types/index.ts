@@ -302,3 +302,72 @@ export interface BillingStatus {
   subscriptionStatus?: string | null
   currentPeriodEnd?: number | null
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1 Intelligence Types
+// ---------------------------------------------------------------------------
+
+export interface BrandVoiceScore {
+  score: number
+  grade: 'A' | 'B' | 'C' | 'D' | 'F'
+  summary: string
+  strengths: string[]
+  issues: string[]
+  suggestions: string[]
+  on_brand_words: string[]
+  off_brand_words: string[]
+}
+
+export interface ContentPrediction {
+  score: number
+  prediction: 'excellent' | 'above average' | 'average' | 'below average' | 'poor'
+  hook_strength: number
+  clarity: number
+  cta_strength: number
+  brand_alignment: number
+  estimated_engagement: 'low' | 'medium' | 'high'
+  best_posting_time: string
+  reasons: string[]
+  improvements: string[]
+}
+
+export interface CompetitorAnalysis {
+  tone: string
+  key_themes: string[]
+  posting_style: string
+  strengths: string[]
+  weaknesses: string[]
+  content_gaps: string[]
+  top_hashtags: string[]
+  engagement_patterns: string
+}
+
+export interface CompetitorSnapshot {
+  id: string
+  name: string
+  scrapedAt: string
+  platforms: Record<string, unknown>
+  analysis?: CompetitorAnalysis
+}
+
+export interface MemoryFeedbackItem {
+  id: string
+  type: 'edit' | 'approve' | 'reject' | 'instruction'
+  original?: string
+  edited?: string
+  reason?: string
+  instruction?: string
+  platform?: string
+  createdAt: string
+}
+
+export interface BrandDriftResult {
+  drift_score: number
+  status: 'on_track' | 'minor_drift' | 'significant_drift' | 'off_brand' | 'no_data' | 'error'
+  tone_drift: boolean
+  theme_drift: boolean
+  voice_drift: boolean
+  issues: string[]
+  recommendations: string[]
+  positive_observations: string[]
+}

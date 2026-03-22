@@ -10,6 +10,7 @@ import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
 import { BrandCorePanel } from '@/components/brand-core/brand-core-panel'
 import { IngestionOverlay } from '@/components/brand-core/ingestion-overlay'
+import { BrandVoiceScorerPanel } from '@/components/brand-tools/brand-voice-scorer-panel'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/stores/app-store'
@@ -411,6 +412,7 @@ export default function ChatPage() {
                       message={msg}
                       isLast={idx === messages.length - 1}
                       onRegenerate={!isStreaming ? handleRegenerate : undefined}
+                      projectId={params.projectId}
                     />
                   </motion.div>
                 ))}
@@ -436,6 +438,7 @@ export default function ChatPage() {
       {/* Panels — rendered outside the scroll container */}
       <BrandCorePanel />
       <IngestionOverlay />
+      <BrandVoiceScorerPanel projectId={params.projectId} />
     </div>
   )
 }

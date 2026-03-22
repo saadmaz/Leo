@@ -21,7 +21,7 @@ from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 from backend.schemas.message import MessageCreate
-from backend.services import billing_service, firebase_service, llm_service, moderation_service
+from backend.services import billing_service, firebase_service, llm_service, moderation_service, intelligence_service
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +91,10 @@ async def send_message(
     # stream_chat() appends it separately as the final user turn.
     history = all_messages[:-1]
 
+    # Load brand memory (last 15 items) to inject learnings into system prompt.
+    memory_items = firebase_service.get_memory_feedback(project_id, limit=15)
+    memory_context = intelligence_service.build_memory_context(memory_items)
+
     async def event_stream():
         assembled_parts: list[str] = []
 
@@ -110,6 +114,7 @@ async def send_message(
                 channel=body.channel,
                 images=images,
                 model=project.get("contentModel") or None,
+                memory_context=memory_context or None,
             ):
                 yield chunk
 

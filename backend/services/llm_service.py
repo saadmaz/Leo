@@ -327,6 +327,7 @@ async def stream_chat(
     channel: Optional[str] = None,
     images: Optional[list] = None,
     model: Optional[str] = None,
+    memory_context: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream a Claude response as SSE-formatted text chunks.
@@ -355,6 +356,8 @@ async def stream_chat(
         preset = CHANNEL_PRESETS[channel]
         channel_section = f"\n\nCHANNEL CONSTRAINTS:\n{preset['constraints']}"
 
+    memory_section = f"\n\n{memory_context}" if memory_context else ""
+
     system_prompt = (
         f"You are LEO, a brand-aware marketing co-pilot for the brand '{project_name}'. "
         "You help marketers create on-brand campaigns, content, copy, and strategy "
@@ -362,6 +365,7 @@ async def stream_chat(
         "and actionable.\n\n"
         "BRAND CORE:\n"
         + build_brand_core_context(brand_core)
+        + memory_section
         + channel_section
         + ARTIFACT_INSTRUCTIONS
     )

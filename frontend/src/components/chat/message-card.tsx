@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Sparkles, User, Copy, Check, RefreshCw } from 'lucide-react'
+import { Sparkles, User, Copy, Check, RefreshCw, ThumbsUp, ThumbsDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { api } from '@/lib/api'
 import type { OptimisticMessage } from '@/types'
 import { ArtifactCard, parseArtifacts } from './artifact-cards'
 
@@ -12,11 +14,15 @@ interface MessageCardProps {
   message: OptimisticMessage
   isLast?: boolean
   onRegenerate?: () => void
+  projectId?: string
 }
 
-export function MessageCard({ message, isLast, onRegenerate }: MessageCardProps) {
+export function MessageCard({ message, isLast, onRegenerate, projectId }: MessageCardProps) {
   const isAssistant = message.role === 'assistant'
   const [copied, setCopied] = useState(false)
+  const [feedback, setFeedback] = useState<'approved' | 'rejected' | null>(null)
+  const [showRejectInput, setShowRejectInput] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   // For assistant messages: strip artifact blocks from text, collect cards
   const { clean, artifacts } = isAssistant
@@ -27,6 +33,41 @@ export function MessageCard({ message, isLast, onRegenerate }: MessageCardProps)
     navigator.clipboard.writeText(clean || message.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  async function handleApprove() {
+    if (!projectId || feedback) return
+    setFeedback('approved')
+    try {
+      await api.memory.feedback(projectId, {
+        type: 'approve',
+        original: (clean || message.content).slice(0, 500),
+      })
+    } catch {
+      // non-critical — don't surface to user
+    }
+  }
+
+  async function handleReject() {
+    if (!projectId || feedback) return
+    setShowRejectInput(true)
+  }
+
+  async function submitReject() {
+    if (!projectId) return
+    setFeedback('rejected')
+    setShowRejectInput(false)
+    try {
+      await api.memory.feedback(projectId, {
+        type: 'reject',
+        original: (clean || message.content).slice(0, 500),
+        reason: rejectReason || undefined,
+      })
+      toast.success("LEO will avoid this in future responses.")
+    } catch {
+      // non-critical
+    }
+    setRejectReason('')
   }
 
   return (
@@ -119,30 +160,91 @@ export function MessageCard({ message, isLast, onRegenerate }: MessageCardProps)
                 <ArtifactCard key={i} artifact={artifact} />
               ))}
 
-              {/* Action bar — copy + regenerate, visible on hover or when last */}
+              {/* Action bar — copy + regenerate + memory feedback */}
               {!message.pending && (clean || artifacts.length > 0) && (
-                <div className={cn(
-                  'flex items-center gap-1 mt-2 transition-opacity',
-                  isLast ? 'opacity-100' : 'opacity-0 group-hover/msg:opacity-100',
-                )}>
-                  <button
-                    onClick={handleCopy}
-                    title="Copy response"
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    <span>{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
-
-                  {isLast && onRegenerate && (
+                <div className="mt-2 space-y-1.5">
+                  <div className={cn(
+                    'flex items-center gap-1 transition-opacity',
+                    isLast ? 'opacity-100' : 'opacity-0 group-hover/msg:opacity-100',
+                  )}>
                     <button
-                      onClick={onRegenerate}
-                      title="Regenerate response"
+                      onClick={handleCopy}
+                      title="Copy response"
                       className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Regenerate</span>
+                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
+
+                    {isLast && onRegenerate && (
+                      <button
+                        onClick={onRegenerate}
+                        title="Regenerate response"
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Regenerate</span>
+                      </button>
+                    )}
+
+                    {/* Memory feedback — only when projectId is available */}
+                    {projectId && (
+                      <div className="flex items-center gap-0.5 ml-auto">
+                        <button
+                          onClick={handleApprove}
+                          title="Good response — LEO will do more of this"
+                          className={cn(
+                            'p-1.5 rounded-md text-xs transition-colors',
+                            feedback === 'approved'
+                              ? 'text-green-500 bg-green-500/10'
+                              : 'text-muted-foreground hover:text-green-500 hover:bg-muted',
+                          )}
+                        >
+                          <ThumbsUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={handleReject}
+                          title="Bad response — LEO will avoid this"
+                          className={cn(
+                            'p-1.5 rounded-md text-xs transition-colors',
+                            feedback === 'rejected'
+                              ? 'text-red-500 bg-red-500/10'
+                              : 'text-muted-foreground hover:text-red-500 hover:bg-muted',
+                          )}
+                        >
+                          <ThumbsDown className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reject reason input */}
+                  {showRejectInput && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        autoFocus
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') submitReject()
+                          if (e.key === 'Escape') { setShowRejectInput(false); setRejectReason('') }
+                        }}
+                        placeholder="What was wrong? (optional, press Enter)"
+                        className="flex-1 text-xs bg-muted border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <button
+                        onClick={submitReject}
+                        className="text-xs px-2 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                      >
+                        Send
+                      </button>
+                      <button
+                        onClick={() => { setShowRejectInput(false); setRejectReason('') }}
+                        className="p-1.5 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

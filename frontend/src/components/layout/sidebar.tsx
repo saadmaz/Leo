@@ -6,6 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
+  BarChart2, ShieldCheck,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -35,6 +36,7 @@ export function Sidebar() {
     setWizardOpen,
     setCampaignPanelOpen,
     setProjectSettingsPanelOpen,
+    setBrandVoiceScorerOpen,
   } = useAppStore()
 
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -297,15 +299,33 @@ export function Sidebar() {
             <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
           </button>
 
-          {/* Campaigns */}
+          {/* Project-scoped tools */}
           {activeProject && (
-            <button
-              onClick={() => setCampaignPanelOpen(true)}
-              className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <Megaphone className="w-3.5 h-3.5" />
-              <span>Campaigns</span>
-            </button>
+            <>
+              <button
+                onClick={() => setCampaignPanelOpen(true)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Megaphone className="w-3.5 h-3.5" />
+                <span>Campaigns</span>
+              </button>
+
+              <button
+                onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>Intelligence</span>
+              </button>
+
+              <button
+                onClick={() => setBrandVoiceScorerOpen(true)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Voice Scorer</span>
+              </button>
+            </>
           )}
 
           {/* Settings */}

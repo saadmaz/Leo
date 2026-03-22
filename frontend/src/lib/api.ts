@@ -14,12 +14,17 @@ import { auth } from './firebase'
 import type {
   BillingStatus,
   BrandCore,
+  BrandDriftResult,
+  BrandVoiceScore,
   Campaign,
   CampaignEvent,
   CampaignGenerateRequest,
   Chat,
+  CompetitorSnapshot,
+  ContentPrediction,
   ImageAttachment,
   IngestionEvent,
+  MemoryFeedbackItem,
   Message,
   Project,
   ProjectCreate,
@@ -446,4 +451,89 @@ export const api = {
   // Health
   // -------------------------------------------------------------------------
   health: (signal?: AbortSignal) => get<{ status: string }>('/health', signal),
+
+  // -------------------------------------------------------------------------
+  // Intelligence — Phase 1
+  // -------------------------------------------------------------------------
+  intelligence: {
+    get: (projectId: string, signal?: AbortSignal) =>
+      get<{ snapshots: CompetitorSnapshot[] }>(`/projects/${projectId}/intelligence`, signal),
+
+    refresh: (
+      projectId: string,
+      competitors: { name: string; instagram?: string; facebook?: string; tiktok?: string }[],
+      signal?: AbortSignal,
+    ) =>
+      post<{ refreshed: { name: string; platforms_scraped: string[] }[] }>(
+        `/projects/${projectId}/intelligence/refresh`,
+        { competitors },
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Brand Voice Scorer
+  // -------------------------------------------------------------------------
+  brandVoice: {
+    score: (
+      projectId: string,
+      text: string,
+      signal?: AbortSignal,
+    ) =>
+      post<BrandVoiceScore>(`/projects/${projectId}/brand-voice/score`, { text }, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Content Performance Predictor
+  // -------------------------------------------------------------------------
+  contentPredict: {
+    predict: (
+      projectId: string,
+      content: string,
+      platform: string,
+      signal?: AbortSignal,
+    ) =>
+      post<ContentPrediction>(
+        `/projects/${projectId}/content/predict`,
+        { content, platform },
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Brand Memory
+  // -------------------------------------------------------------------------
+  memory: {
+    get: (projectId: string, signal?: AbortSignal) =>
+      get<{ items: MemoryFeedbackItem[]; summary: string; count: number }>(
+        `/projects/${projectId}/memory`,
+        signal,
+      ),
+
+    feedback: (
+      projectId: string,
+      body: {
+        type: 'edit' | 'approve' | 'reject' | 'instruction'
+        original?: string
+        edited?: string
+        reason?: string
+        instruction?: string
+        platform?: string
+      },
+      signal?: AbortSignal,
+    ) =>
+      post<{ saved: boolean }>(`/projects/${projectId}/memory/feedback`, body, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Brand Drift Detector
+  // -------------------------------------------------------------------------
+  drift: {
+    check: (projectId: string, ownContent: string[], signal?: AbortSignal) =>
+      post<BrandDriftResult>(
+        `/projects/${projectId}/drift/check`,
+        { own_content: ownContent },
+        signal,
+      ),
+  },
 }

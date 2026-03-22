@@ -1167,3 +1167,76 @@ def list_messages(
     docs = list(query.stream())
     docs.reverse()  # Back to chronological order for display and LLM context
     return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Brand Memory
+# ---------------------------------------------------------------------------
+
+def save_memory_feedback(project_id: str, feedback_data: dict) -> dict:
+    """
+    Persist a brand memory feedback item under projects/{id}/brand_memory.
+
+    feedback_data must include: type (edit|approve|reject|instruction)
+    Optional fields: original, edited, reason, instruction, platform, context, userId
+    """
+    db = get_db()
+    now = _utcnow()
+    data = {**feedback_data, "createdAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("brand_memory").document()
+    )
+    ref.set(data)
+    return {"id": ref.id, **data}
+
+
+def get_memory_feedback(project_id: str, limit: int = 20) -> list[dict]:
+    """
+    Return the most recent `limit` brand memory items, newest first.
+    """
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("brand_memory")
+        .order_by("createdAt", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Competitive Intelligence Snapshots
+# ---------------------------------------------------------------------------
+
+def save_competitor_snapshot(project_id: str, snapshot: dict) -> dict:
+    """
+    Persist or overwrite a competitor snapshot keyed by competitor name.
+    Stores under projects/{id}/competitor_snapshots/{name_slug}.
+    """
+    db = get_db()
+    now = _utcnow()
+    name = snapshot.get("name", "unknown")
+    doc_id = name.lower().replace(" ", "_").replace("/", "_")[:64]
+    data = {**snapshot, "scrapedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_snapshots").document(doc_id)
+    )
+    ref.set(data)
+    return {"id": ref.id, **data}
+
+
+def get_competitor_snapshots(project_id: str) -> list[dict]:
+    """
+    Return all stored competitor snapshots for a project.
+    """
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_snapshots")
+        .order_by("scrapedAt", direction=firestore.Query.DESCENDING)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
