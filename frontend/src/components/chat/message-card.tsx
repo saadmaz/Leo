@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Sparkles, User, Copy, Check, RefreshCw, ThumbsUp, ThumbsDown, X } from 'lucide-react'
+import { User, Copy, Check, RefreshCw, ThumbsUp, ThumbsDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -80,7 +81,7 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
             isAssistant ? 'bg-primary/5 text-primary' : 'bg-secondary text-muted-foreground',
           )}
         >
-          {isAssistant ? <Sparkles className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+          {isAssistant ? <Image src="/Leo-agent.png" alt="LEO" width={20} height={20} className="rounded-md" /> : <User className="h-3.5 w-3.5" />}
         </div>
 
         {/* Content */}

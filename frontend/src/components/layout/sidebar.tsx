@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { useRouter, useParams } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import {
@@ -184,7 +185,10 @@ export function Sidebar() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-border">
-          <span className="text-base font-bold tracking-tight">LEO</span>
+          <div className="flex items-center gap-2">
+            <Image src="/Leo-agent.png" alt="LEO" width={28} height={28} className="rounded-lg" />
+            <span className="text-base font-bold tracking-tight">LEO</span>
+          </div>
           <div className="flex items-center gap-1">
             {activeProject && (
               <NotificationBell projectId={activeProject.id} />

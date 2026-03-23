@@ -1,6 +1,7 @@
 'use client'
 
-import { Sparkles, Zap, MessageSquare, ArrowRight } from 'lucide-react'
+import Image from 'next/image'
+import { Zap, MessageSquare, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -35,9 +36,7 @@ export function OnboardingCard() {
     >
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-center mx-auto mb-4">
-          <Sparkles className="w-6 h-6 text-primary" />
-        </div>
+        <Image src="/Leo-agent.png" alt="LEO" width={72} height={72} className="mx-auto mb-4 rounded-2xl" />
         <h1 className="text-2xl font-bold">Welcome to LEO</h1>
         <p className="mt-1.5 text-sm text-muted-foreground max-w-xs mx-auto">
           Your brand-aware AI marketing co-pilot. Get started in under 2 minutes.
