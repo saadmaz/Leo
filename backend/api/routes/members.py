@@ -90,6 +90,35 @@ async def invite_member(project_id: str, body: InviteMemberBody, user: CurrentUs
     return {**profile, "role": body.role}
 
 
+class UpdateRoleBody(BaseModel):
+    role: str  # "admin" | "editor" | "viewer"
+
+
+@router.patch("/{project_id}/members/{member_uid}")
+async def update_member_role(
+    project_id: str, member_uid: str, body: UpdateRoleBody, user: CurrentUser
+) -> dict:
+    """Change a member's role. Admin only. Cannot demote the last admin."""
+    if body.role not in ("admin", "editor", "viewer"):
+        raise HTTPException(status_code=400, detail="role must be 'admin', 'editor', or 'viewer'")
+
+    project = get_project_as_admin(project_id, user["uid"])
+    members: dict = dict(project.get("members") or {})
+
+    if member_uid not in members:
+        raise HTTPException(status_code=404, detail="Member not found in this project.")
+
+    if body.role != "admin" and members[member_uid] == "admin":
+        remaining_admins = [u for u, r in members.items() if r == "admin" and u != member_uid]
+        if not remaining_admins:
+            raise HTTPException(status_code=400, detail="Cannot demote the last admin.")
+
+    members[member_uid] = body.role
+    firebase_service.update_project(project_id, {"members": members})
+    profile = firebase_service.get_user_profile(member_uid) or {"uid": member_uid, "email": "", "displayName": member_uid}
+    return {**profile, "role": body.role}
+
+
 @router.delete("/{project_id}/members/{member_uid}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_member(project_id: str, member_uid: str, user: CurrentUser) -> None:
     """

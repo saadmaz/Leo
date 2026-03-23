@@ -516,6 +516,8 @@ export const api = {
       get<ProjectMember[]>(`/projects/${projectId}/members`, signal),
     invite: (projectId: string, email: string, role: string, signal?: AbortSignal) =>
       post<ProjectMember>(`/projects/${projectId}/members`, { email, role }, signal),
+    updateRole: (projectId: string, uid: string, role: string) =>
+      patch<ProjectMember>(`/projects/${projectId}/members/${uid}`, { role }),
     remove: (projectId: string, uid: string, signal?: AbortSignal) =>
       del(`/projects/${projectId}/members/${uid}`, signal),
   },

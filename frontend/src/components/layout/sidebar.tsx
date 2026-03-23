@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen,
+  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen, Users,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -17,6 +17,7 @@ import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
+import { NotificationBell } from '@/components/layout/notification-bell'
 import type { Project, Chat } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -185,6 +186,9 @@ export function Sidebar() {
         <div className="flex items-center justify-between px-4 py-4 border-b border-border">
           <span className="text-base font-bold tracking-tight">LEO</span>
           <div className="flex items-center gap-1">
+            {activeProject && (
+              <NotificationBell projectId={activeProject.id} />
+            )}
             <button
               onClick={() => setWizardOpen(true)}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -255,6 +259,7 @@ export function Sidebar() {
             <div className="mt-1 border-t border-border/50 pt-1">
               <NavGroup label="Content" storageKey="nav_content">
                 <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)} />
+                <NavItem icon={<Users className="w-3.5 h-3.5" />}           label="Team"            onClick={() => router.push(`/projects/${activeProject.id}/team`)} />
                 <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => router.push(`/projects/${activeProject.id}/library`)} />
                 <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => router.push(`/projects/${activeProject.id}/bulk`)} />
                 <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => router.push(`/projects/${activeProject.id}/planner`)} />
