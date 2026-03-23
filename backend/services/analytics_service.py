@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.services.firebase_service import db
+from backend.services import firebase_service
 from backend.services.llm_service import get_client
 from backend.config import settings
 
@@ -18,6 +18,7 @@ from backend.config import settings
 # ---------------------------------------------------------------------------
 
 async def log_metrics(project_id: str, item_id: str, metrics: dict) -> dict:
+    db = firebase_service.get_db()
     doc = {
         "item_id": item_id,
         "platform": metrics.get("platform", ""),
@@ -47,6 +48,7 @@ async def log_metrics(project_id: str, item_id: str, metrics: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 async def get_overview(project_id: str) -> dict:
+    db = firebase_service.get_db()
     analytics_docs = (
         db.collection("projects").document(project_id)
           .collection("analytics").stream()
@@ -134,6 +136,7 @@ async def get_overview(project_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 async def get_content_performance(project_id: str) -> list[dict]:
+    db = firebase_service.get_db()
     analytics_docs = (
         db.collection("projects").document(project_id)
           .collection("analytics").stream()
@@ -174,6 +177,7 @@ async def get_content_performance(project_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 async def get_trends(project_id: str) -> dict:
+    db = firebase_service.get_db()
     library_docs = (
         db.collection("projects").document(project_id)
           .collection("content_library").stream()
@@ -213,6 +217,7 @@ async def get_trends(project_id: str) -> dict:
 
 async def get_activity_feed(project_id: str, limit: int = 60) -> list[dict]:
     try:
+        db = firebase_service.get_db()
         docs = (
             db.collection("projects").document(project_id)
               .collection("activity")
@@ -235,6 +240,7 @@ async def log_activity(
     if not project_id:
         return
     try:
+        db = firebase_service.get_db()
         event = {
             "event_type": event_type,
             "user_email": user_email,
