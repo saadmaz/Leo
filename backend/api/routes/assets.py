@@ -57,8 +57,14 @@ async def upload_logo(
     user: CurrentUser,
     file: UploadFile = File(...),
 ) -> dict:
-    project = get_project_or_404(project_id)
-    assert_editor(project, user["uid"])
+    try:
+        project = get_project_or_404(project_id)
+        assert_editor(project, user["uid"])
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Project fetch failed for %s: %s", project_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to load project.") from exc
 
     content_type = (file.content_type or "").lower()
     if not any(content_type.startswith(p) for p in _ALLOWED_MIME_PREFIXES):
@@ -71,11 +77,16 @@ async def upload_logo(
     if len(data) > _MAX_LOGO_BYTES:
         raise HTTPException(status_code=413, detail="Logo must be ≤ 5 MB.")
 
-    # --- Upload path: R2 if configured, otherwise base64 data URL in Firestore ---
-    r2 = _get_r2_client()
+    # --- Upload path: R2 if configured, auto-fallback to base64 on any failure ---
+    logo_url: str | None = None
+
+    r2 = None
+    try:
+        r2 = _get_r2_client()
+    except Exception as exc:
+        logger.warning("R2 client init failed, falling back to base64: %s", exc)
 
     if r2 is not None:
-        # R2 path
         _ext_map = {
             "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
             "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg",
@@ -91,37 +102,25 @@ async def upload_logo(
                 ContentType=content_type,
                 CacheControl="public, max-age=31536000",
             )
-        except (BotoCoreError, ClientError) as exc:
-            logger.error("R2 upload failed for project %s: %s", project_id, exc)
-            raise HTTPException(status_code=502, detail=f"Storage upload failed: {exc}") from exc
+            public_base = settings.CLOUDFLARE_R2_PUBLIC_URL
+            if public_base:
+                logo_url = f"{public_base.rstrip('/')}/{object_key}"
+            else:
+                logger.warning("CLOUDFLARE_R2_PUBLIC_URL not set — falling back to base64 for project %s", project_id)
         except Exception as exc:
-            logger.error("Unexpected R2 upload error for project %s: %s", project_id, exc, exc_info=True)
-            raise HTTPException(status_code=502, detail=f"Storage upload failed: {exc}") from exc
+            logger.error("R2 upload failed for project %s (%s), falling back to base64: %s", project_id, type(exc).__name__, exc, exc_info=True)
 
-        # Build a publicly accessible URL.
-        # If CLOUDFLARE_R2_PUBLIC_URL is set (custom domain or pub-*.r2.dev), use it.
-        # Otherwise fall back to storing as base64 since the S3 endpoint is private.
-        public_base = getattr(settings, "CLOUDFLARE_R2_PUBLIC_URL", None)
-        if public_base:
-            logo_url = f"{public_base.rstrip('/')}/{object_key}"
-        else:
-            logger.warning(
-                "CLOUDFLARE_R2_PUBLIC_URL not set — R2 upload succeeded but URL is not publicly "
-                "accessible. Falling back to base64 data URL for project %s.", project_id
-            )
-            b64 = base64.b64encode(data).decode("utf-8")
-            logo_url = f"data:{content_type};base64,{b64}"
-    else:
+    if logo_url is None:
         # Fallback: store as base64 data URL directly in Firestore
         b64 = base64.b64encode(data).decode("utf-8")
         logo_url = f"data:{content_type};base64,{b64}"
-        logger.info("R2 not configured — storing logo as base64 data URL for project %s", project_id)
+        logger.info("Storing logo as base64 data URL for project %s", project_id)
 
     try:
         firebase_service.update_project(project_id, {"logoUrl": logo_url})
     except Exception as exc:
-        logger.error("Firestore update failed for project %s logo: %s", project_id, exc)
-        raise HTTPException(status_code=502, detail="Uploaded but failed to save URL to project.") from exc
+        logger.error("Firestore update failed for project %s logo: %s", project_id, exc, exc_info=True)
+        raise HTTPException(status_code=502, detail="Failed to save logo URL to project.") from exc
 
     logger.info("Logo saved for project %s", project_id)
     return {"url": logo_url}
