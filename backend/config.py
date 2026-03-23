@@ -57,7 +57,9 @@ class Settings(BaseSettings):
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: Optional[str] = None
     CLOUDFLARE_R2_BUCKET_NAME: Optional[str] = None
     CLOUDFLARE_R2_ENDPOINT: Optional[str] = None
-    CLOUDFLARE_R2_PUBLIC_URL: Optional[str] = None  # Public bucket URL (custom domain or pub-*.r2.dev)
+    CLOUDFLARE_R2_PUBLIC_URL: Optional[str] = None  # Public bucket URL (pub-*.r2.dev)
+    CLOUDFLARE_R2_CATALOG_URL: Optional[str] = None  # R2 Data Catalog endpoint
+    CLOUDFLARE_R2_WAREHOUSE_NAME: Optional[str] = None  # R2 Data Catalog warehouse name
 
     # --- Email ---
     RESEND_API_KEY: Optional[str] = None
