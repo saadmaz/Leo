@@ -1708,3 +1708,232 @@ def delete_generated_image(project_id: str, image_id: str) -> None:
         .delete()
     )
 
+
+
+# ---------------------------------------------------------------------------
+# Web Search Cache — TTL-based cache for Exa/Tavily results
+# ---------------------------------------------------------------------------
+
+def get_cached_search(project_id: str, query_hash: str) -> Optional[list]:
+    """
+    Return cached search results if they exist and haven't expired.
+    Returns None if cache miss or expired.
+    """
+    from datetime import datetime, timezone
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("web_search_cache").document(query_hash)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    data = doc.to_dict()
+    expires_at = data.get("expires_at", "")
+    if expires_at and expires_at < datetime.now(timezone.utc).isoformat():
+        return None  # expired
+    return data.get("results")
+
+
+def save_search_cache(
+    project_id: str,
+    query_hash: str,
+    results: list,
+    source: str,
+    ttl_hours: int = 6,
+) -> None:
+    """Persist search results to cache with TTL."""
+    from datetime import datetime, timedelta, timezone
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    db.collection("projects").document(project_id).collection("web_search_cache").document(query_hash).set({
+        "results": results,
+        "source": source,
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=ttl_hours)).isoformat(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Search Usage — daily quota tracking per project
+# ---------------------------------------------------------------------------
+
+def get_search_usage(project_id: str, source: str) -> dict:
+    """
+    Return today's search usage counters for a project.
+    source: "exa" | "tavily"
+    Returns dict with keys: exa_searches, exa_research_ops, tavily_searches (all defaulting to 0)
+    """
+    from datetime import date
+    db = get_db()
+    today = date.today().isoformat()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("search_usage").document(today)
+        .get()
+    )
+    if not doc.exists:
+        return {}
+    return doc.to_dict() or {}
+
+
+def increment_search_usage(
+    project_id: str,
+    source: str,
+    operation: str,
+    count: int = 1,
+) -> None:
+    """
+    Atomically increment today's usage counter.
+    source: "exa" | "tavily"
+    operation: "search" | "contents" | "answer" | "research"
+    """
+    from datetime import date
+    db = get_db()
+    today = date.today().isoformat()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("search_usage").document(today)
+    )
+    field = f"{source}_research_ops" if operation == "research" else f"{source}_searches"
+    ref.set(
+        {field: firestore.Increment(count), "date": today},
+        merge=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Monitor Alerts — brand & competitor news monitoring
+# ---------------------------------------------------------------------------
+
+def save_monitor_alert(project_id: str, data: dict) -> dict:
+    """
+    Save a brand monitoring alert. Returns the saved doc with id.
+    data keys: alert_type, keyword, title, url, snippet, published_date, sentiment
+    """
+    db = get_db()
+    doc_ref = (
+        db.collection("projects").document(project_id)
+        .collection("monitor_alerts").document()
+    )
+    payload = {
+        **data,
+        "read": False,
+        "created_at": _utcnow(),
+    }
+    doc_ref.set(payload)
+    return {"id": doc_ref.id, **payload}
+
+
+def list_monitor_alerts(
+    project_id: str,
+    unread_only: bool = False,
+    limit: int = 50,
+    days: int = 30,
+) -> list[dict]:
+    """List monitor alerts for a project, ordered by newest first."""
+    from datetime import datetime, timedelta, timezone
+    db = get_db()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    query = (
+        db.collection("projects").document(project_id)
+        .collection("monitor_alerts")
+        .where("created_at", ">=", cutoff)
+        .order_by("created_at", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+    )
+    if unread_only:
+        query = query.where("read", "==", False)
+    docs = query.stream()
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def mark_alert_read(project_id: str, alert_id: str) -> None:
+    """Mark a single monitor alert as read."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("monitor_alerts").document(alert_id)
+        .update({"read": True})
+    )
+
+
+def alert_url_exists(project_id: str, url: str) -> bool:
+    """Check if an alert with the given URL already exists (dedup check)."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("monitor_alerts")
+        .where("url", "==", url)
+        .limit(1)
+        .stream()
+    )
+    return any(True for _ in docs)
+
+
+# ---------------------------------------------------------------------------
+# Research Reports — async deep research tasks
+# ---------------------------------------------------------------------------
+
+def save_research_report(project_id: str, data: dict) -> dict:
+    """
+    Create a new research report document (status: pending).
+    Returns the doc dict with id.
+    """
+    db = get_db()
+    doc_ref = (
+        db.collection("projects").document(project_id)
+        .collection("research_reports").document()
+    )
+    payload = {
+        "status": "pending",
+        "created_at": _utcnow(),
+        "completed_at": None,
+        **data,
+    }
+    doc_ref.set(payload)
+    return {"id": doc_ref.id, **payload}
+
+
+def update_research_report(project_id: str, report_id: str, data: dict) -> None:
+    """Update fields on an existing research report (e.g. status → complete)."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("research_reports").document(report_id)
+        .update(data)
+    )
+
+
+def get_research_report(project_id: str, report_id: str) -> Optional[dict]:
+    """Return a single research report dict, or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("research_reports").document(report_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def list_research_reports(project_id: str, limit: int = 20) -> list[dict]:
+    """List research reports for a project, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("research_reports")
+        .order_by("created_at", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def delete_research_report(project_id: str, report_id: str) -> None:
+    """Delete a research report."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("research_reports").document(report_id)
+        .delete()
+    )

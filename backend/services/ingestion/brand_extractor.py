@@ -221,6 +221,16 @@ def _build_combined_content(scraped_data: list[dict]) -> str:
                 header += f"\nVideo titles & descriptions:\n{raw[:3000]}\n"
             sections.append(header)
 
+        elif src_type == "web_enrichment":
+            # Content from Exa findSimilar + get_contents — competitor/similar brand data
+            header = f"=== WEB ENRICHMENT (Similar Brand): {source.get('url', '')} ===\n"
+            if source.get("title"):
+                header += f"Title: {source['title']}\n"
+            content = source.get("content", "")
+            if content:
+                header += f"Content:\n{content[:2000]}\n"
+            sections.append(header)
+
         else:
             logger.debug("Brand extractor: unknown source type %r — skipping", src_type)
 

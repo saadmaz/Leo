@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     FIRECRAWL_API_KEY: Optional[str] = None
     APIFY_API_KEY: Optional[str] = None
 
+    # --- Web Search & Research ---
+    EXA_API_KEY: Optional[str] = None
+    TAVILY_API_KEY: Optional[str] = None
+
+    # --- Search Cost Controls ---
+    EXA_DAILY_SEARCH_LIMIT: int = 100
+    TAVILY_DAILY_SEARCH_LIMIT: int = 200
+    EXA_RESEARCH_DAILY_LIMIT: int = 5
+    SEARCH_CACHE_TTL_HOURS: int = 6
+
     # --- Social & Data APIs ---
     YOUTUBE_API_KEY: Optional[str] = None
     META_APP_ID: Optional[str] = None

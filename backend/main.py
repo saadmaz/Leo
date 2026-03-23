@@ -15,7 +15,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio, templates, planner, analytics, reports
+from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio, templates, planner, analytics, reports, monitoring, seo
 from backend.middleware.rate_limit import limiter
 from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
@@ -61,6 +61,16 @@ async def lifespan(app: FastAPI):
         logger.warning("OPENAI_API_KEY is not set — image generation will return 503.")
     else:
         logger.info("OpenAI API key loaded — image generation enabled.")
+
+    if not settings.EXA_API_KEY:
+        logger.warning("EXA_API_KEY is not set — semantic search and research features disabled.")
+    else:
+        logger.info("Exa API key loaded — semantic search, competitor discovery, research enabled.")
+
+    if not settings.TAVILY_API_KEY:
+        logger.warning("TAVILY_API_KEY is not set — real-time web search and news monitoring disabled.")
+    else:
+        logger.info("Tavily API key loaded — web search, news monitoring, content enrichment enabled.")
 
     yield  # server is running
 
@@ -128,6 +138,8 @@ app.include_router(templates.router)
 app.include_router(planner.router)
 app.include_router(analytics.router)
 app.include_router(reports.router)
+app.include_router(monitoring.router)
+app.include_router(seo.router)
 
 # ---------------------------------------------------------------------------
 # Health endpoints
@@ -164,6 +176,8 @@ def debug_config():
         "YOUTUBE_API_KEY": _status(settings.YOUTUBE_API_KEY),
         "RESEND_API_KEY": _status(settings.RESEND_API_KEY),
         "STRIPE_SECRET_KEY": _status(settings.STRIPE_SECRET_KEY),
+        "EXA_API_KEY": _status(settings.EXA_API_KEY),
+        "TAVILY_API_KEY": _status(settings.TAVILY_API_KEY),
         "LLM_CHAT_MODEL": settings.LLM_CHAT_MODEL,
         "LLM_EXTRACTION_MODEL": settings.LLM_EXTRACTION_MODEL,
         "ENVIRONMENT": settings.ENVIRONMENT,

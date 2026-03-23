@@ -106,7 +106,12 @@ async def send_message(
         )
 
         try:
-            async for chunk in llm_service.stream_chat(
+            # Use tool-enabled streaming when search keys are configured.
+            # Falls back gracefully if neither key is set (tools simply won't fire).
+            from backend.config import settings as _settings
+            _use_tools = bool(_settings.EXA_API_KEY or _settings.TAVILY_API_KEY)
+            _stream_fn = llm_service.stream_chat_with_tools if _use_tools else llm_service.stream_chat
+            _kwargs = dict(
                 project_name=project.get("name", ""),
                 brand_core=project.get("brandCore"),
                 history=history,
@@ -115,7 +120,10 @@ async def send_message(
                 images=images,
                 model=project.get("contentModel") or None,
                 memory_context=memory_context or None,
-            ):
+            )
+            if _use_tools:
+                _kwargs["project_id"] = project_id
+            async for chunk in _stream_fn(**_kwargs):
                 yield chunk
 
                 # Accumulate delta text to reconstruct the full response.

@@ -266,6 +266,48 @@ async def run(
         yield _progress(current_progress)
 
     # -----------------------------------------------------------------------
+    # Step 8 — Web enrichment via Exa (competitor discovery + similar brands)
+    # Runs only when website_url is available and EXA_API_KEY is configured.
+    # Non-blocking: failures are logged and skipped, never fatal.
+    # -----------------------------------------------------------------------
+    if website_url and settings.EXA_API_KEY:
+        yield _step("Discovering similar brands & competitors…", "running")
+        try:
+            from backend.services.integrations import exa_client
+            from urllib.parse import urlparse
+            brand_domain = urlparse(website_url).netloc
+
+            similar = await exa_client.find_similar(
+                url=website_url,
+                num_results=8,
+                exclude_domains=[brand_domain],
+            )
+
+            if similar:
+                enriched_urls = [r["url"] for r in similar[:3] if r.get("url")]
+                if enriched_urls:
+                    try:
+                        contents = await exa_client.get_contents(enriched_urls, max_chars=2000)
+                        for item in contents:
+                            if item.get("text"):
+                                scraped_data.append({
+                                    "source_type": "web_enrichment",
+                                    "url": item.get("url", ""),
+                                    "title": item.get("title", ""),
+                                    "content": item.get("text", ""),
+                                })
+                    except Exception as exc:
+                        logger.debug("Exa get_contents failed (non-fatal): %s", exc)
+
+                yield _step(f"Web enrichment complete ({len(similar)} similar brands found)", "done")
+            else:
+                yield _step("Web enrichment complete", "done")
+
+        except Exception as exc:
+            logger.warning("Web enrichment step failed (non-fatal): %s", exc)
+            yield _step("Web enrichment skipped", "skipped", str(exc)[:80])
+
+    # -----------------------------------------------------------------------
     # Guard — bail if no data was collected
     # -----------------------------------------------------------------------
     if not scraped_data:

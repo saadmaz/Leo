@@ -305,6 +305,51 @@ type="image_prompt"
   "context": "Brief explanation of how this image fits the brand or campaign"
 }
 
+type="research_report"
+{
+  "title": "Short descriptive title for the report",
+  "report_id": "Firestore report ID (if available, else omit)",
+  "executive_summary": "2-3 sentence summary of key findings",
+  "report_type": "market" | "competitor" | "audience" | "trend",
+  "sections": [
+    { "heading": "...", "content": "..." }
+  ],
+  "key_insights": ["...", "..."],
+  "sources": [{ "title": "...", "url": "..." }]
+}
+
+type="competitor_landscape"
+{
+  "competitors": [
+    {
+      "name": "...",
+      "url": "...",
+      "positioning": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "content_gaps": ["..."]
+    }
+  ],
+  "market_summary": "...",
+  "opportunities": ["..."]
+}
+
+type="influencer_list"
+{
+  "topic": "...",
+  "platform": "...",
+  "influencers": [
+    {
+      "name": "...",
+      "url": "...",
+      "bio": "...",
+      "estimated_reach": "...",
+      "relevance_score": 0.0,
+      "brand_alignment": "..."
+    }
+  ]
+}
+
 Rules:
 - Always use an artifact for captions (3+ items), ad copy, campaign briefs, colour palettes, content calendars, video scripts, email content, and image prompts.
 - Place the artifact after a short conversational intro — never instead of it.
@@ -413,4 +458,217 @@ async def stream_chat(
 
     except anthropic.APIError as exc:
         logger.error("Anthropic API error during chat stream: %s", exc)
+        yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+
+
+# ---------------------------------------------------------------------------
+# Trend context builder (for content generation enrichment)
+# ---------------------------------------------------------------------------
+
+# Keywords that indicate content-generation intent
+_CONTENT_INTENT_KEYWORDS = frozenset([
+    "write", "create", "generate", "draft", "caption", "post", "copy",
+    "email", "ad", "script", "blog", "article", "campaign",
+])
+
+
+async def build_trend_context(
+    topic: str,
+    platform: str,
+    brand_core: Optional[dict] = None,
+) -> str:
+    """
+    Fetch current trending content signals for a topic + platform combo.
+    Called before stream_chat_with_tools when content-generation intent is detected.
+    Returns a brief trend-context string injected into the system prompt.
+    Uses ~2 Tavily credits. Fast (<1s typical).
+    """
+    try:
+        from backend.services.integrations import tavily_client
+        query = f"trending {topic} content {platform} 2025 strategy"
+        resp = await tavily_client.search_basic(
+            query=query,
+            max_results=3,
+            include_answer=True,
+        )
+        snippets = []
+        if resp.get("answer"):
+            snippets.append(resp["answer"])
+        for r in resp.get("results", [])[:3]:
+            content = r.get("content", "")[:200]
+            if content:
+                snippets.append(f"- {content}")
+        if snippets:
+            return "CURRENT TRENDS (live data):\n" + "\n".join(snippets)
+    except Exception as exc:
+        logger.debug("build_trend_context failed (non-fatal): %s", exc)
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Agentic streaming chat with tool use
+# ---------------------------------------------------------------------------
+
+# Maximum tool-use iterations per response to prevent infinite loops
+_MAX_TOOL_ITERATIONS = 3
+
+
+async def stream_chat_with_tools(
+    project_name: str,
+    brand_core: Optional[dict],
+    history: list[dict],
+    user_message: str,
+    channel: Optional[str] = None,
+    images: Optional[list] = None,
+    model: Optional[str] = None,
+    memory_context: Optional[str] = None,
+    project_id: Optional[str] = None,
+) -> AsyncGenerator[str, None]:
+    """
+    Agentic streaming chat that can invoke web search tools mid-conversation.
+
+    Implements the tool-use loop:
+      1. Send message to Claude with SEARCH_TOOLS defined.
+      2. If Claude returns tool_use blocks → execute via tool_dispatcher.
+      3. Stream SSE tool_call / tool_result events to frontend.
+      4. Feed tool results back as tool_result blocks.
+      5. Stream final text response.
+      6. Repeat up to _MAX_TOOL_ITERATIONS.
+
+    Falls back to plain stream_chat if tool use is unavailable (no API keys).
+
+    New SSE event types emitted (frontend should handle gracefully):
+      {"type": "tool_call",   "tool": "web_search", "query": "..."}
+      {"type": "tool_result", "tool": "web_search",  "result_count": 5}
+    """
+    from backend.services.tool_dispatcher import SEARCH_TOOLS, dispatch_tool
+
+    client = get_client()
+
+    # Check if content-generation intent detected → inject trend context
+    trend_context = ""
+    msg_lower = user_message.lower()
+    if any(kw in msg_lower for kw in _CONTENT_INTENT_KEYWORDS):
+        # Extract a rough topic from the message (first 5 words after intent keyword)
+        topic_hint = " ".join(user_message.split()[:8])
+        channel_label = CHANNEL_PRESETS.get(channel or "", {}).get("label", "social media")
+        try:
+            trend_context = await build_trend_context(topic_hint, channel_label, brand_core)
+        except Exception:
+            pass
+
+    channel_section = ""
+    if channel and channel in CHANNEL_PRESETS:
+        preset = CHANNEL_PRESETS[channel]
+        channel_section = f"\n\nCHANNEL CONSTRAINTS:\n{preset['constraints']}"
+
+    memory_section = f"\n\n{memory_context}" if memory_context else ""
+    trend_section = f"\n\n{trend_context}" if trend_context else ""
+
+    system_prompt = (
+        f"You are LEO, a brand-aware marketing co-pilot for the brand '{project_name}'. "
+        "You help marketers create on-brand campaigns, content, copy, and strategy "
+        "through natural conversation. Always stay on-brand. Be concise, strategic, "
+        "and actionable.\n\n"
+        "You have access to web search tools. Use them proactively when the user asks "
+        "about competitors, market trends, recent news, or anything requiring current data. "
+        "Always cite your sources.\n\n"
+        "BRAND CORE:\n"
+        + build_brand_core_context(brand_core)
+        + memory_section
+        + trend_section
+        + channel_section
+        + ARTIFACT_INSTRUCTIONS
+    )
+
+    context_window = history[-settings.LLM_CONTEXT_MESSAGES:]
+    messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in context_window
+    ]
+
+    if images:
+        user_content: list[dict] = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": img["mediaType"],
+                    "data": img["base64"],
+                },
+            }
+            for img in images
+        ]
+        user_content.append({"type": "text", "text": user_message})
+    else:
+        user_content = user_message  # type: ignore[assignment]
+
+    messages.append({"role": "user", "content": user_content})
+
+    chosen_model = model or settings.LLM_CHAT_MODEL
+
+    try:
+        for _iteration in range(_MAX_TOOL_ITERATIONS):
+            # Non-streaming call when tool use is in play (tools require non-stream for reliability)
+            response = await client.messages.create(
+                model=chosen_model,
+                max_tokens=settings.LLM_MAX_TOKENS,
+                system=system_prompt,
+                messages=messages,
+                tools=SEARCH_TOOLS,
+                tool_choice={"type": "auto"},
+            )
+
+            # Collect any text blocks to stream immediately
+            text_blocks = [b for b in response.content if b.type == "text"]
+            tool_blocks = [b for b in response.content if b.type == "tool_use"]
+
+            # Stream text content if present
+            for block in text_blocks:
+                if block.text:
+                    # Chunk it to feel like streaming
+                    chunk_size = 40
+                    for i in range(0, len(block.text), chunk_size):
+                        chunk = block.text[i:i + chunk_size]
+                        yield f"data: {json.dumps({'type': 'delta', 'content': chunk})}\n\n"
+
+            # If no tool calls, we're done
+            if not tool_blocks or response.stop_reason == "end_turn":
+                break
+
+            # Execute tool calls
+            tool_results = []
+            for tool_block in tool_blocks:
+                tool_name = tool_block.name
+                tool_input = tool_block.input or {}
+
+                # Signal to frontend that a tool call is happening
+                query_hint = (
+                    tool_input.get("query")
+                    or tool_input.get("brand_name")
+                    or tool_input.get("url", "")
+                )
+                yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool_name, 'query': query_hint})}\n\n"
+
+                # Execute the tool
+                result_text = await dispatch_tool(tool_name, tool_input, project_id)
+
+                # Signal result back to frontend
+                result_preview = result_text[:100].replace("\n", " ")
+                yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool_name, 'preview': result_preview})}\n\n"
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_block.id,
+                    "content": result_text,
+                })
+
+            # Add assistant turn + tool results to message history for next iteration
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
+
+        yield "data: [DONE]\n\n"
+
+    except anthropic.APIError as exc:
+        logger.error("Anthropic API error during tool-use chat stream: %s", exc)
         yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"

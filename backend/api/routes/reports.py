@@ -149,3 +149,109 @@ async def score_content_batch(
             results[item_id] = {"score": None, "error": str(exc)}
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Deep Research Reports (Exa + Tavily)
+# ---------------------------------------------------------------------------
+
+import json as _json
+import asyncio as _asyncio
+from fastapi import Query as _Query
+from fastapi.responses import StreamingResponse as _StreamingResponse
+from pydantic import Field as _Field
+from fastapi import Request as _Request
+from backend.middleware.rate_limit import limiter as _limiter
+
+
+class StartResearchRequest(BaseModel):
+    title: str = _Field(..., min_length=1, max_length=200)
+    query: str = _Field(..., min_length=10, max_length=1000)
+    report_type: str = _Field(default="market")
+    model: str = _Field(default="exa-research")
+
+
+@router.post("/reports/research/start")
+@_limiter.limit("3/minute")
+async def start_research(
+    request: _Request,
+    project_id: str,
+    body: StartResearchRequest,
+    user: CurrentUser,
+):
+    """
+    Start an async deep research task. Returns report_id immediately.
+    Poll /reports/research/{id}/status for completion.
+    """
+    project = get_project_as_member(project_id, user["uid"])
+
+    from backend.services import research_service
+    report_id = await research_service.start_research_report(
+        project_id=project_id,
+        user_id=user["uid"],
+        title=body.title,
+        query=body.query,
+        report_type=body.report_type,
+        model=body.model,
+        brand_core=project.get("brandCore"),
+    )
+
+    return {"report_id": report_id, "status": "started"}
+
+
+@router.get("/reports/research/{report_id}/status")
+async def get_research_status(
+    project_id: str,
+    report_id: str,
+    user: CurrentUser,
+):
+    """
+    Poll or stream the status of a research task.
+    Returns current report state; call repeatedly until status='complete'.
+    """
+    get_project_as_member(project_id, user["uid"])
+
+    from backend.services import research_service
+    report = await research_service.poll_research_report(project_id, report_id)
+    return report
+
+
+@router.get("/reports/research")
+async def list_research_reports(
+    project_id: str,
+    user: CurrentUser,
+    limit: int = _Query(20, ge=1, le=50),
+):
+    """List all research reports for a project."""
+    get_project_as_member(project_id, user["uid"])
+
+    reports = firebase_service.list_research_reports(project_id, limit=limit)
+    return {"reports": reports, "total": len(reports)}
+
+
+@router.get("/reports/research/{report_id}")
+async def get_research_report(
+    project_id: str,
+    report_id: str,
+    user: CurrentUser,
+):
+    """Get a single research report by ID."""
+    get_project_as_member(project_id, user["uid"])
+
+    report = firebase_service.get_research_report(project_id, report_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found.")
+    return report
+
+
+@router.delete("/reports/research/{report_id}")
+async def delete_research_report(
+    project_id: str,
+    report_id: str,
+    user: CurrentUser,
+):
+    """Delete a research report."""
+    get_project_as_member(project_id, user["uid"])
+
+    firebase_service.delete_research_report(project_id, report_id)
+    return {"success": True}

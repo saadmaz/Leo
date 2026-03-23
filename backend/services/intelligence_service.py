@@ -531,3 +531,390 @@ Be honest and data-driven. Don't be generic. If data is sparse, focus on what th
         return _parse_json_response(response.content[0].text)
     except Exception:
         return {"insights": []}
+"""
+Web-enriched intelligence functions — appended to intelligence_service.py
+"""
+
+# ---------------------------------------------------------------------------
+# Web-enriched Competitor Intelligence (Exa + Tavily)
+# ---------------------------------------------------------------------------
+
+async def refresh_competitor_intelligence_web(
+    project_id: str,
+    competitors: list[dict],
+) -> dict:
+    """
+    Augments competitor snapshots with live web data via Exa + Tavily.
+    Merges with existing Apify social snapshots in Firestore.
+    """
+    from backend.services import firebase_service
+    from backend.services.integrations import exa_client, tavily_client
+
+    results = []
+
+    for competitor in competitors[:5]:
+        name = competitor.get("name", "Unknown")
+        domain = competitor.get("website") or competitor.get("url") or ""
+
+        web_data: dict = {"name": name, "web": {}}
+
+        try:
+            company_results = await exa_client.search_companies(
+                f"{name} brand website official",
+                num_results=3,
+                project_id=project_id,
+            )
+            if company_results:
+                top = company_results[0]
+                web_data["web"]["company_url"] = top.get("url", "")
+                web_data["web"]["company_summary"] = (
+                    top.get("summary") or
+                    (top.get("highlights", [""])[0] if top.get("highlights") else "")
+                )
+                if not domain and top.get("url"):
+                    domain = top["url"]
+        except Exception as exc:
+            logger.warning("Exa company search failed for %s: %s", name, exc)
+
+        try:
+            news_resp = await tavily_client.search_news(
+                query=f"{name} brand news announcement",
+                days=30,
+                max_results=5,
+                project_id=project_id,
+            )
+            news_items = news_resp.get("results", [])
+            web_data["web"]["recent_news"] = [
+                {
+                    "title": r.get("title", ""),
+                    "url": r.get("url", ""),
+                    "snippet": r.get("content", "")[:300],
+                    "date": r.get("published_date", ""),
+                }
+                for r in news_items[:5]
+            ]
+            web_data["web"]["news_summary"] = news_resp.get("answer", "")
+        except Exception as exc:
+            logger.warning("Tavily news search failed for %s: %s", name, exc)
+
+        if domain:
+            try:
+                url_for_similar = domain if domain.startswith("http") else f"https://{domain}"
+                similar = await exa_client.find_similar(
+                    url=url_for_similar,
+                    num_results=5,
+                    project_id=project_id,
+                )
+                web_data["web"]["similar_companies"] = [
+                    {"title": r.get("title", ""), "url": r.get("url", "")}
+                    for r in similar[:5]
+                ]
+            except Exception as exc:
+                logger.warning("Exa findSimilar failed for %s: %s", name, exc)
+
+        if web_data["web"]:
+            analysis = await _analyse_competitor_web(name, web_data["web"])
+            web_data["web_analysis"] = analysis
+            try:
+                existing = firebase_service.get_competitor_snapshot(project_id, name)
+                if existing:
+                    merged = {**existing, "web": web_data["web"], "web_analysis": analysis}
+                    firebase_service.save_competitor_snapshot(project_id, merged)
+                else:
+                    firebase_service.save_competitor_snapshot(project_id, web_data)
+            except Exception:
+                pass
+
+        results.append({"name": name, "web_enriched": bool(web_data["web"])})
+
+    return {"web_refreshed": results}
+
+
+async def _analyse_competitor_web(name: str, web_data: dict) -> dict:
+    client = get_client()
+
+    news_section = ""
+    if web_data.get("recent_news"):
+        headlines = "\n".join(
+            f"- {n['title']} ({n['date'][:10]})" for n in web_data["recent_news"][:5]
+        )
+        news_section = f"\nRECENT NEWS:\n{headlines}"
+
+    summary = web_data.get("company_summary") or web_data.get("news_summary") or ""
+
+    prompt = f"""Analyse this competitor based on web intelligence.
+
+COMPETITOR: {name}
+WEB SUMMARY: {summary[:500]}
+{news_section}
+
+Return ONLY valid JSON:
+{{
+  "recent_news_summary": "<1-2 sentence summary>",
+  "market_position": "<current positioning>",
+  "momentum": "growing",
+  "recent_moves": [],
+  "opportunity": "<key opportunity for our brand>"
+}}"""
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=600,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    try:
+        return _parse_json_response(response.content[0].text)
+    except Exception:
+        return {"recent_news_summary": "", "market_position": "", "momentum": "stable", "recent_moves": [], "opportunity": ""}
+
+
+# ---------------------------------------------------------------------------
+# Live-enriched Hashtag Research
+# ---------------------------------------------------------------------------
+
+async def research_hashtags_enriched(
+    topic: str,
+    platform: str,
+    content: str,
+    brand_core: dict,
+    project_id: Optional[str] = None,
+) -> dict:
+    """research_hashtags() with live Tavily + Exa trend data injected."""
+    import asyncio as _asyncio
+    from backend.services.integrations import tavily_client as _tavily, exa_client as _exa
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+
+    live_context = ""
+    try:
+        async def _tv():
+            r = await _tavily.search_basic(
+                query=f"trending {topic} hashtags {platform} 2025",
+                max_results=3, include_answer=True, project_id=project_id,
+            )
+            return r.get("answer", "")
+
+        async def _ex():
+            rs = await _exa.search(
+                query=f"best hashtags {topic} {platform} strategy",
+                num_results=3, include_highlights=True, project_id=project_id,
+            )
+            return " ".join(r.get("highlights", [""])[0] for r in rs[:3] if r.get("highlights"))
+
+        tv_ans, ex_ans = await _asyncio.gather(_tv(), _ex(), return_exceptions=True)
+        parts = [x for x in [tv_ans, ex_ans] if isinstance(x, str) and x]
+        if parts:
+            live_context = "\nLIVE TREND DATA:\n" + "\n".join(parts[:2])
+    except Exception:
+        pass
+
+    content_section = f"\nCONTENT:\n{content[:500]}" if content else ""
+
+    prompt = f"""You are a social media hashtag strategist.
+BRAND: {brand_context}
+PLATFORM: {platform}
+TOPIC: {topic}{content_section}{live_context}
+
+Return ONLY valid JSON:
+{{
+  "tiers": {{
+    "mega":   [{{"tag": "#tag", "approx_posts": "10M+"}}],
+    "large":  [{{"tag": "#tag", "approx_posts": "800k"}}],
+    "medium": [{{"tag": "#tag", "approx_posts": "120k"}}],
+    "niche":  [{{"tag": "#tag", "approx_posts": "8k"}}]
+  }},
+  "strategy": "<one sentence>",
+  "recommended_mix": "<e.g. 3 mega + 6 large + 8 medium + 5 niche>",
+  "trending_now": ["<currently trending tag>"]
+}}"""
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=1500,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    try:
+        return _parse_json_response(response.content[0].text)
+    except Exception:
+        return {"tiers": {"mega": [], "large": [], "medium": [], "niche": []}, "strategy": "", "recommended_mix": "", "trending_now": []}
+
+
+# ---------------------------------------------------------------------------
+# Influencer Discovery
+# ---------------------------------------------------------------------------
+
+async def discover_influencers(
+    topic: str,
+    platform: str,
+    audience_size: str,
+    brand_core: dict,
+    location: Optional[str] = None,
+    project_id: Optional[str] = None,
+) -> dict:
+    """Discover relevant influencers using Exa's 1B+ people index."""
+    from backend.services.integrations import exa_client
+
+    size_hint = {
+        "micro": "micro-influencer 10k to 100k followers",
+        "macro": "macro-influencer 100k to 1M followers",
+        "mega": "mega influencer celebrity 1M+ followers",
+    }.get(audience_size, "influencer")
+
+    query = f"{topic} {platform} {size_hint} content creator"
+    if location:
+        query += f" {location}"
+
+    try:
+        raw_results = await exa_client.search_people(query=query, num_results=20, project_id=project_id)
+    except Exception as exc:
+        logger.error("Exa people search failed: %s", exc)
+        return {"influencers": [], "total_found": 0, "error": str(exc)}
+
+    if not raw_results:
+        return {"influencers": [], "total_found": 0}
+
+    top_urls = [r["url"] for r in raw_results[:10] if r.get("url")]
+    bio_contents: dict[str, str] = {}
+    if top_urls:
+        try:
+            contents = await exa_client.get_contents(top_urls, max_chars=400, project_id=project_id)
+            for c in contents:
+                if c.get("url") and c.get("text"):
+                    bio_contents[c["url"]] = c["text"][:400]
+        except Exception:
+            pass
+
+    enriched = []
+    for r in raw_results[:10]:
+        bio = bio_contents.get(r.get("url", ""), "")
+        if not bio:
+            bio = r.get("summary") or (r.get("highlights", [""])[0] if r.get("highlights") else "")
+        enriched.append({
+            "name": r.get("title", "")[:80],
+            "url": r.get("url", ""),
+            "bio": bio[:300],
+            "score": r.get("score", 0.5),
+        })
+
+    scored = await _score_influencer_alignment(enriched, topic, brand_core)
+    return {"influencers": scored, "total_found": len(raw_results), "query_used": query}
+
+
+async def _score_influencer_alignment(candidates: list[dict], topic: str, brand_core: dict) -> list[dict]:
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+    candidate_list = "\n".join(
+        f"{i+1}. {c['name']} ({c['url']})\nBio: {c['bio']}"
+        for i, c in enumerate(candidates)
+    )
+
+    prompt = f"""Score these influencer candidates for brand alignment.
+BRAND CORE: {brand_context}
+TOPIC: {topic}
+CANDIDATES:
+{candidate_list}
+
+Return ONLY valid JSON:
+{{"scored": [{{"index": 1, "relevance_score": 0.85, "brand_alignment": "<1 sentence>"}}]}}"""
+
+    score_map: dict = {}
+    try:
+        response = await client.messages.create(
+            model=settings.LLM_CHAT_MODEL,
+            max_tokens=800,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        data = _parse_json_response(response.content[0].text)
+        score_map = {s["index"]: s for s in data.get("scored", [])}
+    except Exception:
+        pass
+
+    result = []
+    for i, c in enumerate(candidates, 1):
+        s = score_map.get(i, {})
+        result.append({
+            "name": c["name"], "url": c["url"], "bio": c["bio"],
+            "relevance_score": s.get("relevance_score", round(c.get("score", 0.5), 2)),
+            "brand_alignment": s.get("brand_alignment", ""),
+        })
+    result.sort(key=lambda x: x["relevance_score"], reverse=True)
+    return result[:8]
+
+
+# ---------------------------------------------------------------------------
+# Competitor Auto-Discovery
+# ---------------------------------------------------------------------------
+
+async def discover_competitors(
+    project_id: str,
+    brand_core: dict,
+    website_url: Optional[str] = None,
+) -> dict:
+    """Auto-discover competitors using Exa findSimilar or company search."""
+    from backend.services.integrations import exa_client
+
+    existing_competitors = set(brand_core.get("competitors") or [])
+    candidates: list[dict] = []
+
+    if website_url:
+        try:
+            from urllib.parse import urlparse
+            brand_domain = urlparse(website_url).netloc
+            similar = await exa_client.find_similar(
+                url=website_url, num_results=10,
+                exclude_domains=[brand_domain], project_id=project_id,
+            )
+            for r in similar:
+                name = r.get("title", "").split("|")[0].strip()[:60]
+                if name and name not in existing_competitors:
+                    candidates.append({
+                        "name": name, "url": r.get("url", ""),
+                        "snippet": r.get("summary") or (r.get("highlights", [""])[0] if r.get("highlights") else ""),
+                    })
+        except Exception as exc:
+            logger.warning("findSimilar competitor discovery failed: %s", exc)
+
+    themes = brand_core.get("themes") or []
+    if themes and len(candidates) < 5:
+        try:
+            query = f"{themes[0]} {themes[1] if len(themes) > 1 else ''} brand company"
+            company_results = await exa_client.search_companies(query, num_results=8, project_id=project_id)
+            for r in company_results:
+                name = r.get("title", "").split("|")[0].strip()[:60]
+                if name and name not in existing_competitors:
+                    candidates.append({"name": name, "url": r.get("url", ""), "snippet": r.get("summary") or ""})
+        except Exception as exc:
+            logger.warning("Company search competitor discovery failed: %s", exc)
+
+    if not candidates:
+        return {"discovered": [], "message": "No competitors found"}
+
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+    candidate_text = "\n".join(
+        f"{i+1}. {c['name']} — {c['url']}\n   {c['snippet'][:200]}"
+        for i, c in enumerate(candidates[:10])
+    )
+
+    prompt = f"""Given this brand, identify the top 5 genuine competitors.
+BRAND CORE: {brand_context}
+CANDIDATES:
+{candidate_text}
+
+Return ONLY valid JSON:
+{{"competitors": [{{"name": "...", "url": "...", "reason": "<1 sentence>"}}]}}"""
+
+    try:
+        response = await client.messages.create(
+            model=settings.LLM_CHAT_MODEL,
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = _parse_json_response(response.content[0].text)
+        return {"discovered": result.get("competitors", [])}
+    except Exception:
+        return {"discovered": [
+            {"name": c["name"], "url": c["url"], "reason": "Similar brand in same space"}
+            for c in candidates[:5]
+        ]}

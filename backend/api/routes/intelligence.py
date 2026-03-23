@@ -139,6 +139,13 @@ async def refresh_intelligence(
         result = await intelligence_service.refresh_competitor_intelligence(
             project_id, competitors
         )
+        # Run web enrichment in parallel (non-blocking) when search keys are available
+        from backend.config import settings as _settings
+        if _settings.EXA_API_KEY or _settings.TAVILY_API_KEY:
+            import asyncio as _asyncio
+            _asyncio.create_task(
+                intelligence_service.refresh_competitor_intelligence_web(project_id, competitors)
+            )
         return result
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -249,9 +256,16 @@ async def suggest_hashtags(
     brand_core = project.get("brandCore") or {}
 
     try:
-        result = await intelligence_service.research_hashtags(
-            body.topic, body.platform, body.content or "", brand_core
-        )
+        from backend.config import settings as _settings
+        if _settings.EXA_API_KEY or _settings.TAVILY_API_KEY:
+            result = await intelligence_service.research_hashtags_enriched(
+                body.topic, body.platform, body.content or "", brand_core,
+                project_id=project_id,
+            )
+        else:
+            result = await intelligence_service.research_hashtags(
+                body.topic, body.platform, body.content or "", brand_core
+            )
         return result
     except Exception as exc:
         logger.error("Hashtag research failed: %s", exc)
