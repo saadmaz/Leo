@@ -67,6 +67,10 @@ const API = '/api/backend'
 // ---------------------------------------------------------------------------
 
 async function authHeaders(): Promise<HeadersInit> {
+  // Wait for Firebase to restore the persisted auth session before reading
+  // currentUser — without this, requests made on initial page load race against
+  // auth initialisation and arrive with no token, causing 401s.
+  await auth.authStateReady()
   const user = auth.currentUser
   const token = user ? await user.getIdToken() : null
   return {
