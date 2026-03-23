@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     META_APP_ID: Optional[str] = None
     META_APP_SECRET: Optional[str] = None
     META_ACCESS_TOKEN: Optional[str] = None
+    THREADS_APP_ID: Optional[str] = None
+    THREADS_APP_SECRET: Optional[str] = None
     LINKEDIN_CLIENT_ID: Optional[str] = None
     LINKEDIN_CLIENT_SECRET: Optional[str] = None
     TIKTOK_CLIENT_KEY: Optional[str] = None
