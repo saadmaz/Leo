@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
+import { SetupChecklist } from '@/components/onboarding/setup-checklist'
 import type { ProjectAnalytics, ProjectInsight } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -137,6 +138,9 @@ export default function DashboardPage() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+        {/* Setup checklist — shown until dismissed */}
+        {activeProject && <SetupChecklist project={activeProject} />}
 
         {/* Top stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
