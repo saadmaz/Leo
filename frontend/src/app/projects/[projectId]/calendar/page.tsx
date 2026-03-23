@@ -142,7 +142,7 @@ export default function CalendarPage() {
       </div>
 
       {/* Month nav */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-muted/20 shrink-0">
+      <div className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-border bg-muted/20 shrink-0">
         <button onClick={prevMonth} className="p-1.5 rounded-md hover:bg-muted transition-colors">
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -168,7 +168,7 @@ export default function CalendarPage() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid grid-cols-7 auto-rows-[minmax(100px,1fr)]">
+          <div className="grid grid-cols-7 auto-rows-[minmax(80px,1fr)]">
             {/* Empty cells before month start */}
             {Array.from({ length: startDay }).map((_, i) => (
               <div key={`empty-${i}`} className="border-b border-r border-border bg-muted/10" />
@@ -263,7 +263,7 @@ function EntryPanel({
   const statuses = ['planned', 'drafted', 'approved', 'scheduled', 'posted']
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 bg-card border-l border-border shadow-2xl z-40 flex flex-col">
+    <div className="fixed inset-y-0 right-0 w-full sm:w-80 bg-card border-l border-border shadow-2xl z-40 flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <div className={cn('w-2 h-2 rounded-full', PLATFORM_COLORS[entry.platform] ?? 'bg-muted-foreground')} />

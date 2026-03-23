@@ -143,7 +143,7 @@ export default function ReportsPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 max-w-3xl mx-auto w-full space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-3xl mx-auto w-full space-y-4">
         {!digest && !loading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="p-4 rounded-full bg-muted mb-4">

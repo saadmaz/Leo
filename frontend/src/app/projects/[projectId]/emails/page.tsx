@@ -33,7 +33,7 @@ export default function EmailsPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
         <BackButton />
         <Mail className="w-4 h-4 text-primary" />
@@ -53,7 +53,7 @@ export default function EmailsPage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         {tab === 'sequence'
           ? <SequenceTab projectId={params.projectId} />
           : <SingleTab   projectId={params.projectId} />}

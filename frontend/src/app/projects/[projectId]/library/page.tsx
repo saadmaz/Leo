@@ -158,7 +158,7 @@ export default function LibraryPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
         <BackButton />
         <Library className="w-4 h-4 text-primary" />
@@ -193,7 +193,7 @@ export default function LibraryPage() {
 
       {/* Filters */}
       <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-3 flex-wrap shrink-0">
-        <div className="relative flex-1 min-w-48 max-w-64">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
             value={search}

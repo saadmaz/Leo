@@ -212,7 +212,7 @@ export default function ChatPage() {
         <AnnouncementBanner />
 
         {/* Top bar */}
-        <div className="flex items-center gap-3 px-6 py-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center gap-3 px-3 sm:px-6 py-3 border-b border-border bg-card shrink-0">
           <SidebarToggle />
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">{activeProject?.name ?? 'LEO'}</span>

@@ -81,7 +81,7 @@ export default function IntelligencePage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
         <BackButton />
         <div className="flex items-center gap-2">
@@ -230,7 +230,7 @@ export default function IntelligencePage() {
           </div>
         ) : (
           /* Snapshot cards */
-          <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="px-4 sm:px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             {snapshots.map((snapshot) => (
               <CompetitorCard key={snapshot.id} snapshot={snapshot} />
             ))}

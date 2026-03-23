@@ -39,7 +39,7 @@ export default function SEOPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
         <BackButton />
         <Globe className="w-4 h-4 text-primary" />
@@ -66,7 +66,7 @@ export default function SEOPage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         {tab === 'blog'    && <BlogPostTab projectId={params.projectId} />}
         {tab === 'meta'    && <MetaTagsTab projectId={params.projectId} />}
         {tab === 'website' && <WebsiteCopyTab projectId={params.projectId} />}
