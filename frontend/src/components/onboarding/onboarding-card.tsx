@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Zap, MessageSquare, ArrowRight } from 'lucide-react'
+import { Sparkles, Zap, MessageSquare, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
