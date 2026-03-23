@@ -94,12 +94,23 @@ async def upload_logo(
         except (BotoCoreError, ClientError) as exc:
             logger.error("R2 upload failed for project %s: %s", project_id, exc)
             raise HTTPException(status_code=502, detail=f"Storage upload failed: {exc}") from exc
+        except Exception as exc:
+            logger.error("Unexpected R2 upload error for project %s: %s", project_id, exc, exc_info=True)
+            raise HTTPException(status_code=502, detail=f"Storage upload failed: {exc}") from exc
 
-        endpoint = settings.CLOUDFLARE_R2_ENDPOINT or ""
-        if endpoint and settings.CLOUDFLARE_ACCOUNT_ID:
-            logo_url = f"{endpoint.rstrip('/')}/{object_key}"
+        # Build a publicly accessible URL.
+        # If CLOUDFLARE_R2_PUBLIC_URL is set (custom domain or pub-*.r2.dev), use it.
+        # Otherwise fall back to storing as base64 since the S3 endpoint is private.
+        public_base = getattr(settings, "CLOUDFLARE_R2_PUBLIC_URL", None)
+        if public_base:
+            logo_url = f"{public_base.rstrip('/')}/{object_key}"
         else:
-            logo_url = f"https://{bucket}.{settings.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/{object_key}"
+            logger.warning(
+                "CLOUDFLARE_R2_PUBLIC_URL not set — R2 upload succeeded but URL is not publicly "
+                "accessible. Falling back to base64 data URL for project %s.", project_id
+            )
+            b64 = base64.b64encode(data).decode("utf-8")
+            logo_url = f"data:{content_type};base64,{b64}"
     else:
         # Fallback: store as base64 data URL directly in Firestore
         b64 = base64.b64encode(data).decode("utf-8")

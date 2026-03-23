@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: Optional[str] = None
     CLOUDFLARE_R2_BUCKET_NAME: Optional[str] = None
     CLOUDFLARE_R2_ENDPOINT: Optional[str] = None
+    CLOUDFLARE_R2_PUBLIC_URL: Optional[str] = None  # Public bucket URL (custom domain or pub-*.r2.dev)
 
     # --- Email ---
     RESEND_API_KEY: Optional[str] = None
