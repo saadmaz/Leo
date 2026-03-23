@@ -632,3 +632,73 @@ export interface ProjectAnalytics {
     reach: number
   }[]
 }
+
+// ---------------------------------------------------------------------------
+// Phase 8 — Analytics & Activity Feed
+// ---------------------------------------------------------------------------
+
+export interface ContentMetrics {
+  platform: string
+  impressions: number
+  reach: number
+  clicks: number
+  likes: number
+  comments: number
+  shares: number
+}
+
+export interface AnalyticsOverview {
+  total_content: number
+  total_posted: number
+  avg_engagement: number
+  total_impressions: number
+  best_platform: string
+  platform_breakdown: Record<string, number>
+  top_content: { id: string; platform: string; engagement: number; impressions: number }[]
+  has_metrics: boolean
+}
+
+export interface ContentPerformanceRow {
+  id: string
+  platform: string
+  status: string
+  created_at: string
+  impressions: number
+  reach: number
+  clicks: number
+  likes: number
+  comments: number
+  shares: number
+  engagement: number
+  has_metrics: boolean
+}
+
+export interface TrendPoint {
+  date: string
+  count: number
+}
+
+export interface PlatformBreakdown {
+  platform: string
+  count: number
+}
+
+export interface StatusBreakdown {
+  status: string
+  count: number
+}
+
+export interface AnalyticsTrends {
+  daily_creation: TrendPoint[]
+  platform_breakdown: PlatformBreakdown[]
+  status_breakdown: StatusBreakdown[]
+}
+
+export interface ActivityEvent {
+  id: string
+  event_type: string
+  user_email: string
+  description: string
+  timestamp: string
+  metadata: Record<string, unknown>
+}

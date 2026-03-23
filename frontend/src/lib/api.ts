@@ -49,6 +49,11 @@ import type {
   StyleGuide,
   TransformResult,
   WebsiteCopySection,
+  ContentMetrics,
+  AnalyticsOverview,
+  ContentPerformanceRow,
+  AnalyticsTrends,
+  ActivityEvent,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -804,6 +809,18 @@ export const api = {
   analytics: {
     get: (projectId: string, signal?: AbortSignal) =>
       get<ProjectAnalytics>(`/projects/${projectId}/analytics`, signal),
+    logMetrics: (projectId: string, itemId: string, metrics: ContentMetrics) =>
+      post<ContentMetrics>(`/projects/${projectId}/analytics/${itemId}/metrics`, metrics),
+    getOverview: (projectId: string) =>
+      get<AnalyticsOverview>(`/projects/${projectId}/analytics/overview`),
+    getContent: (projectId: string) =>
+      get<ContentPerformanceRow[]>(`/projects/${projectId}/analytics/content`),
+    getTrends: (projectId: string) =>
+      get<AnalyticsTrends>(`/projects/${projectId}/analytics/trends`),
+    getActivity: (projectId: string) =>
+      get<ActivityEvent[]>(`/projects/${projectId}/analytics/activity`),
+    getAiSummary: (projectId: string) =>
+      get<{ summary: string }>(`/projects/${projectId}/analytics/ai-summary`),
   },
 
   performance: {
@@ -1035,4 +1052,5 @@ export const api = {
       }
     }
   },
+
 }

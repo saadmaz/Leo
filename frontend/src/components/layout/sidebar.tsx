@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen,
+  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -268,6 +268,7 @@ export function Sidebar() {
               </NavGroup>
 
               <NavGroup label="Intelligence" storageKey="nav_intelligence">
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />}   label="Analytics"        onClick={() => router.push(`/projects/${activeProject.id}/analytics`)} />
                 <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Intelligence"     onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
                 <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Voice Scorer"     onClick={() => setBrandVoiceScorerOpen(true)} />
                 <NavItem icon={<Hash className="w-3.5 h-3.5" />}        label="Hashtag Research" onClick={() => setHashtagPanelOpen(true)} />

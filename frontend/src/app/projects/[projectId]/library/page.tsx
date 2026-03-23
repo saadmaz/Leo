@@ -16,6 +16,7 @@ import type { ContentLibraryItem, ContentLibraryStatus } from '@/types'
 import { RecycleModal } from '@/components/content-ops/recycle-modal'
 import { TransformModal } from '@/components/content-ops/transform-modal'
 import { PerformanceModal } from '@/components/content-ops/performance-modal'
+import { LogMetricsModal } from '@/components/brand-tools/log-metrics-modal'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -63,6 +64,7 @@ export default function LibraryPage() {
   const [recycleItem, setRecycleItem] = useState<ContentLibraryItem | null>(null)
   const [transformItem, setTransformItem] = useState<ContentLibraryItem | null>(null)
   const [performanceItem, setPerformanceItem] = useState<ContentLibraryItem | null>(null)
+  const [metricsItem, setMetricsItem] = useState<ContentLibraryItem | null>(null)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -228,8 +230,9 @@ export default function LibraryPage() {
                 onDelete={() => handleDelete(item.id)}
                 onRecycle={() => setRecycleItem(item)}
                 onTransform={() => setTransformItem(item)}
-                onPerformance={() => setPerformanceItem(item)}
+
                 onSubmitReview={() => handleSubmitReview(item.id)}
+                onLogMetrics={() => setMetricsItem(item)}
               />
             ))}
           </div>
@@ -261,6 +264,14 @@ export default function LibraryPage() {
           onSaved={loadItems}
         />
       )}
+      {metricsItem && (
+        <LogMetricsModal
+          projectId={params.projectId}
+          itemId={metricsItem.id}
+          platform={metricsItem.platform}
+          onClose={() => setMetricsItem(null)}
+        />
+      )}
     </div>
   )
 }
@@ -270,7 +281,7 @@ export default function LibraryPage() {
 // ---------------------------------------------------------------------------
 
 function LibraryCard({
-  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onPerformance, onSubmitReview,
+  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onSubmitReview, onLogMetrics,
 }: {
   item: ContentLibraryItem
   selected: boolean
@@ -279,8 +290,8 @@ function LibraryCard({
   onDelete: () => void
   onRecycle: () => void
   onTransform: () => void
-  onPerformance: () => void
   onSubmitReview: () => void
+  onLogMetrics: () => void
 }) {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.draft
@@ -358,12 +369,12 @@ function LibraryCard({
           <span>Transform</span>
         </button>
         <button
-          onClick={onPerformance}
+          onClick={onLogMetrics}
           title="Log performance metrics"
           className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-green-600 hover:bg-muted transition-colors"
         >
           <TrendingUp className="w-3 h-3" />
-          <span>Log</span>
+          <span>Metrics</span>
         </button>
         {item.status === 'draft' && (
           <button
