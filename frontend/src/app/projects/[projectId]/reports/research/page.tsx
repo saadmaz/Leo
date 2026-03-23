@@ -181,7 +181,7 @@ export default function ResearchReportsPage() {
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Deep research uses Exa's async research engine. Reports take 2–5 minutes and include sourced analysis.
+              Deep research uses Exa&apos;s async research engine. Reports take 2–5 minutes and include sourced analysis.
             </p>
           </div>
 
