@@ -165,10 +165,75 @@ from backend.middleware.rate_limit import limiter as _limiter
 
 
 class StartResearchRequest(BaseModel):
-    title: str = _Field(..., min_length=1, max_length=200)
-    query: str = _Field(..., min_length=10, max_length=1000)
-    report_type: str = _Field(default="market")
+    topic: str = _Field(..., min_length=3, max_length=300)
+    report_type: str = _Field(default="market_landscape")
     model: str = _Field(default="exa-research")
+
+
+def _normalize_report(report: dict) -> dict:
+    """
+    Map Firestore field names to the frontend ResearchReport type.
+    Converts snake_case timestamps, normalises status values, maps
+    citations → sources, and parses report_markdown into summary + sections.
+    """
+    # Status normalisation: backend may save "running" or "started"
+    _status_map = {"running": "processing", "started": "pending"}
+    raw_status = report.get("status", "pending")
+    fe_status = _status_map.get(raw_status, raw_status)
+
+    # Parse report_markdown into summary + sections
+    summary = None
+    sections = []
+    markdown = report.get("report_markdown") or ""
+    if markdown:
+        lines = markdown.split("\n")
+        # First non-heading, non-empty line becomes the summary
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                summary = stripped[:500]
+                break
+        # H2 headings (##) become sections
+        current_title: str | None = None
+        current_body: list[str] = []
+        for line in lines:
+            if line.startswith("## "):
+                if current_title is not None:
+                    sections.append({
+                        "title": current_title,
+                        "content": "\n".join(current_body).strip(),
+                    })
+                current_title = line[3:].strip()
+                current_body = []
+            elif current_title is not None:
+                current_body.append(line)
+        if current_title is not None:
+            sections.append({
+                "title": current_title,
+                "content": "\n".join(current_body).strip(),
+            })
+
+    # Citations → sources
+    sources = [
+        {"title": c.get("title", ""), "url": c.get("url", "")}
+        for c in (report.get("citations") or [])
+        if c.get("url")
+    ]
+
+    return {
+        "id": report.get("id", ""),
+        "projectId": report.get("project_id", ""),
+        "topic": report.get("query") or report.get("topic") or report.get("title", ""),
+        "title": report.get("title"),
+        "report_type": report.get("report_type"),
+        "status": fe_status,
+        "summary": summary or None,
+        "sections": sections if sections else None,
+        "sources": sources if sources else None,
+        "error": report.get("error"),
+        "createdAt": report.get("created_at") or report.get("createdAt", ""),
+        "completedAt": report.get("completed_at") or report.get("completedAt"),
+    }
 
 
 @router.post("/reports/research/start")
@@ -189,8 +254,8 @@ async def start_research(
     report_id = await research_service.start_research_report(
         project_id=project_id,
         user_id=user["uid"],
-        title=body.title,
-        query=body.query,
+        title=body.topic,
+        query=body.topic,
         report_type=body.report_type,
         model=body.model,
         brand_core=project.get("brandCore"),
@@ -213,7 +278,7 @@ async def get_research_status(
 
     from backend.services import research_service
     report = await research_service.poll_research_report(project_id, report_id)
-    return report
+    return _normalize_report(report)
 
 
 @router.get("/reports/research")
@@ -226,7 +291,8 @@ async def list_research_reports(
     get_project_as_member(project_id, user["uid"])
 
     reports = firebase_service.list_research_reports(project_id, limit=limit)
-    return {"reports": reports, "total": len(reports)}
+    normalized = [_normalize_report(r) for r in reports]
+    return {"reports": normalized, "total": len(normalized)}
 
 
 @router.get("/reports/research/{report_id}")
@@ -241,7 +307,7 @@ async def get_research_report(
     report = firebase_service.get_research_report(project_id, report_id)
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found.")
-    return report
+    return _normalize_report(report)
 
 
 @router.delete("/reports/research/{report_id}")
