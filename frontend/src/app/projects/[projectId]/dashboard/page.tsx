@@ -117,7 +117,7 @@ export default function DashboardPage() {
   const byPlatform = Object.entries(lib?.by_platform ?? {}).sort((a, b) => b[1] - a[1])
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />

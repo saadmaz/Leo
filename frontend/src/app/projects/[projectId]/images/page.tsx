@@ -137,7 +137,7 @@ export default function ImagesPage() {
   }[aspectRatio]
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col flex-1 overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />

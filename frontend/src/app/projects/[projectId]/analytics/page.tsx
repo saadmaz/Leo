@@ -168,7 +168,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden">
       {/* Header */}
       <header className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />

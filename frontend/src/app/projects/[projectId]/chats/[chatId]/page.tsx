@@ -4,8 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone } from 'lucide-react'
-import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
-import { AnnouncementBanner } from '@/components/layout/announcement-banner'
+import { SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
 import { BrandCorePanel } from '@/components/brand-core/brand-core-panel'
@@ -205,12 +204,8 @@ export default function ChatPage() {
   const isProcessing = activeProject?.ingestionStatus === 'processing'
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar />
-
+    <>
       <div className="flex flex-col flex-1 overflow-hidden">
-        <AnnouncementBanner />
-
         {/* Top bar */}
         <div className="flex items-center gap-3 px-3 sm:px-6 py-3 border-b border-border bg-card shrink-0">
           <SidebarToggle />
@@ -441,6 +436,6 @@ export default function ChatPage() {
       <IngestionOverlay />
       <BrandVoiceScorerPanel projectId={params.projectId} />
       <HashtagPanel />
-    </div>
+    </>
   )
 }
