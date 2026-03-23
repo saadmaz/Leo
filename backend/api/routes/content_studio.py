@@ -31,15 +31,15 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["content-studio"])
 # ---------------------------------------------------------------------------
 
 class BlogPostRequest(BaseModel):
-    topic: str = Field(..., min_length=5, max_length=300)
+    topic: str = Field(..., min_length=1, max_length=300)
     keywords: list[str] = Field(default_factory=list, max_length=10)
     tone: str = Field(default="informative and engaging", max_length=100)
     word_count: int = Field(default=1000, ge=300, le=3000)
 
 
 class MetaTagsRequest(BaseModel):
-    page_title: str = Field(..., min_length=3, max_length=200)
-    page_description: str = Field(..., min_length=10, max_length=1000)
+    page_title: str = Field(..., min_length=1, max_length=200)
+    page_description: str = Field(..., min_length=1, max_length=1000)
     page_type: str = Field(default="homepage", max_length=50)
 
 
@@ -50,13 +50,13 @@ class WebsiteCopyRequest(BaseModel):
 
 class EmailSequenceRequest(BaseModel):
     sequence_type: str = Field(..., max_length=50)
-    goal: str = Field(..., min_length=5, max_length=300)
-    product_or_service: str = Field(..., min_length=3, max_length=300)
+    goal: str = Field(..., min_length=1, max_length=300)
+    product_or_service: str = Field(..., min_length=1, max_length=300)
 
 
 class SingleEmailRequest(BaseModel):
     email_type: str = Field(..., max_length=100)
-    context: str = Field(..., min_length=5, max_length=500)
+    context: str = Field(..., min_length=1, max_length=500)
 
 
 # ---------------------------------------------------------------------------

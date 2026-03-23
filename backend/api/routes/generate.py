@@ -84,7 +84,7 @@ async def generate_image(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except ValueError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
 
     return {"url": url}
 

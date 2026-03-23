@@ -1288,7 +1288,6 @@ def list_content_library_items(
     query = (
         db.collection("projects").document(project_id)
         .collection("content_library")
-        .order_by("createdAt", direction=firestore.Query.DESCENDING)
         .limit(limit)
     )
     if platform:
@@ -1299,7 +1298,9 @@ def list_content_library_items(
         query = query.where("type", "==", item_type)
 
     docs = list(query.stream())
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    items = [{"id": d.id, **d.to_dict()} for d in docs]
+    items.sort(key=lambda x: x.get("createdAt") or "", reverse=True)
+    return items
 
 
 def update_content_library_item(project_id: str, item_id: str, updates: dict) -> dict:

@@ -241,7 +241,7 @@ export default function TeamPage() {
         )}
 
         {/* Members list */}
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="bg-card border border-border rounded-lg">
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-semibold">Members</p>
           </div>
