@@ -654,7 +654,7 @@ async def send_broadcast(body: BroadcastRequest, user: SuperAdminUser):
 
     all_users = firebase_service.list_all_users(limit=5000)
 
-    if body.segment:
+    if body.segment and body.segment != "all":
         recipients = [u["email"] for u in all_users if u.get("tier") == body.segment and u.get("email")]
     else:
         recipients = [u["email"] for u in all_users if u.get("email")]

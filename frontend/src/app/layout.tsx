@@ -25,8 +25,12 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   themeColor: '#7c3aed',
   appleWebApp: {
+    capable: true,
     statusBarStyle: 'default',
     title: 'LEO',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
   openGraph: {
     type: 'website',
