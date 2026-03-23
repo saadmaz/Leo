@@ -392,6 +392,7 @@ export interface ContentLibraryItem {
   scheduledAt?: string | null
   createdAt: string
   updatedAt: string
+  voice_score?: number | null
 }
 
 export interface CalendarEntry {
@@ -701,4 +702,21 @@ export interface ActivityEvent {
   description: string
   timestamp: string
   metadata: Record<string, unknown>
+}
+
+// ---------------------------------------------------------------------------
+// Phase 10 — Reports & Content Scoring
+// ---------------------------------------------------------------------------
+
+export interface WeeklyDigest {
+  digest: string
+  overview: AnalyticsOverview
+  trends: AnalyticsTrends
+  generated_at: string
+}
+
+export interface ContentScoreResult {
+  score: number | null
+  feedback?: string
+  error?: string
 }

@@ -54,6 +54,8 @@ import type {
   ContentPerformanceRow,
   AnalyticsTrends,
   ActivityEvent,
+  WeeklyDigest,
+  ContentScoreResult,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -1055,4 +1057,11 @@ export const api = {
     }
   },
 
+  // Reports — Phase 10
+  reports: {
+    getDigest: (projectId: string) =>
+      get<WeeklyDigest>(`/projects/${projectId}/reports/digest`),
+    scoreContent: (projectId: string, itemIds: string[]) =>
+      post<Record<string, ContentScoreResult>>(`/projects/${projectId}/reports/score-content`, { item_ids: itemIds }),
+  },
 }

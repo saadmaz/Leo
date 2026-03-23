@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp,
-  Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck,
+  Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck, Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -65,6 +65,8 @@ export default function LibraryPage() {
   const [transformItem, setTransformItem] = useState<ContentLibraryItem | null>(null)
   const [performanceItem, setPerformanceItem] = useState<ContentLibraryItem | null>(null)
   const [metricsItem, setMetricsItem] = useState<ContentLibraryItem | null>(null)
+  const [scoring, setScoring] = useState(false)
+  const [scores, setScores] = useState<Record<string, number | null>>({})
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -126,6 +128,25 @@ export default function LibraryPage() {
     }
   }
 
+  async function handleScoreAll() {
+    if (scoring || items.length === 0) return
+    setScoring(true)
+    try {
+      const ids = items.slice(0, 20).map((i) => i.id)
+      const result = await api.reports.scoreContent(params.projectId, ids)
+      const newScores: Record<string, number | null> = {}
+      for (const [id, r] of Object.entries(result)) {
+        newScores[id] = r.score
+      }
+      setScores((prev) => ({ ...prev, ...newScores }))
+      toast.success('Content scored')
+    } catch {
+      toast.error('Scoring failed — Brand Core required')
+    } finally {
+      setScoring(false)
+    }
+  }
+
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const s = new Set(prev)
@@ -155,6 +176,15 @@ export default function LibraryPage() {
               </button>
             </>
           )}
+          <button
+            onClick={handleScoreAll}
+            disabled={scoring}
+            title="Score all items against brand voice"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+          >
+            {scoring ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+            Score
+          </button>
           <button onClick={loadItems} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
@@ -225,12 +255,12 @@ export default function LibraryPage() {
                 key={item.id}
                 item={item}
                 selected={selectedIds.has(item.id)}
+                voiceScore={scores[item.id] ?? item.voice_score ?? null}
                 onSelect={() => toggleSelect(item.id)}
                 onStatusChange={(s) => handleStatusChange(item, s)}
                 onDelete={() => handleDelete(item.id)}
                 onRecycle={() => setRecycleItem(item)}
                 onTransform={() => setTransformItem(item)}
-
                 onSubmitReview={() => handleSubmitReview(item.id)}
                 onLogMetrics={() => setMetricsItem(item)}
               />
@@ -280,11 +310,22 @@ export default function LibraryPage() {
 // LibraryCard
 // ---------------------------------------------------------------------------
 
+function ScorePill({ score }: { score: number | null }) {
+  if (score === null) return null
+  const color = score >= 80 ? 'text-green-600 bg-green-500/10' : score >= 60 ? 'text-amber-600 bg-amber-500/10' : 'text-red-600 bg-red-500/10'
+  return (
+    <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', color)}>
+      {score}
+    </span>
+  )
+}
+
 function LibraryCard({
-  item, selected, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onSubmitReview, onLogMetrics,
+  item, selected, voiceScore, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onSubmitReview, onLogMetrics,
 }: {
   item: ContentLibraryItem
   selected: boolean
+  voiceScore: number | null
   onSelect: () => void
   onStatusChange: (s: ContentLibraryStatus) => void
   onDelete: () => void
@@ -317,6 +358,7 @@ function LibraryCard({
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">{TYPE_ICONS[item.type] ?? <FileText className="w-3 h-3" />}</span>
           <span className="text-xs font-medium">{item.platform}</span>
+          <ScorePill score={voiceScore} />
         </div>
         {/* Status badge */}
         <button
