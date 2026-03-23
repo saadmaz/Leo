@@ -121,11 +121,12 @@ async def score_content_batch(
             detail="Brand Core not set up yet.",
         )
 
+    db = firebase_service.get_db()
     results: dict[str, dict] = {}
     for item_id in body.item_ids[:20]:  # cap at 20 to avoid timeout
         try:
             item_doc = (
-                firebase_service.db
+                db
                 .collection("projects").document(project_id)
                 .collection("content_library").document(item_id)
                 .get()
@@ -138,7 +139,7 @@ async def score_content_batch(
             score_result = await intelligence_service.score_brand_voice(content, brand_core)
             score = score_result.get("score", 0)
             # Persist score on content item
-            firebase_service.db \
+            db \
                 .collection("projects").document(project_id) \
                 .collection("content_library").document(item_id) \
                 .update({"voice_score": score})
