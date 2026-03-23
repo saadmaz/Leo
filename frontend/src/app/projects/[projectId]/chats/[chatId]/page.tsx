@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone, Globe, Search } from 'lucide-react'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [hintsOpen, setHintsOpen] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
+  const [activeToolCall, setActiveToolCall] = useState<{ tool: string; query: string } | null>(null)
 
   const MESSAGES_PAGE_SIZE = 50
 
@@ -141,7 +142,11 @@ export default function ChatPage() {
       {
         onDelta: (text) => appendDelta(assistantId, text),
 
+        onToolCall: (tool, query) => setActiveToolCall({ tool, query }),
+        onToolResult: () => setActiveToolCall(null),
+
         onDone: () => {
+          setActiveToolCall(null)
           // Read the final accumulated content from the store.
           const current = useAppStore.getState().messages.find((m) => m.id === assistantId)
           finaliseMessage(assistantId, current?.content ?? '')
@@ -159,6 +164,7 @@ export default function ChatPage() {
 
         onError: (err) => {
           console.error('Stream error:', err)
+          setActiveToolCall(null)
           setIsStreaming(false)
           setStreamController(null)
           if (err.includes('402')) {
@@ -414,6 +420,48 @@ export default function ChatPage() {
                 ))}
               </AnimatePresence>
             )}
+
+            {/* Tool-use indicator — shown while LEO is searching the web */}
+            <AnimatePresence>
+              {activeToolCall && (
+                <motion.div
+                  key="tool-indicator"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border bg-muted/30 max-w-[420px]"
+                >
+                  {activeToolCall.tool.includes('news') || activeToolCall.tool.includes('monitor') ? (
+                    <Globe className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+                  ) : (
+                    <Search className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-foreground">
+                      {activeToolCall.tool === 'web_search' ? 'Searching the web' :
+                       activeToolCall.tool === 'find_similar_companies' ? 'Finding similar companies' :
+                       activeToolCall.tool === 'research_topic' ? 'Researching topic' :
+                       activeToolCall.tool === 'get_brand_news' ? 'Fetching brand news' :
+                       'Searching'}
+                      <span className="inline-flex gap-0.5 ml-1">
+                        {[0, 1, 2].map((i) => (
+                          <motion.span
+                            key={i}
+                            animate={{ opacity: [0, 1, 0] }}
+                            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+                            className="text-primary"
+                          >·</motion.span>
+                        ))}
+                      </span>
+                    </p>
+                    {activeToolCall.query && (
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{activeToolCall.query}</p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div ref={bottomRef} />
           </div>

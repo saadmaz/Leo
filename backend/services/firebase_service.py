@@ -1228,6 +1228,18 @@ def save_competitor_snapshot(project_id: str, snapshot: dict) -> dict:
     return {"id": ref.id, **data}
 
 
+def get_competitor_snapshot(project_id: str, name: str) -> Optional[dict]:
+    """Return a single competitor snapshot by name, or None if not found."""
+    db = get_db()
+    doc_id = name.lower().replace(" ", "_").replace("/", "_")[:64]
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_snapshots").document(doc_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
 def get_competitor_snapshots(project_id: str) -> list[dict]:
     """
     Return all stored competitor snapshots for a project.

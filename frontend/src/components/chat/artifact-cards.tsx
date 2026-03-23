@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink, BookmarkPlus, BookmarkCheck } from 'lucide-react'
+import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink, BookmarkPlus, BookmarkCheck, Globe, Users, TrendingUp, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -12,7 +12,7 @@ import { useAppStore } from '@/stores/app-store'
 // Types
 // ---------------------------------------------------------------------------
 
-export type ArtifactType = 'captions' | 'ad_copy' | 'campaign_brief' | 'colour_palette' | 'content_calendar' | 'video_script' | 'email_content' | 'image_prompt'
+export type ArtifactType = 'captions' | 'ad_copy' | 'campaign_brief' | 'colour_palette' | 'content_calendar' | 'video_script' | 'email_content' | 'image_prompt' | 'research_report' | 'competitor_landscape' | 'influencer_list'
 
 export interface CaptionsArtifact {
   type: 'captions'
@@ -88,6 +88,53 @@ export interface ImagePromptArtifact {
   context?: string
 }
 
+export interface ResearchReportSection {
+  title: string
+  content: string
+}
+
+export interface ResearchReportArtifact {
+  type: 'research_report'
+  title: string
+  summary: string
+  sections: ResearchReportSection[]
+  sources?: { title: string; url: string }[]
+  generated_at?: string
+}
+
+export interface CompetitorProfile {
+  name: string
+  strengths: string[]
+  weaknesses: string[]
+  opportunities?: string[]
+  tone?: string
+  top_content_themes?: string[]
+}
+
+export interface CompetitorLandscapeArtifact {
+  type: 'competitor_landscape'
+  brand_name: string
+  competitors: CompetitorProfile[]
+  market_gaps?: string[]
+}
+
+export interface InfluencerEntry {
+  name: string
+  handle: string
+  platform?: string
+  followers?: string
+  alignment_score?: number
+  bio?: string
+  content_themes?: string[]
+}
+
+export interface InfluencerListArtifact {
+  type: 'influencer_list'
+  topic: string
+  platform: string
+  influencers: InfluencerEntry[]
+}
+
 export type Artifact =
   | CaptionsArtifact
   | AdCopyArtifact
@@ -97,6 +144,9 @@ export type Artifact =
   | VideoScriptArtifact
   | EmailContentArtifact
   | ImagePromptArtifact
+  | ResearchReportArtifact
+  | CompetitorLandscapeArtifact
+  | InfluencerListArtifact
 
 // ---------------------------------------------------------------------------
 // Parser
@@ -139,6 +189,9 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
       {artifact.type === 'video_script' && <VideoScriptCard artifact={artifact} />}
       {artifact.type === 'email_content' && <EmailContentCard artifact={artifact} />}
       {artifact.type === 'image_prompt' && <ImagePromptCard artifact={artifact} />}
+      {artifact.type === 'research_report' && <ResearchReportCard artifact={artifact} />}
+      {artifact.type === 'competitor_landscape' && <CompetitorLandscapeCard artifact={artifact} />}
+      {artifact.type === 'influencer_list' && <InfluencerListCard artifact={artifact} />}
     </motion.div>
   )
 }
@@ -579,6 +632,243 @@ function ImagePromptCard({ artifact }: { artifact: ImagePromptArtifact }) {
             </div>
           </div>
         )}
+      </div>
+    </Card>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Research report card
+// ---------------------------------------------------------------------------
+
+function ResearchReportCard({ artifact }: { artifact: ResearchReportArtifact }) {
+  const [expandedSection, setExpandedSection] = useState<number | null>(0)
+
+  const copyText = [
+    `# ${artifact.title}`,
+    `\n${artifact.summary}`,
+    ...artifact.sections.map((s) => `\n## ${s.title}\n${s.content}`),
+    artifact.sources?.length
+      ? `\n## Sources\n${artifact.sources.map((s) => `- ${s.title}: ${s.url}`).join('\n')}`
+      : '',
+  ].filter(Boolean).join('\n')
+
+  return (
+    <Card icon={<Globe className="w-3.5 h-3.5" />} title={artifact.title} copyText={copyText}>
+      <div className="space-y-3">
+        {/* Summary */}
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Summary</p>
+          <p className="text-sm leading-relaxed">{artifact.summary}</p>
+        </div>
+
+        {/* Sections */}
+        {artifact.sections.map((section, i) => (
+          <div key={i} className="rounded-lg border border-border bg-background overflow-hidden">
+            <button
+              onClick={() => setExpandedSection(expandedSection === i ? null : i)}
+              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-muted/30 transition-colors"
+            >
+              <span className="text-xs font-semibold">{section.title}</span>
+              <span className="text-muted-foreground text-xs">{expandedSection === i ? '▲' : '▼'}</span>
+            </button>
+            {expandedSection === i && (
+              <div className="px-3 pb-3">
+                <p className="text-sm leading-relaxed text-muted-foreground">{section.content}</p>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Sources */}
+        {artifact.sources && artifact.sources.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sources</p>
+            {artifact.sources.map((src, i) => (
+              <a
+                key={i}
+                href={src.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline truncate"
+              >
+                <ExternalLink className="w-3 h-3 shrink-0" />
+                {src.title || src.url}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Competitor landscape card
+// ---------------------------------------------------------------------------
+
+function CompetitorLandscapeCard({ artifact }: { artifact: CompetitorLandscapeArtifact }) {
+  const [selected, setSelected] = useState(0)
+  const competitor = artifact.competitors[selected]
+
+  const copyText = artifact.competitors
+    .map((c) => [
+      `## ${c.name}`,
+      `Strengths: ${c.strengths.join(', ')}`,
+      `Weaknesses: ${c.weaknesses.join(', ')}`,
+      c.opportunities?.length ? `Opportunities: ${c.opportunities.join(', ')}` : '',
+      c.tone ? `Tone: ${c.tone}` : '',
+    ].filter(Boolean).join('\n'))
+    .join('\n\n')
+
+  return (
+    <Card icon={<BarChart2 className="w-3.5 h-3.5" />} title={`${artifact.brand_name} — Competitor Landscape`} count={artifact.competitors.length} copyText={copyText}>
+      {/* Competitor selector tabs */}
+      <div className="flex gap-1.5 flex-wrap mb-3">
+        {artifact.competitors.map((c, i) => (
+          <button
+            key={i}
+            onClick={() => setSelected(i)}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+              selected === i
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {c.name}
+          </button>
+        ))}
+      </div>
+
+      {competitor && (
+        <div className="space-y-3">
+          {/* Tone badge */}
+          {competitor.tone && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Tone:</span>
+              <span className="px-2 py-0.5 rounded-full bg-muted text-xs font-medium">{competitor.tone}</span>
+            </div>
+          )}
+
+          {/* Strengths */}
+          <div>
+            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1.5">Strengths</p>
+            <ul className="space-y-0.5">
+              {competitor.strengths.map((s, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-xs"><span className="text-emerald-500 mt-0.5 shrink-0">✓</span>{s}</li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Weaknesses */}
+          <div>
+            <p className="text-xs font-semibold text-rose-500 uppercase tracking-wide mb-1.5">Weaknesses</p>
+            <ul className="space-y-0.5">
+              {competitor.weaknesses.map((w, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-xs"><span className="text-rose-400 mt-0.5 shrink-0">✗</span>{w}</li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Opportunities */}
+          {competitor.opportunities && competitor.opportunities.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-amber-500 uppercase tracking-wide mb-1.5">Opportunities for you</p>
+              <ul className="space-y-0.5">
+                {competitor.opportunities.map((o, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-xs"><span className="text-amber-400 mt-0.5 shrink-0">→</span>{o}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Content themes */}
+          {competitor.top_content_themes && competitor.top_content_themes.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">Top content themes</p>
+              <div className="flex flex-wrap gap-1.5">
+                {competitor.top_content_themes.map((t) => (
+                  <span key={t} className="px-2 py-0.5 rounded-full bg-muted text-xs">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Market gaps */}
+      {artifact.market_gaps && artifact.market_gaps.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-border">
+          <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1.5">Market gaps you can own</p>
+          <ul className="space-y-0.5">
+            {artifact.market_gaps.map((g, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-xs"><span className="text-primary mt-0.5 shrink-0">✦</span>{g}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Influencer list card
+// ---------------------------------------------------------------------------
+
+function InfluencerListCard({ artifact }: { artifact: InfluencerListArtifact }) {
+  const copyText = artifact.influencers
+    .map((inf) => [
+      `${inf.name} (@${inf.handle})`,
+      inf.platform ? `Platform: ${inf.platform}` : '',
+      inf.followers ? `Followers: ${inf.followers}` : '',
+      inf.alignment_score !== undefined ? `Alignment: ${inf.alignment_score}/10` : '',
+      inf.bio ? `Bio: ${inf.bio}` : '',
+    ].filter(Boolean).join(' | '))
+    .join('\n')
+
+  return (
+    <Card
+      icon={<Users className="w-3.5 h-3.5" />}
+      title={`${artifact.platform} Influencers — ${artifact.topic}`}
+      count={artifact.influencers.length}
+      copyText={copyText}
+    >
+      <div className="space-y-2.5">
+        {artifact.influencers.map((inf, i) => (
+          <div key={i} className="rounded-lg border border-border bg-background p-3 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{inf.name}</p>
+                <p className="text-xs text-primary">@{inf.handle}</p>
+              </div>
+              <div className="flex flex-col items-end gap-0.5 shrink-0">
+                {inf.alignment_score !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3 text-emerald-500" />
+                    <span className="text-xs font-semibold text-emerald-600">{inf.alignment_score}/10</span>
+                  </div>
+                )}
+                {inf.followers && (
+                  <span className="text-[11px] text-muted-foreground">{inf.followers}</span>
+                )}
+              </div>
+            </div>
+            {inf.bio && (
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{inf.bio}</p>
+            )}
+            {inf.content_themes && inf.content_themes.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {inf.content_themes.map((t) => (
+                  <span key={t} className="px-1.5 py-0.5 rounded-full bg-muted text-[10px]">{t}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </Card>
   )

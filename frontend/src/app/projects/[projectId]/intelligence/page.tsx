@@ -2,16 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import {
   BarChart2, RefreshCw, Plus, X, Loader2, ChevronDown, ChevronUp,
-  TrendingUp, AlertTriangle, Lightbulb, Zap,
+  TrendingUp, AlertTriangle, Lightbulb, Zap, Bell, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
-import type { CompetitorSnapshot } from '@/types'
+import type { CompetitorSnapshot, DiscoveredCompetitor } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Page
@@ -19,11 +20,14 @@ import type { CompetitorSnapshot } from '@/types'
 
 export default function IntelligencePage() {
   const params = useParams<{ projectId: string }>()
+  const router = useRouter()
   const { activeProject } = useAppStore()
 
   const [snapshots, setSnapshots] = useState<CompetitorSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
+  const [discovered, setDiscovered] = useState<DiscoveredCompetitor[]>([])
 
   // Add competitor form state
   const [showAddForm, setShowAddForm] = useState(false)
@@ -78,6 +82,38 @@ export default function IntelligencePage() {
     }
   }
 
+  async function handleDiscover() {
+    setDiscovering(true)
+    setDiscovered([])
+    try {
+      const result = await api.seoIntel.discoverCompetitors(params.projectId)
+      setDiscovered(result.competitors)
+      if (result.competitors.length === 0) {
+        toast.info('No competitors found automatically. Add them manually.')
+      }
+    } catch {
+      toast.error('Auto-discovery requires an Exa API key.')
+    } finally {
+      setDiscovering(false)
+    }
+  }
+
+  function addDiscoveredCompetitor(c: DiscoveredCompetitor) {
+    // Pre-fill a new row in the add form with the competitor name
+    let name = c.name
+    if (!name) {
+      try { name = new URL(c.url).hostname.replace('www.', '') } catch { name = c.url }
+    }
+    setCompetitors((prev) => {
+      const empty = prev.find((p) => !p.name.trim())
+      if (empty) {
+        return prev.map((p) => p.name.trim() === '' ? { ...p, name } : p)
+      }
+      return [...prev, { name, instagram: '', facebook: '', tiktok: '' }]
+    })
+    setShowAddForm(true)
+  }
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Top bar */}
@@ -92,6 +128,23 @@ export default function IntelligencePage() {
           <span className="text-xs text-muted-foreground">— {activeProject.name}</span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {/* Monitoring link */}
+          <button
+            onClick={() => router.push(`/projects/${params.projectId}/intelligence/monitoring`)}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            Monitoring
+          </button>
+          {/* Auto-discover */}
+          <button
+            onClick={handleDiscover}
+            disabled={discovering}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-md text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+          >
+            {discovering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            {discovering ? 'Discovering…' : 'Auto-discover'}
+          </button>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors"
@@ -202,6 +255,35 @@ export default function IntelligencePage() {
                   <><Zap className="w-3.5 h-3.5" /> Run Analysis</>
                 )}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Auto-discovered competitors */}
+        {discovered.length > 0 && (
+          <div className="border-b border-border bg-muted/20 px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Auto-discovered competitors — click to add
+              </p>
+              <button onClick={() => setDiscovered([])} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {discovered.map((c, i) => (
+                <button
+                  key={i}
+                  onClick={() => addDiscoveredCompetitor(c)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
+                >
+                  <Plus className="w-3 h-3 text-primary shrink-0" />
+                  <span className="font-medium">{c.name || (() => { try { return new URL(c.url).hostname.replace('www.', '') } catch { return c.url } })()}</span>
+                  {c.relevance_score !== undefined && (
+                    <span className="text-muted-foreground ml-1">{Math.round(c.relevance_score * 100)}%</span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         )}

@@ -159,7 +159,19 @@ export interface StreamError {
   error: string
 }
 
-export type StreamEvent = StreamDelta | StreamError
+export interface StreamToolCall {
+  type: 'tool_call'
+  tool: string
+  query: string
+}
+
+export interface StreamToolResult {
+  type: 'tool_result'
+  tool: string
+  preview: string
+}
+
+export type StreamEvent = StreamDelta | StreamError | StreamToolCall | StreamToolResult
 
 // ---------------------------------------------------------------------------
 // SSE Ingestion events
@@ -719,4 +731,83 @@ export interface ContentScoreResult {
   score: number | null
   feedback?: string
   error?: string
+}
+
+// ---------------------------------------------------------------------------
+// Exa + Tavily — Monitoring, Research, SEO, Discovery
+// ---------------------------------------------------------------------------
+
+export type AlertSentiment = 'positive' | 'negative' | 'neutral'
+
+export interface MonitorAlert {
+  id: string
+  projectId: string
+  title: string
+  url: string
+  snippet?: string
+  source?: string
+  sentiment: AlertSentiment
+  subject?: string        // 'brand' | competitor name
+  read: boolean
+  savedAt: string
+  publishedAt?: string
+}
+
+export interface ResearchReportSection {
+  title: string
+  content: string
+}
+
+export interface ResearchReport {
+  id: string
+  projectId: string
+  topic: string
+  report_type?: string
+  status: 'pending' | 'processing' | 'complete' | 'error'
+  title?: string
+  summary?: string
+  sections?: ResearchReportSection[]
+  sources?: { title: string; url: string }[]
+  error?: string
+  createdAt: string
+  completedAt?: string
+}
+
+export interface ContentGap {
+  topic: string
+  competitor?: string
+  search_volume_estimate?: string
+  brand_angle?: string
+  priority?: 'high' | 'medium' | 'low'
+  reasoning?: string
+}
+
+export interface ContentTopic {
+  title: string
+  platform: string
+  content_type: string
+  hook: string
+  angle: string
+  keywords?: string[]
+  estimated_engagement?: string
+  priority?: 'high' | 'medium' | 'low'
+}
+
+export interface DiscoveredCompetitor {
+  name: string
+  url: string
+  relevance_score?: number
+  description?: string
+  why_competitor?: string
+}
+
+export interface DiscoveredInfluencer {
+  name: string
+  handle: string
+  platform?: string
+  followers?: string
+  alignment_score?: number
+  bio?: string
+  content_themes?: string[]
+  url?: string
 }

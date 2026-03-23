@@ -56,6 +56,12 @@ import type {
   ActivityEvent,
   WeeklyDigest,
   ContentScoreResult,
+  MonitorAlert,
+  ResearchReport,
+  ContentGap,
+  ContentTopic,
+  DiscoveredCompetitor,
+  DiscoveredInfluencer,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -244,6 +250,8 @@ export const api = {
       onDelta: (text: string) => void
       onDone: () => void
       onError: (err: string) => void
+      onToolCall?: (tool: string, query: string) => void
+      onToolResult?: (tool: string, preview: string) => void
     },
     signal?: AbortSignal,
     channel?: string | null,
@@ -283,6 +291,8 @@ export const api = {
       (event) => {
         if (event.type === 'delta') callbacks.onDelta(event.content)
         if (event.type === 'error') callbacks.onError(event.error)
+        if (event.type === 'tool_call') callbacks.onToolCall?.(event.tool, event.query)
+        if (event.type === 'tool_result') callbacks.onToolResult?.(event.tool, event.preview)
       },
       callbacks.onDone,
     )
@@ -1067,5 +1077,76 @@ export const api = {
       get<WeeklyDigest>(`/projects/${projectId}/reports/digest`),
     scoreContent: (projectId: string, itemIds: string[]) =>
       post<Record<string, ContentScoreResult>>(`/projects/${projectId}/reports/score-content`, { item_ids: itemIds }),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Brand Monitoring (Exa + Tavily)
+  // ---------------------------------------------------------------------------
+  monitoring: {
+    run: (projectId: string) =>
+      post<{ alerts_saved: number; scan_summary: { total: number; new_alerts: number } }>(
+        `/projects/${projectId}/monitor/run`,
+        {},
+      ),
+    alerts: (projectId: string, params?: { unread_only?: boolean; days?: number; limit?: number }) => {
+      const qs = new URLSearchParams()
+      if (params?.unread_only) qs.set('unread_only', 'true')
+      if (params?.days !== undefined) qs.set('days', String(params.days))
+      if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+      const q = qs.toString()
+      return get<{ alerts: MonitorAlert[] }>(`/projects/${projectId}/monitor/alerts${q ? `?${q}` : ''}`)
+    },
+    markRead: (projectId: string, alertId: string) =>
+      post<{ updated: boolean }>(`/projects/${projectId}/monitor/alerts/${alertId}/read`, {}),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Research Reports (Exa async deep-research)
+  // ---------------------------------------------------------------------------
+  research: {
+    start: (projectId: string, topic: string, report_type?: string) =>
+      post<{ report_id: string; status: string; task_id?: string }>(
+        `/projects/${projectId}/reports/research/start`,
+        { topic, report_type },
+      ),
+    status: (projectId: string, reportId: string) =>
+      get<ResearchReport>(`/projects/${projectId}/reports/research/${reportId}/status`),
+    list: (projectId: string) =>
+      get<{ reports: ResearchReport[] }>(`/projects/${projectId}/reports/research`),
+    get: (projectId: string, reportId: string) =>
+      get<ResearchReport>(`/projects/${projectId}/reports/research/${reportId}`),
+    delete: (projectId: string, reportId: string) =>
+      del(`/projects/${projectId}/reports/research/${reportId}`),
+  },
+
+  // ---------------------------------------------------------------------------
+  // SEO & Competitor Discovery (Exa + Tavily)
+  // ---------------------------------------------------------------------------
+  seoIntel: {
+    contentGaps: (projectId: string, competitors: string[], topic?: string) =>
+      post<{ gaps: ContentGap[]; total_gaps: number }>(
+        `/projects/${projectId}/seo/content-gaps`,
+        { competitors, topic },
+      ),
+    contentTopics: (projectId: string, gaps: ContentGap[], num_topics?: number) =>
+      post<{ topics: ContentTopic[]; total: number }>(
+        `/projects/${projectId}/seo/content-topics`,
+        { gaps, num_topics },
+      ),
+    discoverCompetitors: (projectId: string) =>
+      get<{ competitors: DiscoveredCompetitor[]; source: string }>(
+        `/projects/${projectId}/intelligence/discover-competitors`,
+      ),
+    discoverInfluencers: (
+      projectId: string,
+      topic: string,
+      platform: string,
+      audience_size?: string,
+      location?: string,
+    ) =>
+      post<{ influencers: DiscoveredInfluencer[]; total: number; topic: string; platform: string }>(
+        `/projects/${projectId}/influencers/discover`,
+        { topic, platform, audience_size: audience_size ?? 'micro', location },
+      ),
   },
 }
