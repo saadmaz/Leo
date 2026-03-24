@@ -62,6 +62,7 @@ import type {
   ContentTopic,
   DiscoveredCompetitor,
   DiscoveredInfluencer,
+  CompetitiveStrategy,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -552,7 +553,7 @@ export const api = {
 
     refresh: (
       projectId: string,
-      competitors: { name: string; instagram?: string; facebook?: string; tiktok?: string }[],
+      competitors: { name: string; website?: string; instagram?: string; facebook?: string; tiktok?: string; linkedin?: string; youtube?: string }[],
       signal?: AbortSignal,
     ) =>
       post<{ refreshed: { name: string; platforms_scraped: string[] }[] }>(
@@ -560,6 +561,9 @@ export const api = {
         { competitors },
         signal,
       ),
+
+    strategy: (projectId: string, signal?: AbortSignal) =>
+      get<CompetitiveStrategy>(`/projects/${projectId}/intelligence/strategy`, signal),
   },
 
   // -------------------------------------------------------------------------

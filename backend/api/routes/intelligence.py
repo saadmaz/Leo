@@ -43,9 +43,12 @@ class PredictPerformanceRequest(BaseModel):
 
 class CompetitorProfile(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
+    website: Optional[str] = None
     instagram: Optional[str] = None
     facebook: Optional[str] = None
     tiktok: Optional[str] = None
+    linkedin: Optional[str] = None
+    youtube: Optional[str] = None
 
 
 class RefreshIntelligenceRequest(BaseModel):
@@ -166,6 +169,40 @@ async def get_intelligence(
         firebase_service.get_competitor_snapshots, project_id
     )
     return {"snapshots": snapshots}
+
+
+@router.get("/intelligence/strategy")
+async def get_strategy_plan(
+    project_id: str,
+    user: CurrentUser,
+):
+    """
+    Generate a competitive strategy plan comparing brand core vs competitors.
+    Requires at least one competitor snapshot and a configured Brand Core.
+    """
+    project = get_project_as_member(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+
+    snapshots = await asyncio.to_thread(
+        firebase_service.get_competitor_snapshots, project_id
+    )
+
+    if not snapshots:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No competitor snapshots found. Run intelligence refresh first.",
+        )
+
+    try:
+        result = await intelligence_service.generate_competitive_strategy(
+            brand_core=brand_core,
+            brand_name=project.get("name", ""),
+            competitor_snapshots=snapshots,
+        )
+        return result
+    except Exception as exc:
+        logger.error("Strategy generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------

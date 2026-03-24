@@ -140,7 +140,7 @@ async def refresh_competitor_intelligence(
     Scrape competitor social profiles via Apify, analyse with Claude,
     and store snapshots in Firestore.
 
-    Each competitor dict: { name, instagram?, facebook?, tiktok? }
+    Each competitor dict: { name, website?, instagram?, facebook?, tiktok?, linkedin?, youtube? }
     Returns a summary of what was refreshed.
     """
     from backend.services import firebase_service
@@ -148,6 +148,8 @@ async def refresh_competitor_intelligence(
         scrape_instagram,
         scrape_facebook,
         scrape_tiktok,
+        scrape_linkedin,
+        scrape_youtube,
     )
 
     if not settings.APIFY_API_KEY:
@@ -157,7 +159,7 @@ async def refresh_competitor_intelligence(
 
     for competitor in competitors[:5]:  # cap at 5 to control cost
         name = competitor.get("name", "Unknown")
-        scraped: dict = {"name": name, "platforms": {}}
+        scraped: dict = {"name": name, "platforms": {}, "website": competitor.get("website", "")}
 
         if competitor.get("instagram"):
             try:
@@ -195,6 +197,30 @@ async def refresh_competitor_intelligence(
                 }
             except Exception as exc:
                 logger.warning("TikTok scrape failed for %s: %s", name, exc)
+
+        if competitor.get("linkedin"):
+            try:
+                data = await scrape_linkedin(competitor["linkedin"], settings.APIFY_API_KEY)
+                scraped["platforms"]["linkedin"] = {
+                    "posts": data.get("posts", [])[:10],
+                    "followers": data.get("followers", 0),
+                    "tagline": data.get("tagline", ""),
+                    "industry": data.get("industry", ""),
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+            except Exception as exc:
+                logger.warning("LinkedIn scrape failed for %s: %s", name, exc)
+
+        if competitor.get("youtube"):
+            try:
+                data = await scrape_youtube(competitor["youtube"], settings.APIFY_API_KEY, max_videos=10)
+                scraped["platforms"]["youtube"] = {
+                    "videos": data.get("videos", [])[:10],
+                    "channel_name": data.get("channel_name", ""),
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+            except Exception as exc:
+                logger.warning("YouTube scrape failed for %s: %s", name, exc)
 
         if scraped["platforms"]:
             scraped["analysis"] = await _analyse_competitor(name, scraped["platforms"])
@@ -252,6 +278,108 @@ Return ONLY valid JSON:
         return _parse_json_response(response.content[0].text)
     except Exception:
         return {"tone": "Unknown", "key_themes": [], "content_gaps": []}
+
+
+# ---------------------------------------------------------------------------
+# Competitive Strategy Plan
+# ---------------------------------------------------------------------------
+
+async def generate_competitive_strategy(
+    brand_core: dict,
+    brand_name: str,
+    competitor_snapshots: list[dict],
+) -> dict:
+    """
+    Compare brand core vs competitor analyses and produce an actionable
+    competitive strategy plan.
+
+    Returns:
+      executive_summary, brand_position, competitor_breakdown,
+      battlegrounds, action_plan, quick_wins
+    """
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+
+    competitors_text = ""
+    for snap in competitor_snapshots[:5]:
+        analysis = snap.get("analysis") or {}
+        web = snap.get("web_analysis") or {}
+        platforms = list((snap.get("platforms") or {}).keys())
+        competitors_text += f"""
+COMPETITOR: {snap.get("name", "?")}
+  Platforms: {", ".join(platforms) or "unknown"}
+  Tone: {analysis.get("tone", "")}
+  Key Themes: {", ".join(analysis.get("key_themes") or [])}
+  Strengths: {", ".join(analysis.get("strengths") or [])}
+  Weaknesses: {", ".join(analysis.get("weaknesses") or [])}
+  Content Gaps They Have: {", ".join(analysis.get("content_gaps") or [])}
+  Top Hashtags: {", ".join((analysis.get("top_hashtags") or [])[:8])}
+  Market Position: {web.get("market_position", "")}
+  Momentum: {web.get("momentum", "")}
+"""
+
+    prompt = f"""You are a senior brand strategist. Analyse this brand against its competitors and produce an actionable competitive strategy plan.
+
+OUR BRAND: {brand_name}
+{brand_context}
+
+COMPETITORS:
+{competitors_text}
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "executive_summary": "<2-3 sentence summary of our competitive position>",
+  "brand_position": {{
+    "strengths": [<up to 3 genuine strengths vs competitors>],
+    "vulnerabilities": [<up to 3 real risks or gaps vs competitors>],
+    "differentiation": "<what makes us genuinely different>"
+  }},
+  "competitor_breakdown": [
+    {{
+      "name": "<competitor name>",
+      "threat_level": "high|medium|low",
+      "what_they_do_better": "<1-2 sentences>",
+      "their_weakness": "<1-2 sentences>",
+      "how_to_beat_them": "<1-2 sentences specific tactic>"
+    }}
+  ],
+  "battlegrounds": [
+    {{
+      "area": "<e.g. Short-form video, Educational content, Community>",
+      "our_position": "winning|competitive|losing|untapped",
+      "recommendation": "<specific action>"
+    }}
+  ],
+  "action_plan": [
+    {{
+      "priority": "immediate|short_term|long_term",
+      "action": "<specific action>",
+      "rationale": "<why this matters>",
+      "expected_impact": "<what this achieves>"
+    }}
+  ],
+  "quick_wins": [<up to 3 things we can do THIS WEEK to gain competitive edge>]
+}}
+
+Be specific. Use competitor names. Reference actual patterns from the data. Make the plan genuinely actionable."""
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=2000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    try:
+        return _parse_json_response(response.content[0].text)
+    except Exception:
+        return {
+            "executive_summary": "Strategy analysis unavailable.",
+            "brand_position": {"strengths": [], "vulnerabilities": [], "differentiation": ""},
+            "competitor_breakdown": [],
+            "battlegrounds": [],
+            "action_plan": [],
+            "quick_wins": [],
+        }
 
 
 # ---------------------------------------------------------------------------

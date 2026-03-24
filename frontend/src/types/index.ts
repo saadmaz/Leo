@@ -354,12 +354,56 @@ export interface CompetitorAnalysis {
   engagement_patterns: string
 }
 
+export interface CompetitorWebAnalysis {
+  recent_news_summary: string
+  market_position: string
+  momentum: string
+  recent_moves: string[]
+  opportunity: string
+}
+
 export interface CompetitorSnapshot {
   id: string
   name: string
+  website?: string
   scrapedAt: string
   platforms: Record<string, unknown>
   analysis?: CompetitorAnalysis
+  web_analysis?: CompetitorWebAnalysis
+}
+
+export interface CompetitorStrategyBreakdown {
+  name: string
+  threat_level: 'high' | 'medium' | 'low'
+  what_they_do_better: string
+  their_weakness: string
+  how_to_beat_them: string
+}
+
+export interface StrategyBattleground {
+  area: string
+  our_position: 'winning' | 'competitive' | 'losing' | 'untapped'
+  recommendation: string
+}
+
+export interface StrategyAction {
+  priority: 'immediate' | 'short_term' | 'long_term'
+  action: string
+  rationale: string
+  expected_impact: string
+}
+
+export interface CompetitiveStrategy {
+  executive_summary: string
+  brand_position: {
+    strengths: string[]
+    vulnerabilities: string[]
+    differentiation: string
+  }
+  competitor_breakdown: CompetitorStrategyBreakdown[]
+  battlegrounds: StrategyBattleground[]
+  action_plan: StrategyAction[]
+  quick_wins: string[]
 }
 
 export interface MemoryFeedbackItem {
