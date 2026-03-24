@@ -843,6 +843,19 @@ export interface DiscoveredCompetitor {
   relevance_score?: number
   description?: string
   why_competitor?: string
+  location?: string
+  funding_stage?: string
+  funding_amount?: string
+  what_they_do?: string
+  key_advantage?: string
+  employee_count?: string
+  founded?: string
+  industry?: string
+  social_hints?: {
+    instagram?: string
+    linkedin?: string
+    twitter?: string
+  }
 }
 
 export interface DiscoveredInfluencer {

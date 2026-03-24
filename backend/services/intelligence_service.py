@@ -1187,70 +1187,181 @@ async def discover_competitors(
     brand_core: dict,
     website_url: Optional[str] = None,
 ) -> dict:
-    """Auto-discover competitors using Exa findSimilar or company search."""
-    from backend.services.integrations import exa_client
+    """
+    Discover competitors by:
+    1. Web-searching "{brand} competitors" via Tavily (mimics Google AI Overview)
+    2. Exa findSimilar on the brand website
+    3. Exa company search on brand themes
+    4. Synthesising all sources with Claude into rich competitor profiles
+    """
+    import asyncio as _asyncio
+    from backend.services.integrations import exa_client, tavily_client
 
-    existing_competitors = set(brand_core.get("competitors") or [])
+    brand_name = brand_core.get("brandName") or brand_core.get("name") or "this brand"
+    industry   = brand_core.get("industry") or ""
+    themes     = brand_core.get("themes") or []
+    existing   = set(brand_core.get("competitors") or [])
+
+    raw_web_results: list[str] = []
     candidates: list[dict] = []
 
-    if website_url:
+    # ── 1. Tavily: "{brand} competitors" direct web search ──────────────────
+    async def _tavily_competitor_search():
+        try:
+            query = f"{brand_name} {industry} top competitors alternatives"
+            resp = await tavily_client.search_advanced(
+                query=query,
+                max_results=8,
+                include_answer=True,
+                project_id=project_id,
+            )
+            answer = resp.get("answer", "")
+            snippets = [
+                f"{r.get('title', '')}: {r.get('content', '')[:400]}"
+                for r in (resp.get("results") or [])[:6]
+            ]
+            return answer, snippets
+        except Exception as exc:
+            logger.warning("Tavily competitor search failed: %s", exc)
+            return "", []
+
+    # ── 2. Exa findSimilar on brand website ─────────────────────────────────
+    async def _exa_similar():
+        if not website_url:
+            return []
         try:
             from urllib.parse import urlparse
-            brand_domain = urlparse(website_url).netloc
+            domain = urlparse(website_url).netloc
             similar = await exa_client.find_similar(
-                url=website_url, num_results=10,
-                exclude_domains=[brand_domain], project_id=project_id,
+                url=website_url, num_results=8,
+                exclude_domains=[domain], project_id=project_id,
             )
-            for r in similar:
-                name = r.get("title", "").split("|")[0].strip()[:60]
-                if name and name not in existing_competitors:
-                    candidates.append({
-                        "name": name, "url": r.get("url", ""),
-                        "snippet": r.get("summary") or (r.get("highlights", [""])[0] if r.get("highlights") else ""),
-                    })
+            return [
+                {
+                    "name": r.get("title", "").split("|")[0].strip()[:60],
+                    "url": r.get("url", ""),
+                    "snippet": r.get("summary") or (r.get("highlights") or [""])[0],
+                }
+                for r in similar
+                if r.get("title")
+            ]
         except Exception as exc:
-            logger.warning("findSimilar competitor discovery failed: %s", exc)
+            logger.warning("Exa findSimilar failed: %s", exc)
+            return []
 
-    themes = brand_core.get("themes") or []
-    if themes and len(candidates) < 5:
+    # ── 3. Exa company search on brand themes ────────────────────────────────
+    async def _exa_company_search():
+        if not themes:
+            return []
         try:
-            query = f"{themes[0]} {themes[1] if len(themes) > 1 else ''} brand company"
-            company_results = await exa_client.search_companies(query, num_results=8, project_id=project_id)
-            for r in company_results:
-                name = r.get("title", "").split("|")[0].strip()[:60]
-                if name and name not in existing_competitors:
-                    candidates.append({"name": name, "url": r.get("url", ""), "snippet": r.get("summary") or ""})
+            query = f"{' '.join(themes[:2])} {industry} company startup"
+            results = await exa_client.search_companies(query, num_results=8, project_id=project_id)
+            return [
+                {
+                    "name": r.get("title", "").split("|")[0].strip()[:60],
+                    "url": r.get("url", ""),
+                    "snippet": r.get("summary") or "",
+                }
+                for r in results
+                if r.get("title")
+            ]
         except Exception as exc:
-            logger.warning("Company search competitor discovery failed: %s", exc)
+            logger.warning("Exa company search failed: %s", exc)
+            return []
 
-    if not candidates:
-        return {"discovered": [], "message": "No competitors found"}
-
-    client = get_client()
-    brand_context = build_brand_core_context(brand_core)
-    candidate_text = "\n".join(
-        f"{i+1}. {c['name']} — {c['url']}\n   {c['snippet'][:200]}"
-        for i, c in enumerate(candidates[:10])
+    # Run all three in parallel
+    (tavily_answer, tavily_snippets), exa_similar_results, exa_company_results = (
+        await _asyncio.gather(
+            _tavily_competitor_search(),
+            _exa_similar(),
+            _exa_company_search(),
+        )
     )
 
-    prompt = f"""Given this brand, identify the top 5 genuine competitors.
+    raw_web_results = [tavily_answer] + tavily_snippets if tavily_answer else tavily_snippets
+    candidates = exa_similar_results + exa_company_results
+
+    # ── 4. Claude: synthesise everything into rich profiles ──────────────────
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+
+    web_context = "\n\n".join(filter(None, raw_web_results[:8]))
+    candidate_list = "\n".join(
+        f"- {c['name']} ({c['url']}): {c['snippet'][:200]}"
+        for c in candidates[:10]
+        if c.get("name") and c["name"] not in existing
+    )
+
+    prompt = f"""You are a competitive intelligence analyst. Identify the top 6 genuine competitors for this brand.
+
+OUR BRAND: {brand_name}
 BRAND CORE: {brand_context}
-CANDIDATES:
-{candidate_text}
+
+WEB SEARCH RESULTS (from "{brand_name} competitors" search):
+{web_context[:3000] or "No web results available"}
+
+ADDITIONAL COMPANY CANDIDATES:
+{candidate_list[:2000] or "None found"}
+
+Extract the 6 most relevant competitors. For each, extract or infer as much information as possible from the available data.
 
 Return ONLY valid JSON:
-{{"competitors": [{{"name": "...", "url": "...", "reason": "<1 sentence>"}}]}}"""
+{{
+  "competitors": [
+    {{
+      "name": "<company name>",
+      "url": "<website URL>",
+      "description": "<1-2 sentence description of what they do>",
+      "what_they_do": "<their core product/service in plain language>",
+      "key_advantage": "<their main competitive advantage>",
+      "location": "<city, country>",
+      "founded": "<year or range e.g. 2018-2020>",
+      "employee_count": "<e.g. 11-50 or 200+>",
+      "funding_stage": "<bootstrapped|pre-seed|seed|series-a|series-b|public|unknown>",
+      "funding_amount": "<e.g. $300K or $2.5M or unknown>",
+      "industry": "<industry/sector>",
+      "why_competitor": "<1 sentence: why they directly compete with us>",
+      "relevance_score": <float 0.0-1.0>,
+      "social_hints": {{
+        "instagram": "<handle if known, else null>",
+        "linkedin": "<company URL if known, else null>",
+        "twitter": "<handle if known, else null>"
+      }}
+    }}
+  ]
+}}
+
+IMPORTANT:
+- Only include genuine competitors (same market, similar customers)
+- Relevance score: 0.9+ means direct/primary competitor, 0.6-0.8 means significant, 0.4-0.6 means adjacent
+- Extract real data from the web results — don't fabricate funding amounts you don't see in the sources
+- Use "unknown" for fields you cannot determine
+- Order by relevance_score descending"""
 
     try:
         response = await client.messages.create(
             model=settings.LLM_CHAT_MODEL,
-            max_tokens=600,
+            max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse_json_response(response.content[0].text)
-        return {"discovered": result.get("competitors", [])}
-    except Exception:
-        return {"discovered": [
-            {"name": c["name"], "url": c["url"], "reason": "Similar brand in same space"}
-            for c in candidates[:5]
-        ]}
+        competitors = result.get("competitors", [])
+        # Filter already-tracked
+        competitors = [c for c in competitors if c.get("name") and c["name"] not in existing]
+        return {"competitors": competitors[:6]}
+    except Exception as exc:
+        logger.warning("Competitor discovery synthesis failed: %s", exc)
+        # Fallback: return raw candidates
+        return {
+            "competitors": [
+                {
+                    "name": c["name"],
+                    "url": c["url"],
+                    "description": c.get("snippet", ""),
+                    "why_competitor": "Similar company in the same space",
+                    "relevance_score": 0.6,
+                }
+                for c in candidates[:6]
+                if c.get("name") and c["name"] not in existing
+            ]
+        }

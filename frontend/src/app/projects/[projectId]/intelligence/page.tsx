@@ -7,7 +7,7 @@ import {
   TrendingUp, AlertTriangle, Lightbulb, Zap, Bell, Search,
   Globe, Instagram, Youtube, Linkedin, Facebook, Target,
   ArrowRight, CheckCircle2, Clock, Flame, Shield, Swords,
-  TrendingDown, Minus, Activity, Sparkles,
+  TrendingDown, Minus, Activity, Sparkles, MapPin, DollarSign, Building2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -275,16 +275,23 @@ export default function IntelligencePage() {
   }
 
   function addDiscoveredCompetitor(c: DiscoveredCompetitor) {
-    let name = c.name
-    if (!name) {
-      try { name = new URL(c.url).hostname.replace('www.', '') } catch { name = c.url }
+    const name = c.name || (() => { try { return new URL(c.url).hostname.replace('www.', '') } catch { return c.url } })()
+    const prefill: CompetitorForm = {
+      ...emptyForm(),
+      name,
+      website: c.url || '',
+      instagram: c.social_hints?.instagram || '',
+      linkedin: c.social_hints?.linkedin || '',
     }
     setCompetitors(prev => {
-      const empty = prev.find(p => !p.name.trim())
-      if (empty) return prev.map(p => !p.name.trim() ? { ...p, name, website: c.url } : p)
-      return [...prev, { ...emptyForm(), name, website: c.url }]
+      const emptyIdx = prev.findIndex(p => !p.name.trim())
+      if (emptyIdx >= 0) {
+        return prev.map((p, i) => i === emptyIdx ? prefill : p)
+      }
+      return [...prev, prefill]
     })
     setShowAddForm(true)
+    toast.success(`${name} added to the form — fill in any missing handles and run analysis.`)
   }
 
   // ---------------------------------------------------------------------------
@@ -568,8 +575,14 @@ function ProgressPanel({ steps }: { steps: ProgressStep[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Discovered Banner
+// Discovered Banner — rich cards
 // ---------------------------------------------------------------------------
+
+const RELEVANCE_LABEL = (score: number) => {
+  if (score >= 0.85) return { label: 'Direct competitor', color: 'text-red-400 bg-red-400/10' }
+  if (score >= 0.65) return { label: 'Strong competitor', color: 'text-amber-400 bg-amber-400/10' }
+  return { label: 'Adjacent', color: 'text-blue-400 bg-blue-400/10' }
+}
 
 function DiscoveredBanner({
   discovered,
@@ -581,29 +594,96 @@ function DiscoveredBanner({
   onDismiss: () => void
 }) {
   return (
-    <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-border bg-muted/20 p-4">
+    <div className="mx-4 sm:mx-6 mt-4 rounded-2xl border border-border bg-muted/10 p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Auto-discovered competitors — click to add
-        </p>
-        <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground">
+        <div>
+          <p className="text-sm font-semibold">Competitors found — click any to add</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Sourced from web search · {discovered.length} found
+          </p>
+        </div>
+        <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground p-1">
           <X className="w-4 h-4" />
         </button>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {discovered.map((c, i) => (
-          <button
-            key={i}
-            onClick={() => onAdd(c)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs hover:border-primary/50 hover:bg-primary/5 transition-colors"
-          >
-            <Plus className="w-3 h-3 text-primary shrink-0" />
-            <span className="font-medium">{c.name || (() => { try { return new URL(c.url).hostname.replace('www.', '') } catch { return c.url } })()}</span>
-            {c.relevance_score !== undefined && (
-              <span className="text-muted-foreground ml-1">{Math.round(c.relevance_score * 100)}%</span>
-            )}
-          </button>
-        ))}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {discovered.map((c, i) => {
+          const rel = RELEVANCE_LABEL(c.relevance_score ?? 0.6)
+          return (
+            <button
+              key={i}
+              onClick={() => onAdd(c)}
+              className="group relative text-left rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-primary/5 transition-all p-4 flex flex-col gap-2"
+            >
+              {/* Top row */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-semibold truncate">{c.name}</span>
+                </div>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${rel.color}`}>
+                  {rel.label}
+                </span>
+              </div>
+
+              {/* Description */}
+              {(c.what_they_do || c.description) && (
+                <p className="text-xs text-foreground/70 line-clamp-2">
+                  {c.what_they_do || c.description}
+                </p>
+              )}
+
+              {/* Key advantage */}
+              {c.key_advantage && (
+                <p className="text-[10px] text-emerald-400 flex items-start gap-1">
+                  <Sparkles className="w-3 h-3 shrink-0 mt-0.5" />
+                  {c.key_advantage}
+                </p>
+              )}
+
+              {/* Meta row */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-auto pt-1 border-t border-border/50">
+                {c.location && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <MapPin className="w-2.5 h-2.5" />{c.location}
+                  </span>
+                )}
+                {c.funding_amount && c.funding_amount !== 'unknown' && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <DollarSign className="w-2.5 h-2.5" />{c.funding_amount}
+                  </span>
+                )}
+                {c.employee_count && c.employee_count !== 'unknown' && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Building2 className="w-2.5 h-2.5" />{c.employee_count}
+                  </span>
+                )}
+                {c.funding_stage && c.funding_stage !== 'unknown' && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                    {c.funding_stage}
+                  </span>
+                )}
+              </div>
+
+              {/* Why competitor */}
+              {c.why_competitor && (
+                <p className="text-[10px] text-muted-foreground italic line-clamp-1">
+                  {c.why_competitor}
+                </p>
+              )}
+
+              {/* Add indicator */}
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <Plus className="w-3 h-3 text-primary-foreground" />
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
