@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import {
-  X, Loader2, Building2, Globe, Users, TrendingUp, TrendingDown,
+  X, Loader2, Building2, Globe, TrendingUp,
   Zap, Target, AlertTriangle, CheckCircle2, ArrowRight, RefreshCw,
-  Star, Flame, Shield, BarChart3, PieChart, Activity, Linkedin,
+  Flame, Shield, BarChart3, PieChart, Activity, Linkedin,
   Instagram, Youtube, Facebook, Clock, DollarSign, MapPin, Calendar,
   ChevronDown, ChevronUp, Lightbulb,
 } from 'lucide-react'
