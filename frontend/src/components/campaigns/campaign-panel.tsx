@@ -520,7 +520,6 @@ function ContentPackView({
             key={i}
             editKey={key}
             edits={edits}
-            onEdit={onEdit}
             copyText={text + (cap.hashtags.length ? '\n\n' + cap.hashtags.map((h) => `#${h}`).join(' ') : '')}
             onSaveToLibrary={() => saveToLibrary(text, cap.hashtags, 'caption')}
           >
@@ -546,7 +545,6 @@ function ContentPackView({
             key={i}
             editKey={headlineKey}
             edits={edits}
-            onEdit={onEdit}
             copyText={copyText}
             onSaveToLibrary={() => saveToLibrary(body, [], 'ad_copy')}
           >
@@ -572,12 +570,11 @@ function ContentPackView({
 // ---------------------------------------------------------------------------
 
 function EditableBlock({
-  children, editKey, edits, onEdit: _onEdit, copyText, onSaveToLibrary,
+  children, editKey, edits, copyText, onSaveToLibrary,
 }: {
   children: React.ReactNode
   editKey: string
   edits: Record<string, string>
-  onEdit: (key: string, value: string) => void
   copyText: string
   onSaveToLibrary: () => void
 }) {
