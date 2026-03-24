@@ -12,10 +12,13 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+import asyncio
+
 from backend.api.deps import get_project_or_404, assert_member
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 from backend.services import content_studio_service, firebase_service
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["planner"])
@@ -34,6 +37,7 @@ class PlannerGenerateRequest(BaseModel):
 
 class PlannerApplyRequest(BaseModel):
     items: list[dict]               # Array of ContentPlanItem dicts
+    mode: str = "library"           # "library" | "calendar"
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +55,7 @@ async def generate_plan(
     """Generate an AI content plan for the given duration and platforms."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "content_plan")
 
     brand_core = project.get("brandCore") or {}
     project_name = project.get("name", "the brand")
@@ -87,22 +92,33 @@ async def apply_plan(
     saved = 0
     for item in body.items:
         try:
-            firebase_service.save_content_library_item(project_id, {
-                "platform": item.get("platform", "Instagram"),
-                "type": item.get("contentType", "caption"),
-                "content": item.get("suggestedContent", item.get("topic", "")),
-                "hashtags": item.get("hashtags", []),
-                "metadata": {
-                    "plannedDate": item.get("date", ""),
-                    "postingTime": item.get("postingTime", ""),
-                    "contentAngle": item.get("contentAngle", ""),
-                },
-                "status": "draft",
-                "tags": ["ai-planned"],
-                "scheduledAt": None,
-            })
+            if body.mode == "calendar":
+                firebase_service.save_calendar_entry(project_id, {
+                    "date": item.get("date", ""),
+                    "platform": item.get("platform", "Instagram"),
+                    "content": item.get("suggestedContent", item.get("topic", "")),
+                    "time": item.get("postingTime", ""),
+                    "hashtags": item.get("hashtags", []),
+                    "type": item.get("contentType", "caption"),
+                    "status": "draft",
+                })
+            else:
+                firebase_service.save_content_library_item(project_id, {
+                    "platform": item.get("platform", "Instagram"),
+                    "type": item.get("contentType", "caption"),
+                    "content": item.get("suggestedContent", item.get("topic", "")),
+                    "hashtags": item.get("hashtags", []),
+                    "metadata": {
+                        "plannedDate": item.get("date", ""),
+                        "postingTime": item.get("postingTime", ""),
+                        "contentAngle": item.get("contentAngle", ""),
+                    },
+                    "status": "draft",
+                    "tags": ["ai-planned"],
+                    "scheduledAt": None,
+                })
             saved += 1
         except Exception as exc:
             logger.warning("Failed to save plan item: %s", exc)
 
-    return {"saved": saved, "total": len(body.items)}
+    return {"saved": saved, "total": len(body.items), "mode": body.mode}

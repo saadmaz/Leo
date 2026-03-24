@@ -54,6 +54,7 @@ export interface ProjectMember {
   email: string
   displayName: string
   role: 'admin' | 'editor' | 'viewer'
+  joinedAt?: string
 }
 
 // ---------------------------------------------------------------------------

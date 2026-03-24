@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp,
-  Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck, Zap,
+  Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck, Zap, CalendarRange,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -68,6 +68,9 @@ export default function LibraryPage() {
   const [scoring, setScoring] = useState(false)
   const [scores, setScores] = useState<Record<string, number | null>>({})
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'score_desc'>('date_desc')
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduling, setScheduling] = useState(false)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -128,6 +131,24 @@ export default function LibraryPage() {
     toast.success(`${ids.length} items approved`)
   }
 
+  async function handleBulkSchedule() {
+    if (!scheduleDate) { toast.error('Pick a start date'); return }
+    setScheduling(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const result = await api.contentLibrary.bulkSchedule(params.projectId, ids, scheduleDate)
+      toast.success(`${result.scheduled} items scheduled to calendar`)
+      setSelectedIds(new Set())
+      setScheduleModalOpen(false)
+      setScheduleDate('')
+      loadItems()
+    } catch {
+      toast.error('Failed to schedule items')
+    } finally {
+      setScheduling(false)
+    }
+  }
+
   async function handleSubmitReview(id: string) {
     try {
       await api.approval.submitForReview(params.projectId, id)
@@ -182,7 +203,13 @@ export default function LibraryPage() {
                 onClick={handleBulkApprove}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
-                <Check className="w-3.5 h-3.5" /> Approve selected
+                <Check className="w-3.5 h-3.5" /> Approve
+              </button>
+              <button
+                onClick={() => setScheduleModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <CalendarRange className="w-3.5 h-3.5" /> Schedule
               </button>
             </>
           )}
@@ -323,6 +350,41 @@ export default function LibraryPage() {
           platform={metricsItem.platform}
           onClose={() => setMetricsItem(null)}
         />
+      )}
+
+      {/* Bulk Schedule Modal */}
+      {scheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border border-border rounded-xl p-6 w-80 shadow-xl space-y-4">
+            <h3 className="text-sm font-semibold">Schedule {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} to Calendar</h3>
+            <p className="text-xs text-muted-foreground">One item per day, starting from the date you choose.</p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Start date</label>
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleBulkSchedule}
+                disabled={scheduling || !scheduleDate}
+                className="flex-1 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {scheduling ? 'Scheduling…' : 'Schedule'}
+              </button>
+              <button
+                onClick={() => { setScheduleModalOpen(false); setScheduleDate('') }}
+                className="flex-1 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

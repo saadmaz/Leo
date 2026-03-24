@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from backend.api.deps import get_project_as_member, get_project_as_editor
 from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service, content_ops_service
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,8 @@ async def bulk_generate(
     """
     project = get_project_as_editor(project_id, user["uid"])
     brand_core = project.get("brandCore") or {}
+    total_items = len(body.platforms) * body.count_per_platform
+    await asyncio.to_thread(check_and_deduct, user["uid"], "bulk_generate_item", total_items)
 
     async def event_stream():
         async for chunk in content_ops_service.stream_bulk_generate(
@@ -347,6 +350,62 @@ async def delete_calendar_entry(
     """Delete a calendar entry."""
     get_project_as_editor(project_id, user["uid"])
     await asyncio.to_thread(firebase_service.delete_calendar_entry, project_id, entry_id)
+
+
+# ---------------------------------------------------------------------------
+# Bulk schedule library items to calendar
+# ---------------------------------------------------------------------------
+
+class BulkScheduleBody(BaseModel):
+    item_ids: list[str]
+    start_date: str  # YYYY-MM-DD — first date, one post/day
+
+
+@router.post("/content-library/bulk-schedule")
+async def bulk_schedule(
+    project_id: str,
+    body: BulkScheduleBody,
+    user: CurrentUser,
+):
+    """Schedule multiple library items to the calendar, starting from start_date, 1 per day."""
+    from datetime import datetime, timedelta
+    get_project_as_editor(project_id, user["uid"])
+
+    try:
+        start = datetime.strptime(body.start_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="start_date must be YYYY-MM-DD")
+
+    scheduled = 0
+    errors = 0
+    for i, item_id in enumerate(body.item_ids):
+        try:
+            item = await asyncio.to_thread(
+                firebase_service.get_content_library_item, project_id, item_id
+            )
+            if not item:
+                errors += 1
+                continue
+            date_str = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+            await asyncio.to_thread(firebase_service.save_calendar_entry, project_id, {
+                "date": date_str,
+                "platform": item.get("platform", "Instagram"),
+                "content": item.get("content", ""),
+                "hashtags": item.get("hashtags", []),
+                "type": item.get("type", "caption"),
+                "status": "scheduled",
+                "libraryItemId": item_id,
+            })
+            await asyncio.to_thread(
+                firebase_service.update_content_library_item,
+                project_id, item_id, {"status": "scheduled", "scheduledAt": date_str}
+            )
+            scheduled += 1
+        except Exception as exc:
+            logging.warning("bulk_schedule: failed for item %s: %s", item_id, exc)
+            errors += 1
+
+    return {"scheduled": scheduled, "errors": errors}
 
 
 # ---------------------------------------------------------------------------

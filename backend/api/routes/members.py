@@ -14,6 +14,7 @@ Notes:
 """
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
@@ -45,14 +46,18 @@ async def list_members(project_id: str, user: CurrentUser) -> list[dict]:
     project = get_project_as_member(project_id, user["uid"])
     members_map: dict = project.get("members") or {}
 
+    joined_at_map: dict = project.get("membersJoinedAt") or {}
+
     result = []
     for uid, role in members_map.items():
         profile = firebase_service.get_user_profile(uid)
+        joined_ts = joined_at_map.get(uid)
+        joined_str = joined_ts.isoformat() if hasattr(joined_ts, "isoformat") else (str(joined_ts) if joined_ts else None)
         if profile:
-            result.append({**profile, "role": role})
+            result.append({**profile, "role": role, "joinedAt": joined_str})
         else:
             # Auth record missing — include uid only so the list still shows
-            result.append({"uid": uid, "email": "", "displayName": uid, "role": role})
+            result.append({"uid": uid, "email": "", "displayName": uid, "role": role, "joinedAt": joined_str})
 
     # Admins first, then editors, then viewers
     _order = {"admin": 0, "editor": 1, "viewer": 2}
@@ -85,9 +90,12 @@ async def invite_member(project_id: str, body: InviteMemberBody, user: CurrentUs
         raise HTTPException(status_code=409, detail="User is already a member of this project.")
 
     members[uid] = body.role
-    firebase_service.update_project(project_id, {"members": members})
+    now = datetime.now(timezone.utc)
+    joined_at_map: dict = dict(project.get("membersJoinedAt") or {})
+    joined_at_map[uid] = now
+    firebase_service.update_project(project_id, {"members": members, "membersJoinedAt": joined_at_map})
     logger.info("User %s invited %s (%s) to project %s", user["uid"], uid, body.role, project_id)
-    return {**profile, "role": body.role}
+    return {**profile, "role": body.role, "joinedAt": now.isoformat()}
 
 
 class UpdateRoleBody(BaseModel):

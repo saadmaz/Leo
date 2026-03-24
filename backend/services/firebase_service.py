@@ -1382,6 +1382,19 @@ def delete_content_library_item(project_id: str, item_id: str) -> None:
     )
 
 
+def get_content_library_item(project_id: str, item_id: str) -> dict | None:
+    """Fetch a single content library item by ID."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("content_library").document(item_id)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    return {"id": doc.id, **doc.to_dict()}
+
+
 # ---------------------------------------------------------------------------
 # Calendar
 # ---------------------------------------------------------------------------

@@ -270,6 +270,11 @@ export default function TeamPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                      {member.joinedAt && (
+                        <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                          Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">

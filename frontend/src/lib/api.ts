@@ -577,11 +577,12 @@ export const api = {
     apply: (
       projectId: string,
       items: ContentPlanItem[],
+      mode: 'library' | 'calendar' = 'library',
       signal?: AbortSignal,
     ) =>
-      post<{ saved: number; total: number }>(
+      post<{ saved: number; total: number; mode: string }>(
         `/projects/${projectId}/planner/apply`,
-        { items },
+        { items, mode },
         signal,
       ),
   },
@@ -747,6 +748,18 @@ export const api = {
 
     delete: (projectId: string, itemId: string, signal?: AbortSignal) =>
       del(`/projects/${projectId}/content-library/${itemId}`, signal),
+
+    bulkSchedule: (
+      projectId: string,
+      itemIds: string[],
+      startDate: string,
+      signal?: AbortSignal,
+    ) =>
+      post<{ scheduled: number; errors: number }>(
+        `/projects/${projectId}/content-library/bulk-schedule`,
+        { item_ids: itemIds, start_date: startDate },
+        signal,
+      ),
   },
 
   // -------------------------------------------------------------------------
@@ -915,6 +928,8 @@ export const api = {
       get<ActivityEvent[]>(`/projects/${projectId}/analytics/activity`),
     getAiSummary: (projectId: string) =>
       get<{ summary: string }>(`/projects/${projectId}/analytics/ai-summary`),
+    compare: (projectId: string, period: '7d' | '30d' = '7d') =>
+      get<{ period_days: number; library: { current: number; previous: number; pct_change: number | null }; calendar: { current: number; previous: number; pct_change: number | null } }>(`/projects/${projectId}/analytics/compare?period=${period}`),
   },
 
   performance: {

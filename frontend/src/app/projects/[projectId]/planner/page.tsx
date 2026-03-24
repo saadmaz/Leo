@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  CalendarRange, Loader2, Sparkles, Check, ChevronDown, ChevronUp, Library, Pencil, AlertTriangle,
+  CalendarRange, Loader2, Sparkles, Check, ChevronDown, ChevronUp, Library, Pencil, AlertTriangle, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -50,6 +50,7 @@ export default function PlannerPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [applying, setApplying] = useState(false)
   const [planEdits, setPlanEdits] = useState<Record<number, { topic?: string; suggestedContent?: string }>>({})
+  const [applyMode, setApplyMode] = useState<'library' | 'calendar'>('library')
 
   function handlePlanEdit(idx: number, field: 'topic' | 'suggestedContent', value: string) {
     setPlanEdits((prev) => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }))
@@ -107,8 +108,9 @@ export default function PlannerPage() {
     if (selected.length === 0) { toast.error('Select at least one post'); return }
     setApplying(true)
     try {
-      const data = await api.planner.apply(params.projectId, selected)
-      toast.success(`${data.saved} posts added to Content Library`)
+      const data = await api.planner.apply(params.projectId, selected, applyMode)
+      const dest = data.mode === 'calendar' ? 'Calendar' : 'Content Library'
+      toast.success(`${data.saved} posts added to ${dest}`)
       setSelectedIds(new Set())
     } catch {
       toast.error('Failed to apply plan')
@@ -146,13 +148,28 @@ export default function PlannerPage() {
         {plan.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{selectedIds.size}/{plan.length} selected</span>
+            {/* Mode toggle */}
+            <div className="flex items-center border border-border rounded-lg overflow-hidden text-xs">
+              <button
+                onClick={() => setApplyMode('library')}
+                className={cn('flex items-center gap-1 px-2.5 py-1.5 transition-colors', applyMode === 'library' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}
+              >
+                <Library className="w-3 h-3" /> Library
+              </button>
+              <button
+                onClick={() => setApplyMode('calendar')}
+                className={cn('flex items-center gap-1 px-2.5 py-1.5 transition-colors', applyMode === 'calendar' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}
+              >
+                <CalendarDays className="w-3 h-3" /> Calendar
+              </button>
+            </div>
             <button
               onClick={handleApply}
               disabled={applying || selectedIds.size === 0}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Library className="w-3.5 h-3.5" />}
-              Add to Library
+              {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Apply
             </button>
           </div>
         )}

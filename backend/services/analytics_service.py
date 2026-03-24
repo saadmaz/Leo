@@ -6,7 +6,7 @@ and AI-powered performance summaries.
 """
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from backend.services import firebase_service
@@ -281,3 +281,63 @@ Be direct. Identify what's working, flag any concerns, and give 1-2 specific act
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text
+
+
+# ---------------------------------------------------------------------------
+# Period comparison
+# ---------------------------------------------------------------------------
+
+def _pct_change(current: int, previous: int) -> float | None:
+    """Return percentage change, or None if there's no previous data."""
+    if previous == 0:
+        return None
+    return round(((current - previous) / previous) * 100, 1)
+
+
+async def get_comparison(project_id: str, days: int = 7) -> dict:
+    """Compare item counts in the current period vs the same-length previous period."""
+    now = datetime.now(timezone.utc)
+    period_start = now - timedelta(days=days)
+    prev_start = period_start - timedelta(days=days)
+
+    db = firebase_service.get_db()
+
+    def _count_in_range(docs, start: datetime, end: datetime) -> int:
+        count = 0
+        for d in docs:
+            data = d.to_dict()
+            ts = data.get("createdAt") or data.get("updatedAt")
+            if ts is None:
+                continue
+            if isinstance(ts, str):
+                try:
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+            else:
+                dt = ts
+            if not dt.tzinfo:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if start <= dt < end:
+                count += 1
+        return count
+
+    lib_docs = list(
+        db.collection("projects").document(project_id)
+          .collection("content_library").stream()
+    )
+    cal_docs = list(
+        db.collection("projects").document(project_id)
+          .collection("calendar_entries").stream()
+    )
+
+    lib_curr = _count_in_range(lib_docs, period_start, now)
+    lib_prev = _count_in_range(lib_docs, prev_start, period_start)
+    cal_curr = _count_in_range(cal_docs, period_start, now)
+    cal_prev = _count_in_range(cal_docs, prev_start, period_start)
+
+    return {
+        "period_days": days,
+        "library": {"current": lib_curr, "previous": lib_prev, "pct_change": _pct_change(lib_curr, lib_prev)},
+        "calendar": {"current": cal_curr, "previous": cal_prev, "pct_change": _pct_change(cal_curr, cal_prev)},
+    }

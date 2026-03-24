@@ -11,8 +11,9 @@ Endpoints:
 """
 
 import logging
+from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from backend.api.deps import get_project_as_member
@@ -89,3 +90,15 @@ async def get_ai_summary(
     get_project_as_member(project_id, user["uid"])
     summary = await analytics_service.generate_performance_summary(project_id)
     return {"summary": summary}
+
+
+@router.get("/analytics/compare")
+async def get_comparison(
+    project_id: str,
+    user: CurrentUser,
+    period: Optional[str] = Query("7d", regex="^(7d|30d)$"),
+):
+    """Compare key metrics for the current period vs the previous same-length period."""
+    get_project_as_member(project_id, user["uid"])
+    days = 30 if period == "30d" else 7
+    return await analytics_service.get_comparison(project_id, days)

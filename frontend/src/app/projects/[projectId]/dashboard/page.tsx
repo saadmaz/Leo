@@ -16,6 +16,12 @@ import { BackButton } from '@/components/layout/back-button'
 import { SetupChecklist } from '@/components/onboarding/setup-checklist'
 import type { ProjectAnalytics, ProjectInsight } from '@/types'
 
+type ComparisonData = {
+  period_days: number
+  library: { current: number; previous: number; pct_change: number | null }
+  calendar: { current: number; previous: number; pct_change: number | null }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -61,19 +67,25 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [insights, setInsights] = useState<ProjectInsight[]>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [comparison, setComparison] = useState<ComparisonData | null>(null)
+  const [comparePeriod, setComparePeriod] = useState<'7d' | '30d'>('7d')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await api.analytics.get(params.projectId)
+      const [result, comp] = await Promise.all([
+        api.analytics.get(params.projectId),
+        api.analytics.compare(params.projectId, comparePeriod),
+      ])
       setData(result)
+      setComparison(comp)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load analytics')
     } finally {
       setLoading(false)
     }
-  }, [params.projectId])
+  }, [params.projectId, comparePeriod])
 
   const loadInsights = useCallback(async () => {
     setInsightsLoading(true)
@@ -127,13 +139,26 @@ export default function DashboardPage() {
         {activeProject && (
           <span className="text-xs text-muted-foreground">— {activeProject.name}</span>
         )}
-        <button
-          onClick={load}
-          className="ml-auto p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center border border-border rounded-md overflow-hidden text-xs">
+            {(['7d', '30d'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => { setComparePeriod(p) }}
+                className={cn('px-2.5 py-1 transition-colors', comparePeriod === p ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted/50')}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={load}
+            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Body */}
@@ -149,6 +174,7 @@ export default function DashboardPage() {
             label="Library Items"
             value={lib?.total ?? 0}
             sub={`${lib?.by_status['posted'] ?? 0} posted`}
+            trend={comparison?.library.pct_change ?? null}
             onClick={() => router.push(`/projects/${params.projectId}/library`)}
           />
           <StatCard
@@ -156,6 +182,7 @@ export default function DashboardPage() {
             label="Upcoming Posts"
             value={cal?.upcoming_count ?? 0}
             sub="next 30 days"
+            trend={comparison?.calendar.pct_change ?? null}
             onClick={() => router.push(`/projects/${params.projectId}/calendar`)}
           />
           <StatCard
@@ -417,12 +444,13 @@ function InsightCard({ insight }: { insight: ProjectInsight }) {
 // ---------------------------------------------------------------------------
 
 function StatCard({
-  icon, label, value, sub, onClick,
+  icon, label, value, sub, trend, onClick,
 }: {
   icon: React.ReactNode
   label: string
   value: number
   sub: string
+  trend?: number | null
   onClick?: () => void
 }) {
   return (
@@ -433,6 +461,14 @@ function StatCard({
       <div className="flex items-center gap-2 text-muted-foreground mb-2 group-hover:text-foreground transition-colors">
         {icon}
         <span className="text-xs font-medium">{label}</span>
+        {trend !== null && trend !== undefined && (
+          <span className={cn(
+            'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+            trend > 0 ? 'bg-green-500/10 text-green-600' : trend < 0 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground',
+          )}>
+            {trend > 0 ? '+' : ''}{trend}%
+          </span>
+        )}
       </div>
       <p className="text-2xl font-bold tabular-nums">{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>

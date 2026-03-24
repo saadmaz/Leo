@@ -20,26 +20,55 @@ const PLANS = [
     icon: Sparkles,
     color: 'text-muted-foreground',
     borderColor: 'border-border',
-    features: ['1 project', '1 brand ingestion', '20 messages / month', '3 campaigns'],
+    credits: '100 credits / day',
+    features: [
+      '1 project',
+      '1 seat',
+      '1 brand ingestion',
+      '100 AI credits / day',
+      'Chat, Bulk Generate, Library',
+      'Community support',
+    ],
   },
   {
     key: 'pro' as const,
     label: 'Pro',
-    price: 29,
+    price: 49,
     icon: Zap,
     color: 'text-violet-400',
     borderColor: 'border-violet-500/50',
     popular: true,
-    features: ['10 projects', 'Unlimited brand ingestions', '500 messages / month', 'Unlimited campaigns', 'Priority support'],
+    credits: '3,000 credits / month',
+    features: [
+      '5 projects',
+      '3 seats',
+      'Unlimited brand ingestions',
+      '3,000 AI credits / month',
+      'Campaigns, Content Planner, Image Studio',
+      'Deep Search (SerpAPI + Firecrawl)',
+      'Analytics & Insights',
+      'Priority support',
+    ],
   },
   {
     key: 'agency' as const,
     label: 'Agency',
-    price: 99,
+    price: 149,
     icon: Building2,
     color: 'text-amber-400',
     borderColor: 'border-amber-500/50',
-    features: ['Unlimited projects', 'Unlimited ingestions', 'Unlimited messages', 'Unlimited campaigns', 'White-label ready', 'Priority support'],
+    credits: '15,000 credits / month',
+    features: [
+      '25 projects',
+      '5 seats',
+      'Unlimited ingestions',
+      '15,000 AI credits / month',
+      'Everything in Pro',
+      'Bulk Schedule to Calendar',
+      'White-label ready',
+      'Client portal & PDF exports',
+      'Dedicated support',
+    ],
   },
 ]
 
@@ -218,9 +247,12 @@ export default function BillingPage() {
                   )}
                 </div>
 
-                <div>
-                  <span className="text-3xl font-bold">${plan.price}</span>
-                  <span className="text-sm text-muted-foreground">/mo</span>
+                <div className="space-y-0.5">
+                  <div>
+                    <span className="text-3xl font-bold">${plan.price}</span>
+                    <span className="text-sm text-muted-foreground">/mo</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{plan.credits}</p>
                 </div>
 
                 <ul className="flex-1 space-y-2">

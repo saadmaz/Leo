@@ -15,11 +15,14 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
+import asyncio
+
 from backend.api.deps import get_project_or_404, assert_member
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 from backend.services import image_service, firebase_service
 from backend.services.llm_service import get_client, build_brand_core_context
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["generate"])
@@ -74,6 +77,7 @@ async def generate_image(
 
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "image_generate")
 
     try:
         url = await image_service.generate_image(
