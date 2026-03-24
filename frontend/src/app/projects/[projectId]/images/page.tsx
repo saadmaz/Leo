@@ -30,6 +30,16 @@ const STYLES = [
 
 const PLATFORMS = ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'X']
 
+const STYLE_PRESETS = [
+  { label: 'Minimal',       prefix: 'Minimalist, clean white background, studio light,' },
+  { label: 'Dark & Moody',  prefix: 'Dark moody atmosphere, dramatic lighting, deep shadows,' },
+  { label: 'Bright & Airy', prefix: 'Bright airy pastel tones, soft natural light, fresh,' },
+  { label: 'Cinematic',     prefix: 'Cinematic wide shot, film grain, dramatic color grade,' },
+  { label: 'Flat Illustr.', prefix: 'Flat illustration style, bold vector shapes, minimal,' },
+  { label: 'Watercolor',    prefix: 'Soft watercolor painting, delicate brush strokes, artistic,' },
+  { label: 'Product Shot',  prefix: 'Professional product photography, clean background, sharp focus,' },
+]
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -48,8 +58,8 @@ export default function ImagesPage() {
   const [platform, setPlatform] = useState('Instagram')
   const [generatingPrompt, setGeneratingPrompt] = useState(false)
   const [generatingImage, setGeneratingImage] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [results, setResults] = useState<string[]>([])
+  const [saving, setSaving] = useState<number | null>(null) // index being saved
 
   // Gallery state
   const [images, setImages] = useState<GeneratedImage[]>([])
@@ -85,10 +95,14 @@ export default function ImagesPage() {
   async function handleGenerateImage() {
     if (!prompt.trim()) { toast.error('Enter or generate a prompt first'); return }
     setGeneratingImage(true)
-    setResult(null)
+    setResults([])
     try {
-      const data = await api.generate.image(params.projectId, { prompt, style, aspectRatio })
-      setResult(data.url)
+      const [r1, r2, r3] = await Promise.all([
+        api.generate.image(params.projectId, { prompt, style, aspectRatio }),
+        api.generate.image(params.projectId, { prompt, style, aspectRatio }),
+        api.generate.image(params.projectId, { prompt, style, aspectRatio }),
+      ])
+      setResults([r1.url, r2.url, r3.url])
     } catch {
       toast.error('Image generation failed — check that GEMINI_API_KEY is configured')
     } finally {
@@ -96,28 +110,34 @@ export default function ImagesPage() {
     }
   }
 
-  async function handleSave() {
-    if (!result) return
-    setSaving(true)
+  async function handleSave(idx: number) {
+    const url = results[idx]
+    if (!url) return
+    setSaving(idx)
     try {
-      await api.images.save(params.projectId, { dataUrl: result, prompt, aspectRatio, style, platform })
+      await api.images.save(params.projectId, { dataUrl: url, prompt, aspectRatio, style, platform })
       toast.success('Saved to gallery')
-      setResult(null)
-      setPrompt('')
-      setBrief('')
     } catch {
       toast.error('Failed to save')
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
-  function handleDownload() {
-    if (!result) return
+  function handleDownload(idx: number) {
+    const url = results[idx]
+    if (!url) return
     const a = document.createElement('a')
-    a.href = result
+    a.href = url
     a.download = `leo-image-${Date.now()}.png`
     a.click()
+  }
+
+  function applyPreset(prefix: string) {
+    setBrief((prev) => {
+      const stripped = STYLE_PRESETS.reduce((s, p) => s.replace(p.prefix + ' ', '').replace(p.prefix, ''), prev).trim()
+      return `${prefix} ${stripped}`.trim()
+    })
   }
 
   async function handleDelete(imageId: string) {
@@ -181,6 +201,26 @@ export default function ImagesPage() {
                         )}
                       >
                         {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Style Presets</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STYLE_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        onClick={() => applyPreset(p.prefix)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-md text-xs transition-colors border',
+                          brief.startsWith(p.prefix)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background border-border text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {p.label}
                       </button>
                     ))}
                   </div>
@@ -275,46 +315,57 @@ export default function ImagesPage() {
               </div>
             </div>
 
-            {/* Result */}
+            {/* Results: 3 variants */}
             {generatingImage && (
-              <div className={cn('rounded-xl border border-border bg-muted/30 flex items-center justify-center w-full max-w-sm mx-auto', aspectClass)}>
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-xs text-muted-foreground">Creating your image…</p>
-                </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className={cn('rounded-xl border border-border bg-muted/30 flex items-center justify-center', aspectClass)}>
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      <p className="text-[10px] text-muted-foreground">Variant {i + 1}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
-            {result && !generatingImage && (
-              <div className="flex flex-col items-center gap-3">
-                <div className={cn('rounded-xl overflow-hidden border border-border w-full max-w-sm', aspectClass)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={result} alt="Generated" className="w-full h-full object-cover" />
+            {results.length > 0 && !generatingImage && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">3 variants generated — save the ones you like</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {results.map((url, i) => (
+                    <div key={i} className="flex flex-col gap-2">
+                      <div className={cn('rounded-xl overflow-hidden border border-border', aspectClass)}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Variant ${i + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDownload(i)}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium border border-border hover:bg-muted transition-colors"
+                        >
+                          <Download className="w-3 h-3" />
+                          Download
+                        </button>
+                        <button
+                          onClick={() => handleSave(i)}
+                          disabled={saving === i}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        >
+                          {saving === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />}
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Download
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  >
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-                    Save to Gallery
-                  </button>
-                  <button
-                    onClick={handleGenerateImage}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Regenerate
-                  </button>
-                </div>
+                <button
+                  onClick={handleGenerateImage}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Regenerate all
+                </button>
               </div>
             )}
           </div>

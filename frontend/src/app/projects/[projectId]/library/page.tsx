@@ -67,6 +67,7 @@ export default function LibraryPage() {
   const [metricsItem, setMetricsItem] = useState<ContentLibraryItem | null>(null)
   const [scoring, setScoring] = useState(false)
   const [scores, setScores] = useState<Record<string, number | null>>({})
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'score_desc'>('date_desc')
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -85,9 +86,18 @@ export default function LibraryPage() {
 
   useEffect(() => { loadItems() }, [loadItems])
 
-  const filtered = items.filter((item) =>
-    !search || item.content.toLowerCase().includes(search.toLowerCase()),
-  )
+  const filtered = items
+    .filter((item) => !search || item.content.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'score_desc') {
+        const sa = scores[a.id] ?? a.voice_score ?? -1
+        const sb = scores[b.id] ?? b.voice_score ?? -1
+        return sb - sa
+      }
+      const ta = new Date(a.createdAt).getTime()
+      const tb = new Date(b.createdAt).getTime()
+      return sortBy === 'date_asc' ? ta - tb : tb - ta
+    })
 
   async function handleStatusChange(item: ContentLibraryItem, newStatus: ContentLibraryStatus) {
     try {
@@ -218,7 +228,19 @@ export default function LibraryPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5 ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="date_desc">Newest first</option>
+            <option value="date_asc">Oldest first</option>
+            <option value="score_desc">Best score</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5">
           {STATUSES.map((s) => (
             <button
               key={s.value}
@@ -384,7 +406,23 @@ function LibraryCard({
 
       {/* Content */}
       <div className="px-4 pb-3">
-        <p className="text-sm text-foreground/90 leading-relaxed line-clamp-4">{item.content}</p>
+        {(() => {
+          const hook = (item.metadata?.hook ?? item.metadata?.headline) as string | undefined
+          const cta = item.metadata?.cta as string | undefined
+          return (
+            <>
+              {hook && (
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1.5 truncate">
+                  {hook}
+                </p>
+              )}
+              <p className="text-sm text-foreground/90 leading-relaxed line-clamp-4">{item.content}</p>
+              {cta && (
+                <p className="mt-1.5 text-xs text-muted-foreground italic truncate">CTA: {cta}</p>
+              )}
+            </>
+          )
+        })()}
         {item.hashtags.length > 0 && (
           <p className="mt-1.5 text-xs text-primary/70 truncate">
             {item.hashtags.slice(0, 6).map((h) => `#${h.replace(/^#/, '')}`).join(' ')}

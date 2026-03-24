@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  CalendarRange, Loader2, Sparkles, Check, ChevronDown, ChevronUp, Library,
+  CalendarRange, Loader2, Sparkles, Check, ChevronDown, ChevronUp, Library, Pencil, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -49,6 +49,11 @@ export default function PlannerPage() {
   const [plan, setPlan] = useState<ContentPlanItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [applying, setApplying] = useState(false)
+  const [planEdits, setPlanEdits] = useState<Record<number, { topic?: string; suggestedContent?: string }>>({})
+
+  function handlePlanEdit(idx: number, field: 'topic' | 'suggestedContent', value: string) {
+    setPlanEdits((prev) => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }))
+  }
 
   function togglePlatform(p: string) {
     setPlatforms((prev) =>
@@ -85,6 +90,7 @@ export default function PlannerPage() {
         postsPerWeek,
       })
       setPlan(data.items)
+      setPlanEdits({})
       setSelectedIds(new Set(data.items.map((_, i) => i)))
       toast.success(`${data.count} posts planned`)
     } catch {
@@ -95,7 +101,9 @@ export default function PlannerPage() {
   }
 
   async function handleApply() {
-    const selected = plan.filter((_, i) => selectedIds.has(i))
+    const selected = plan
+      .map((item, i) => ({ ...item, ...planEdits[i] }))
+      .filter((_, i) => selectedIds.has(i))
     if (selected.length === 0) { toast.error('Select at least one post'); return }
     setApplying(true)
     try {
@@ -107,6 +115,15 @@ export default function PlannerPage() {
     } finally {
       setApplying(false)
     }
+  }
+
+  // Conflict detection: same platform, same date, 3+ posts
+  const conflictKeys = new Set<string>()
+  const platformDateCount: Record<string, number> = {}
+  for (const item of plan) {
+    const key = `${item.date}::${item.platform}`
+    platformDateCount[key] = (platformDateCount[key] ?? 0) + 1
+    if (platformDateCount[key] >= 3) conflictKeys.add(key)
   }
 
   // Group by date
@@ -244,23 +261,36 @@ export default function PlannerPage() {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto space-y-4">
-              {Object.entries(grouped).map(([date, entries]) => (
-                <div key={date}>
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </h3>
-                  <div className="space-y-2">
-                    {entries.map(({ item, idx }) => (
-                      <PlanCard
-                        key={idx}
-                        item={item}
-                        selected={selectedIds.has(idx)}
-                        onToggle={() => toggleSelect(idx)}
-                      />
-                    ))}
+              {Object.entries(grouped).map(([date, entries]) => {
+                const hasConflict = entries.some((e) => conflictKeys.has(`${e.item.date}::${e.item.platform}`))
+                return (
+                  <div key={date}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </h3>
+                      {hasConflict && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          3+ posts same platform
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {entries.map(({ item, idx }) => (
+                        <PlanCard
+                          key={idx}
+                          item={{ ...item, ...planEdits[idx] }}
+                          selected={selectedIds.has(idx)}
+                          onToggle={() => toggleSelect(idx)}
+                          onEdit={(field, value) => handlePlanEdit(idx, field, value)}
+                          hasConflict={conflictKeys.has(`${item.date}::${item.platform}`)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -273,18 +303,22 @@ export default function PlannerPage() {
 // PlanCard
 // ---------------------------------------------------------------------------
 
-function PlanCard({ item, selected, onToggle }: {
+function PlanCard({ item, selected, onToggle, onEdit, hasConflict }: {
   item: ContentPlanItem
   selected: boolean
   onToggle: () => void
+  onEdit: (field: 'topic' | 'suggestedContent', value: string) => void
+  hasConflict: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [editingField, setEditingField] = useState<'topic' | 'suggestedContent' | null>(null)
   const typeStyle = TYPE_COLORS[item.contentType] ?? 'bg-muted text-muted-foreground'
 
   return (
     <div className={cn(
       'rounded-xl border bg-card overflow-hidden transition-all',
       selected ? 'border-primary ring-1 ring-primary/20' : 'border-border',
+      hasConflict && 'border-amber-500/40',
     )}>
       <div className="flex items-start gap-3 px-4 py-3">
         {/* Checkbox */}
@@ -308,7 +342,30 @@ function PlanCard({ item, selected, onToggle }: {
               <span className="text-[10px] text-muted-foreground">{item.postingTime}</span>
             )}
           </div>
-          <p className="text-sm font-medium mt-1">{item.topic}</p>
+
+          {/* Editable topic */}
+          <div className="group/topic flex items-start gap-1 mt-1">
+            {editingField === 'topic' ? (
+              <input
+                autoFocus
+                value={item.topic}
+                onChange={(e) => onEdit('topic', e.target.value)}
+                onBlur={() => setEditingField(null)}
+                className="flex-1 text-sm font-medium bg-muted/40 border border-primary/30 rounded px-2 py-0.5 focus:outline-none"
+              />
+            ) : (
+              <>
+                <p className="text-sm font-medium flex-1">{item.topic}</p>
+                <button
+                  onClick={() => setEditingField('topic')}
+                  className="opacity-0 group-hover/topic:opacity-100 p-0.5 text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </>
+            )}
+          </div>
+
           {item.contentAngle && (
             <p className="text-xs text-muted-foreground mt-0.5 italic">{item.contentAngle}</p>
           )}
@@ -321,7 +378,29 @@ function PlanCard({ item, selected, onToggle }: {
 
       {expanded && (
         <div className="px-4 pb-3 border-t border-border/50 pt-2 space-y-2">
-          <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">{item.suggestedContent}</p>
+          {/* Editable suggested content */}
+          <div className="group/body relative">
+            {editingField === 'suggestedContent' ? (
+              <textarea
+                autoFocus
+                value={item.suggestedContent}
+                onChange={(e) => onEdit('suggestedContent', e.target.value)}
+                onBlur={() => setEditingField(null)}
+                rows={4}
+                className="w-full text-xs text-foreground/80 bg-muted/40 border border-primary/30 rounded-lg px-3 py-2 focus:outline-none resize-none leading-relaxed"
+              />
+            ) : (
+              <>
+                <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed pr-6">{item.suggestedContent}</p>
+                <button
+                  onClick={() => setEditingField('suggestedContent')}
+                  className="absolute top-0 right-0 opacity-0 group-hover/body:opacity-100 p-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </>
+            )}
+          </div>
           {item.hashtags?.length > 0 && (
             <p className="text-xs text-primary/70">
               {item.hashtags.slice(0, 8).map((h) => `#${h.replace(/^#/, '')}`).join(' ')}

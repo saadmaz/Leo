@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import {
   Plus, X, ChevronDown, Flag, Tag, Calendar, User,
   LayoutList, Columns3, Trash2, Pencil, CheckCircle2,
-  Clock, Circle, Archive, AlertCircle,
+  Clock, Circle, Archive, AlertCircle, Search, CheckSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -49,6 +49,36 @@ function timeAgo(iso: string) {
   return `${d}d ago`
 }
 
+function isOverdue(post: Post) {
+  if (!post.dueDate) return false
+  if (post.status === 'done' || post.status === 'archived') return false
+  return new Date(post.dueDate) < new Date(new Date().toDateString())
+}
+
+function AssigneeAvatars({ assignees }: { assignees: string[] }) {
+  if (!assignees || assignees.length === 0) return null
+  const shown = assignees.slice(0, 3)
+  const extra = assignees.length - shown.length
+  return (
+    <div className="flex items-center -space-x-1.5">
+      {shown.map((a, i) => (
+        <div
+          key={i}
+          title={a}
+          className="w-5 h-5 rounded-full bg-primary/20 border border-background flex items-center justify-center text-[9px] font-bold text-primary uppercase"
+        >
+          {a[0]}
+        </div>
+      ))}
+      {extra > 0 && (
+        <div className="w-5 h-5 rounded-full bg-muted border border-background flex items-center justify-center text-[9px] text-muted-foreground">
+          +{extra}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Post card
 // ---------------------------------------------------------------------------
@@ -58,17 +88,48 @@ function PostCard({
   onEdit,
   onDelete,
   onStatusChange,
+  selected,
+  onToggleSelect,
+  bulkMode,
 }: {
   post: Post
   onEdit: () => void
   onDelete: () => void
   onStatusChange: (s: PostStatus) => void
+  selected: boolean
+  onToggleSelect: () => void
+  bulkMode: boolean
 }) {
   const [statusOpen, setStatusOpen] = useState(false)
   const meta = statusMeta(post.status)
+  const overdue = isOverdue(post)
 
   return (
-    <div className="group bg-card border border-border rounded-xl p-4 hover:border-primary/30 hover:shadow-sm transition-all space-y-2.5">
+    <div
+      className={cn(
+        'group relative bg-card border rounded-xl p-4 hover:shadow-sm transition-all space-y-2.5',
+        selected ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/30',
+        overdue && 'ring-1 ring-red-500/30',
+      )}
+    >
+      {/* Checkbox overlay for bulk select */}
+      <div
+        className={cn(
+          'absolute top-3 left-3 transition-opacity',
+          bulkMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
+      >
+        <button
+          onClick={onToggleSelect}
+          className={cn(
+            'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+            selected ? 'bg-primary border-primary' : 'border-muted-foreground/40 bg-card',
+          )}
+        >
+          {selected && <CheckCircle2 className="w-2.5 h-2.5 text-primary-foreground" />}
+        </button>
+      </div>
+
       {/* Priority + status row */}
       <div className="flex items-center justify-between gap-2">
         <div className="relative">
@@ -102,19 +163,26 @@ function PostCard({
           )}
         </div>
 
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={onEdit}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-          >
-            <Pencil className="w-3 h-3" />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
+        <div className="flex items-center gap-1">
+          {overdue && (
+            <span className="text-[10px] font-medium text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-full">
+              Overdue
+            </span>
+          )}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={onEdit}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -142,7 +210,10 @@ function PostCard({
         {post.dueDate && (
           <>
             <span className="text-muted-foreground/40 text-[10px]">·</span>
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span className={cn(
+              'inline-flex items-center gap-1 text-[10px]',
+              overdue ? 'text-red-500 font-medium' : 'text-muted-foreground',
+            )}>
               <Calendar className="w-2.5 h-2.5" />
               {post.dueDate}
             </span>
@@ -163,14 +234,17 @@ function PostCard({
         <span className="ml-auto text-[10px] text-muted-foreground/60">{timeAgo(post.createdAt)}</span>
       </div>
 
-      {/* Author */}
-      <div className="flex items-center gap-1.5">
-        <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
-          <User className="w-2.5 h-2.5 text-primary" />
+      {/* Author + assignees */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+            <User className="w-2.5 h-2.5 text-primary" />
+          </div>
+          <span className="text-[10px] text-muted-foreground truncate">
+            {post.authorName || post.authorEmail}
+          </span>
         </div>
-        <span className="text-[10px] text-muted-foreground truncate">
-          {post.authorName || post.authorEmail}
-        </span>
+        <AssigneeAvatars assignees={post.assignees ?? []} />
       </div>
     </div>
   )
@@ -195,6 +269,7 @@ function PostModal({
   const [priority, setPriority] = useState<PostPriority>(initial?.priority ?? 'medium')
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? '')
   const [tagInput, setTagInput] = useState(initial?.tags?.join(', ') ?? '')
+  const [assigneeInput, setAssigneeInput] = useState(initial?.assignees?.join(', ') ?? '')
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { titleRef.current?.focus() }, [])
@@ -202,7 +277,8 @@ function PostModal({
   function handleSave() {
     if (!title.trim()) { toast.error('Title is required'); return }
     const tags = tagInput.split(',').map((t) => t.trim()).filter(Boolean)
-    onSave({ title: title.trim(), body, status, priority, tags, dueDate: dueDate || null })
+    const assignees = assigneeInput.split(',').map((a) => a.trim()).filter(Boolean)
+    onSave({ title: title.trim(), body, status, priority, tags, dueDate: dueDate || undefined, assignees })
   }
 
   return (
@@ -238,7 +314,6 @@ function PostModal({
           />
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Status */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Status</label>
               <select
@@ -252,7 +327,6 @@ function PostModal({
               </select>
             </div>
 
-            {/* Priority */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Priority</label>
               <select
@@ -268,7 +342,6 @@ function PostModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Due date */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Due Date</label>
               <input
@@ -279,7 +352,6 @@ function PostModal({
               />
             </div>
 
-            {/* Tags */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Tags</label>
               <input
@@ -289,6 +361,18 @@ function PostModal({
                 className="w-full text-xs bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary placeholder:text-muted-foreground/50"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+              Assignees <span className="normal-case font-normal">(comma-separated emails or names)</span>
+            </label>
+            <input
+              value={assigneeInput}
+              onChange={(e) => setAssigneeInput(e.target.value)}
+              placeholder="alice@co.com, bob@co.com…"
+              className="w-full text-xs bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary placeholder:text-muted-foreground/50"
+            />
           </div>
         </div>
 
@@ -322,19 +406,22 @@ function KanbanColumn({
   onEdit,
   onDelete,
   onStatusChange,
+  selectedIds,
+  onToggleSelect,
+  bulkMode,
 }: {
   status: typeof STATUSES[0]
   posts: Post[]
   onEdit: (post: Post) => void
   onDelete: (post: Post) => void
   onStatusChange: (post: Post, s: PostStatus) => void
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
+  bulkMode: boolean
 }) {
   return (
     <div className="flex flex-col min-w-64 max-w-72 w-72">
-      <div className={cn(
-        'flex items-center gap-2 px-3 py-2 rounded-t-xl border border-b-0 border-border mb-0',
-        'bg-muted/30',
-      )}>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-t-xl border border-b-0 border-border bg-muted/30">
         <span className={cn('flex items-center gap-1.5 text-xs font-semibold', status.color.split(' ')[0])}>
           {status.icon}
           {status.label}
@@ -351,6 +438,9 @@ function KanbanColumn({
             onEdit={() => onEdit(post)}
             onDelete={() => onDelete(post)}
             onStatusChange={(s) => onStatusChange(post, s)}
+            selected={selectedIds.has(post.id)}
+            onToggleSelect={() => onToggleSelect(post.id)}
+            bulkMode={bulkMode}
           />
         ))}
         {posts.length === 0 && (
@@ -372,17 +462,40 @@ function ListRow({
   onEdit,
   onDelete,
   onStatusChange,
+  selected,
+  onToggleSelect,
+  bulkMode,
 }: {
   post: Post
   onEdit: () => void
   onDelete: () => void
   onStatusChange: (s: PostStatus) => void
+  selected: boolean
+  onToggleSelect: () => void
+  bulkMode: boolean
 }) {
   const meta = statusMeta(post.status)
   const [statusOpen, setStatusOpen] = useState(false)
+  const overdue = isOverdue(post)
 
   return (
-    <div className="group flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-muted/30 transition-colors">
+    <div className={cn(
+      'group flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-muted/30 transition-colors',
+      selected && 'bg-primary/5',
+      overdue && 'border-l-2 border-l-red-500',
+    )}>
+      {/* Checkbox */}
+      <button
+        onClick={onToggleSelect}
+        className={cn(
+          'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0',
+          bulkMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          selected ? 'bg-primary border-primary' : 'border-muted-foreground/40 bg-card',
+        )}
+      >
+        {selected && <CheckCircle2 className="w-2.5 h-2.5 text-primary-foreground" />}
+      </button>
+
       {/* Status */}
       <div className="relative shrink-0">
         <button
@@ -421,6 +534,11 @@ function ListRow({
         post.status === 'archived' && 'text-muted-foreground',
       )}>
         {post.title}
+        {overdue && (
+          <span className="ml-2 text-[10px] font-medium text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-full">
+            Overdue
+          </span>
+        )}
       </span>
 
       {/* Tags */}
@@ -430,9 +548,15 @@ function ListRow({
         </span>
       )}
 
+      {/* Assignees */}
+      <AssigneeAvatars assignees={post.assignees ?? []} />
+
       {/* Due date */}
       {post.dueDate && (
-        <span className="text-[10px] text-muted-foreground shrink-0 flex items-center gap-1">
+        <span className={cn(
+          'text-[10px] shrink-0 flex items-center gap-1',
+          overdue ? 'text-red-500 font-medium' : 'text-muted-foreground',
+        )}>
           <Calendar className="w-2.5 h-2.5" />
           {post.dueDate}
         </span>
@@ -472,6 +596,11 @@ export default function PostsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingPost, setEditingPost] = useState<Post | null>(null)
   const [filterStatus, setFilterStatus] = useState<PostStatus | 'all'>('all')
+  const [search, setSearch] = useState('')
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const bulkMode = selectedIds.size > 0
 
   useEffect(() => {
     if (!projectId) return
@@ -481,6 +610,46 @@ export default function PostsPage() {
       .catch(() => toast.error('Failed to load posts'))
       .finally(() => setLoading(false))
   }, [projectId])
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  async function handleBulkStatusChange(status: PostStatus) {
+    const ids = Array.from(selectedIds)
+    try {
+      await Promise.all(ids.map((id) => {
+        const post = posts.find((p) => p.id === id)
+        if (!post) return Promise.resolve()
+        return api.posts.update(projectId, id, { status })
+      }))
+      setPosts((prev) => prev.map((p) => selectedIds.has(p.id) ? { ...p, status } : p))
+      toast.success(`Updated ${ids.length} post${ids.length !== 1 ? 's' : ''}`)
+      clearSelection()
+    } catch {
+      toast.error('Failed to update posts')
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds)
+    try {
+      await Promise.all(ids.map((id) => api.posts.delete(projectId, id)))
+      setPosts((prev) => prev.filter((p) => !selectedIds.has(p.id)))
+      toast.success(`Deleted ${ids.length} post${ids.length !== 1 ? 's' : ''}`)
+      clearSelection()
+    } catch {
+      toast.error('Failed to delete posts')
+    }
+  }
 
   async function handleCreate(data: PostCreate) {
     try {
@@ -523,7 +692,16 @@ export default function PostsPage() {
     }
   }
 
-  const filtered = filterStatus === 'all' ? posts : posts.filter((p) => p.status === filterStatus)
+  const filtered = posts.filter((p) => {
+    if (filterStatus !== 'all' && p.status !== filterStatus) return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      const matchTitle = p.title.toLowerCase().includes(q)
+      const matchTags = p.tags?.some((t) => t.toLowerCase().includes(q))
+      if (!matchTitle && !matchTags) return false
+    }
+    return true
+  })
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -537,6 +715,25 @@ export default function PostsPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Search */}
+          <div className="relative hidden sm:block">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title or tag…"
+              className="pl-8 pr-3 py-1.5 text-xs bg-muted/30 border border-border rounded-lg focus:outline-none focus:border-primary w-44"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           {/* Filter */}
           <select
             value={filterStatus}
@@ -606,8 +803,11 @@ export default function PostsPage() {
               Create first post
             </button>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+            No posts match your search.
+          </div>
         ) : view === 'board' ? (
-          // Board view
           <div className="flex gap-4 p-6 overflow-x-auto h-full items-start">
             {STATUSES.filter((s) => filterStatus === 'all' || s.value === filterStatus).map((s) => (
               <KanbanColumn
@@ -617,14 +817,16 @@ export default function PostsPage() {
                 onEdit={setEditingPost}
                 onDelete={handleDelete}
                 onStatusChange={handleStatusChange}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                bulkMode={bulkMode}
               />
             ))}
           </div>
         ) : (
-          // List view
           <div className="max-w-4xl mx-auto">
-            {/* List header */}
             <div className="flex items-center gap-3 px-4 py-2 border-b border-border text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="w-4" />
               <span className="w-24">Status</span>
               <span className="w-4" />
               <span className="flex-1">Title</span>
@@ -639,11 +841,52 @@ export default function PostsPage() {
                 onEdit={() => setEditingPost(post)}
                 onDelete={() => handleDelete(post)}
                 onStatusChange={(s) => handleStatusChange(post, s)}
+                selected={selectedIds.has(post.id)}
+                onToggleSelect={() => toggleSelect(post.id)}
+                bulkMode={bulkMode}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Bulk action bar */}
+      {bulkMode && (
+        <div className="shrink-0 border-t border-border bg-card px-6 py-3 flex items-center gap-3">
+          <CheckSquare className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-2 ml-2">
+            {STATUSES.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => handleBulkStatusChange(s.value)}
+                className={cn(
+                  'inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full transition-colors hover:opacity-80',
+                  s.color,
+                )}
+              >
+                {s.icon}
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => handleBulkDelete()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create modal */}
       {showModal && (
