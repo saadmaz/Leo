@@ -8,7 +8,7 @@ import {
   PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen, Users, FileText,
-  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Bell, Search,
+  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Bell, Search, ClipboardList,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -263,6 +263,7 @@ export function Sidebar() {
             <div className="mt-1 border-t border-border/50 pt-1">
               <NavGroup label="Content" storageKey="nav_content">
                 <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)} />
+                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />}   label="Posts"           onClick={() => router.push(`/projects/${activeProject.id}/posts`)} />
                 <NavItem icon={<Users className="w-3.5 h-3.5" />}           label="Team"            onClick={() => router.push(`/projects/${activeProject.id}/team`)} />
                 <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => router.push(`/projects/${activeProject.id}/library`)} />
                 <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => router.push(`/projects/${activeProject.id}/bulk`)} />

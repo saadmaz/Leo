@@ -64,6 +64,9 @@ import type {
   DiscoveredInfluencer,
   CompetitiveStrategy,
   CompetitorReport,
+  Post,
+  PostCreate,
+  PostUpdate,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -278,6 +281,22 @@ export const api = {
         `/projects/${projectId}/chats/${chatId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`,
         signal,
       ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Posts
+  // -------------------------------------------------------------------------
+  posts: {
+    list: (projectId: string, signal?: AbortSignal) =>
+      get<Post[]>(`/projects/${projectId}/posts`, signal),
+    get: (projectId: string, postId: string, signal?: AbortSignal) =>
+      get<Post>(`/projects/${projectId}/posts/${postId}`, signal),
+    create: (projectId: string, body: PostCreate, signal?: AbortSignal) =>
+      post<Post>(`/projects/${projectId}/posts`, body, signal),
+    update: (projectId: string, postId: string, body: PostUpdate, signal?: AbortSignal) =>
+      patch<Post>(`/projects/${projectId}/posts/${postId}`, body, signal),
+    delete: (projectId: string, postId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/posts/${postId}`, signal),
   },
 
   // -------------------------------------------------------------------------

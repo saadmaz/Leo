@@ -56,7 +56,7 @@ async def create_project(body: ProjectCreate, user: CurrentUser):
 @router.get("", response_model=list[Project])
 async def list_projects(user: CurrentUser):
     """Return all projects the requesting user is a member of."""
-    return firebase_service.list_projects(user["uid"])
+    return await asyncio.to_thread(firebase_service.list_projects, user["uid"])
 
 
 @router.get("/{project_id}", response_model=Project)

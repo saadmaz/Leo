@@ -1950,3 +1950,93 @@ def delete_research_report(project_id: str, report_id: str) -> None:
         .collection("research_reports").document(report_id)
         .delete()
     )
+
+
+# ---------------------------------------------------------------------------
+# Posts
+# ---------------------------------------------------------------------------
+
+def create_post(
+    project_id: str,
+    author_uid: str,
+    author_email: str,
+    author_name: str,
+    title: str,
+    body: str = "",
+    status: str = "open",
+    priority: str = "medium",
+    tags: Optional[list] = None,
+    due_date: Optional[str] = None,
+    assignees: Optional[list] = None,
+) -> dict:
+    """Create a post under a project. Returns the full post dict with 'id'."""
+    db = get_db()
+    now = _utcnow()
+    data = {
+        "projectId": project_id,
+        "title": title,
+        "body": body,
+        "status": status,
+        "priority": priority,
+        "authorId": author_uid,
+        "authorEmail": author_email,
+        "authorName": author_name,
+        "tags": tags or [],
+        "dueDate": due_date,
+        "assignees": assignees or [],
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("posts").document()
+    )
+    ref.set(data)
+    return {"id": ref.id, **data}
+
+
+def get_post(project_id: str, post_id: str) -> Optional[dict]:
+    """Return a post dict (with 'id'), or None if not found."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("posts").document(post_id)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def list_posts(project_id: str, limit: int = 200) -> list[dict]:
+    """Return all posts for a project, sorted by createdAt descending."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("posts")
+        .limit(limit)
+        .stream()
+    )
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    return sorted(results, key=lambda p: p.get("createdAt", ""), reverse=True)
+
+
+def update_post(project_id: str, post_id: str, data: dict) -> None:
+    """Partially update a post document. Always stamps updatedAt."""
+    db = get_db()
+    data["updatedAt"] = _utcnow()
+    (
+        db.collection("projects").document(project_id)
+        .collection("posts").document(post_id)
+        .update(data)
+    )
+
+
+def delete_post(project_id: str, post_id: str) -> None:
+    """Delete a post document."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("posts").document(post_id)
+        .delete()
+    )

@@ -316,6 +316,50 @@ export interface BillingStatus {
 }
 
 // ---------------------------------------------------------------------------
+// Posts
+// ---------------------------------------------------------------------------
+
+export type PostStatus = 'open' | 'in_progress' | 'done' | 'archived'
+export type PostPriority = 'low' | 'medium' | 'high' | 'urgent'
+
+export interface Post {
+  id: string
+  projectId: string
+  title: string
+  body?: string
+  status: PostStatus
+  priority: PostPriority
+  authorId: string
+  authorEmail: string
+  authorName: string
+  tags: string[]
+  dueDate?: string | null
+  assignees: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PostCreate {
+  title: string
+  body?: string
+  status?: PostStatus
+  priority?: PostPriority
+  tags?: string[]
+  dueDate?: string | null
+  assignees?: string[]
+}
+
+export interface PostUpdate {
+  title?: string
+  body?: string
+  status?: PostStatus
+  priority?: PostPriority
+  tags?: string[]
+  dueDate?: string | null
+  assignees?: string[]
+}
+
+// ---------------------------------------------------------------------------
 // Phase 1 Intelligence Types
 // ---------------------------------------------------------------------------
 
