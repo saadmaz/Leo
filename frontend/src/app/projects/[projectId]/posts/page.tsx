@@ -8,7 +8,6 @@ import {
   Clock, Circle, Archive, AlertCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { Post, PostCreate, PostStatus, PostPriority } from '@/types'
@@ -467,8 +466,6 @@ function ListRow({
 export default function PostsPage() {
   const params = useParams<{ projectId: string }>()
   const projectId = params.projectId
-  const { user } = useAppStore()
-
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'board' | 'list'>('board')
