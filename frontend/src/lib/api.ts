@@ -63,6 +63,7 @@ import type {
   DiscoveredCompetitor,
   DiscoveredInfluencer,
   CompetitiveStrategy,
+  CompetitorReport,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -564,6 +565,9 @@ export const api = {
 
     strategy: (projectId: string, signal?: AbortSignal) =>
       get<CompetitiveStrategy>(`/projects/${projectId}/intelligence/strategy`, signal),
+
+    report: (projectId: string, competitorName: string, signal?: AbortSignal) =>
+      get<CompetitorReport>(`/projects/${projectId}/intelligence/competitors/${encodeURIComponent(competitorName)}/report`, signal),
   },
 
   // -------------------------------------------------------------------------

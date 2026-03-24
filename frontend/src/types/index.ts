@@ -855,3 +855,64 @@ export interface DiscoveredInfluencer {
   content_themes?: string[]
   url?: string
 }
+
+export interface CompetitorReportPlatformMetric {
+  platform: string
+  followers: number
+  is_estimated: boolean
+  engagement_rate: number
+  posts_per_week: number
+  avg_likes: number
+  avg_comments: number
+  top_content_type: string
+}
+
+export interface CompetitorReportScorecard {
+  dimension: string
+  competitor: number
+  brand: number
+}
+
+export interface CompetitorReport {
+  company_profile: {
+    description: string
+    industry: string
+    estimated_size: string
+    founded_estimate: string
+    hq_location: string
+    funding_stage: string
+    revenue_range: string
+    business_model: string
+  }
+  platform_metrics: CompetitorReportPlatformMetric[]
+  growth_trajectory: Array<{ month: string; followers_total: number; engagement_index: number }>
+  revenue_trajectory: Array<{ period: string; value: number }>
+  content_mix: Array<{ type: string; percentage: number }>
+  vs_brand_scorecard: CompetitorReportScorecard[]
+  what_they_do_better: Array<{
+    area: string
+    detail: string
+    impact: string
+    how_to_respond: string
+  }>
+  their_strategy: {
+    core_message: string
+    content_pillars: string[]
+    posting_cadence: string
+    cta_strategy: string
+    audience_focus: string
+  }
+  opportunities: Array<{
+    opportunity: string
+    rationale: string
+    action: string
+    difficulty: 'easy' | 'medium' | 'hard'
+    time_to_impact: string
+  }>
+  threat_assessment: {
+    overall_threat: 'high' | 'medium' | 'low'
+    threat_rationale: string
+    areas_of_direct_competition: string[]
+    areas_of_no_overlap: string[]
+  }
+}

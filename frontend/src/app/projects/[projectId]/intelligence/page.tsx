@@ -14,8 +14,10 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
+import { CompetitorReportPanel } from './competitor-report'
 import type {
   CompetitorSnapshot,
+  CompetitorReport,
   DiscoveredCompetitor,
   CompetitiveStrategy,
 } from '@/types'
@@ -107,6 +109,9 @@ export default function IntelligencePage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [competitors, setCompetitors] = useState<CompetitorForm[]>([emptyForm()])
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([])
+  const [reportSnapshot, setReportSnapshot] = useState<CompetitorSnapshot | null>(null)
+  const [report, setReport] = useState<CompetitorReport | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
 
   const loadSnapshots = useCallback(async () => {
     setLoading(true)
@@ -254,6 +259,21 @@ export default function IntelligencePage() {
     }
   }
 
+  async function handleOpenReport(snapshot: CompetitorSnapshot) {
+    setReportSnapshot(snapshot)
+    setReport(null)
+    setReportLoading(true)
+    try {
+      const result = await api.intelligence.report(params.projectId, snapshot.name)
+      setReport(result)
+    } catch (err) {
+      toast.error('Could not generate report. Try again.')
+      console.error(err)
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
   function addDiscoveredCompetitor(c: DiscoveredCompetitor) {
     let name = c.name
     if (!name) {
@@ -375,7 +395,7 @@ export default function IntelligencePage() {
         ) : tab === 'snapshots' ? (
           <div className="px-4 sm:px-6 py-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
             {snapshots.map(snapshot => (
-              <CompetitorCard key={snapshot.id} snapshot={snapshot} />
+              <CompetitorCard key={snapshot.id} snapshot={snapshot} onOpenReport={handleOpenReport} />
             ))}
           </div>
         ) : (
@@ -386,6 +406,16 @@ export default function IntelligencePage() {
           />
         )}
       </div>
+
+      {reportSnapshot && (
+        <CompetitorReportPanel
+          snapshot={reportSnapshot}
+          report={report}
+          loading={reportLoading}
+          onClose={() => { setReportSnapshot(null); setReport(null) }}
+          onRegenerate={() => handleOpenReport(reportSnapshot)}
+        />
+      )}
     </div>
   )
 }
@@ -609,7 +639,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 // Competitor Card
 // ---------------------------------------------------------------------------
 
-function CompetitorCard({ snapshot }: { snapshot: CompetitorSnapshot }) {
+function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapshot; onOpenReport: (s: CompetitorSnapshot) => void }) {
   const [expanded, setExpanded] = useState(true)
   const { analysis, web_analysis } = snapshot
   const platforms = Object.keys(snapshot.platforms || {})
@@ -643,6 +673,15 @@ function CompetitorCard({ snapshot }: { snapshot: CompetitorSnapshot }) {
         </div>
         {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
+      <div className="px-4 pb-3 border-b border-border">
+        <button
+          onClick={() => onOpenReport(snapshot)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+        >
+          <BarChart2 className="w-3.5 h-3.5" />
+          View Deep-Dive Report
+        </button>
+      </div>
 
       {expanded && (
         <div className="px-5 pb-5 space-y-4 border-t border-border">

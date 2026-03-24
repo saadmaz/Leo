@@ -169,6 +169,7 @@ async def refresh_competitor_intelligence(
                 scraped["platforms"]["instagram"] = {
                     "posts": data.get("posts", [])[:10],
                     "profile": data.get("profile", {}),
+                    "followers": data.get("profile", {}).get("followers", 0),
                     "raw_captions": (data.get("raw_captions") or "")[:3000],
                 }
             except Exception as exc:
@@ -180,6 +181,7 @@ async def refresh_competitor_intelligence(
                 scraped["platforms"]["facebook"] = {
                     "posts": data.get("posts", [])[:10],
                     "name": data.get("name", ""),
+                    "followers": data.get("likes", 0),
                     "raw_text": (data.get("raw_text") or "")[:3000],
                 }
             except Exception as exc:
@@ -192,6 +194,7 @@ async def refresh_competitor_intelligence(
                 )
                 scraped["platforms"]["tiktok"] = {
                     "videos": data.get("videos", [])[:10],
+                    "followers": data.get("followers", 0),
                     "top_hashtags": data.get("top_hashtags", []),
                     "raw_text": (data.get("raw_text") or "")[:3000],
                 }
@@ -217,6 +220,7 @@ async def refresh_competitor_intelligence(
                 scraped["platforms"]["youtube"] = {
                     "videos": data.get("videos", [])[:10],
                     "channel_name": data.get("channel_name", ""),
+                    "subscribers": data.get("subscribers", 0),
                     "raw_text": (data.get("raw_text") or "")[:3000],
                 }
             except Exception as exc:
@@ -379,6 +383,210 @@ Be specific. Use competitor names. Reference actual patterns from the data. Make
             "battlegrounds": [],
             "action_plan": [],
             "quick_wins": [],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Competitor Deep-Dive Report
+# ---------------------------------------------------------------------------
+
+async def generate_competitor_report(
+    competitor_snapshot: dict,
+    brand_core: dict,
+    brand_name: str,
+) -> dict:
+    """
+    Generate a comprehensive deep-dive report on a single competitor.
+    Combines scraped social data with Claude's analysis.
+    """
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+
+    name = competitor_snapshot.get("name", "Unknown")
+    platforms_data = competitor_snapshot.get("platforms") or {}
+    analysis = competitor_snapshot.get("analysis") or {}
+    web = competitor_snapshot.get("web_analysis") or {}
+    web_raw = competitor_snapshot.get("web") or {}
+
+    # Build real follower data from scraped data
+    real_metrics: list[dict] = []
+    for platform, data in platforms_data.items():
+        profile = data.get("profile") or {}
+        followers = (
+            profile.get("followers") or
+            data.get("followers") or
+            data.get("likes") or  # facebook page likes
+            0
+        )
+        posts = data.get("posts") or data.get("videos") or []
+        total_likes = sum(p.get("likes", 0) for p in posts)
+        total_comments = sum(p.get("comments", 0) for p in posts)
+        num_posts = len(posts) if posts else 1
+        avg_likes = total_likes / num_posts
+        avg_comments = total_comments / num_posts
+        real_metrics.append({
+            "platform": platform,
+            "followers": followers,
+            "avg_likes": round(avg_likes),
+            "avg_comments": round(avg_comments),
+        })
+
+    platform_summary = "\n".join(
+        f"  {m['platform']}: {m['followers']:,} followers, avg {m['avg_likes']} likes, avg {m['avg_comments']} comments"
+        for m in real_metrics
+    )
+
+    prompt = f"""You are a senior competitive intelligence analyst. Generate a comprehensive deep-dive report on this competitor for the brand "{brand_name}".
+
+OUR BRAND:
+{brand_context}
+
+COMPETITOR: {name}
+Website: {competitor_snapshot.get("website", "unknown")}
+
+SCRAPED PLATFORM DATA:
+{platform_summary or "No platform data available"}
+
+CONTENT ANALYSIS:
+- Tone: {analysis.get("tone", "")}
+- Key themes: {", ".join(analysis.get("key_themes") or [])}
+- Posting style: {analysis.get("posting_style", "")}
+- Strengths: {", ".join(analysis.get("strengths") or [])}
+- Weaknesses: {", ".join(analysis.get("weaknesses") or [])}
+- Content gaps: {", ".join(analysis.get("content_gaps") or [])}
+- Top hashtags: {", ".join((analysis.get("top_hashtags") or [])[:10])}
+- Engagement patterns: {analysis.get("engagement_patterns", "")}
+
+WEB INTELLIGENCE:
+- Market position: {web.get("market_position", "")}
+- Momentum: {web.get("momentum", "stable")}
+- Recent moves: {", ".join(web.get("recent_moves") or [])}
+- Company summary: {web_raw.get("company_summary", "")}
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "company_profile": {{
+    "description": "<2-3 sentence company overview>",
+    "industry": "<industry/sector>",
+    "estimated_size": "<e.g. 11-50 employees>",
+    "founded_estimate": "<e.g. 2018-2020>",
+    "hq_location": "<city, country if knowable>",
+    "funding_stage": "<bootstrapped|pre-seed|seed|series-a|series-b|public|unknown>",
+    "revenue_range": "<e.g. $1M-$5M estimated ARR>",
+    "business_model": "<SaaS|ecommerce|services|marketplace|etc>"
+  }},
+  "platform_metrics": [
+    {{
+      "platform": "<platform name>",
+      "followers": <integer — use real data if available, otherwise estimate>,
+      "is_estimated": <true if you estimated it, false if from real data>,
+      "engagement_rate": <float 0-20 — realistic engagement rate %>,
+      "posts_per_week": <integer>,
+      "avg_likes": <integer>,
+      "avg_comments": <integer>,
+      "top_content_type": "<e.g. reels, carousels, shorts>"
+    }}
+  ],
+  "growth_trajectory": [
+    {{"month": "Oct 2024", "followers_total": <integer>, "engagement_index": <float 1-10>}},
+    {{"month": "Nov 2024", "followers_total": <integer>, "engagement_index": <float 1-10>}},
+    {{"month": "Dec 2024", "followers_total": <integer>, "engagement_index": <float 1-10>}},
+    {{"month": "Jan 2025", "followers_total": <integer>, "engagement_index": <float 1-10>}},
+    {{"month": "Feb 2025", "followers_total": <integer>, "engagement_index": <float 1-10>}},
+    {{"month": "Mar 2025", "followers_total": <integer>, "engagement_index": <float 1-10>}}
+  ],
+  "revenue_trajectory": [
+    {{"period": "Q2 2024", "value": <integer — estimated monthly revenue in USD>}},
+    {{"period": "Q3 2024", "value": <integer>}},
+    {{"period": "Q4 2024", "value": <integer>}},
+    {{"period": "Q1 2025", "value": <integer>}},
+    {{"period": "Q2 2025", "value": <integer — projected>}}
+  ],
+  "content_mix": [
+    {{"type": "<content type>", "percentage": <integer 0-100>}}
+  ],
+  "vs_brand_scorecard": [
+    {{"dimension": "Content Quality",      "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "Posting Frequency",    "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "Audience Engagement",  "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "Brand Consistency",    "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "Visual Identity",      "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "SEO & Web Presence",   "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "Community Building",   "competitor": <1-10>, "brand": <1-10>}},
+    {{"dimension": "Innovation / Trends",  "competitor": <1-10>, "brand": <1-10>}}
+  ],
+  "what_they_do_better": [
+    {{
+      "area": "<specific area>",
+      "detail": "<detailed explanation with specifics>",
+      "impact": "<business/marketing impact>",
+      "how_to_respond": "<specific tactical response for our brand>"
+    }}
+  ],
+  "their_strategy": {{
+    "core_message": "<their brand's central message/positioning>",
+    "content_pillars": ["<pillar 1>", "<pillar 2>", "<pillar 3>"],
+    "posting_cadence": "<e.g. Daily on Instagram, 3x/week on LinkedIn>",
+    "cta_strategy": "<how they drive action>",
+    "audience_focus": "<who they primarily target>"
+  }},
+  "opportunities": [
+    {{
+      "opportunity": "<specific opportunity for our brand vs this competitor>",
+      "rationale": "<why this is an opening>",
+      "action": "<concrete action to take>",
+      "difficulty": "easy|medium|hard",
+      "time_to_impact": "<e.g. 2-4 weeks>"
+    }}
+  ],
+  "threat_assessment": {{
+    "overall_threat": "high|medium|low",
+    "threat_rationale": "<why this threat level>",
+    "areas_of_direct_competition": ["<area 1>", "<area 2>"],
+    "areas_of_no_overlap": ["<area 1>", "<area 2>"]
+  }}
+}}
+
+IMPORTANT:
+- For platform_metrics, only include platforms where we have data OR reasonable estimates
+- For revenue_trajectory, label Q2 2025 as projected
+- Be realistic with follower estimates based on the industry and company size
+- The vs_brand_scorecard brand scores should reflect the brand core honestly
+- Make what_they_do_better specific and actionable, at least 3 items
+- Make opportunities actionable with concrete next steps, at least 3 items
+- Label all estimates clearly with is_estimated: true"""
+
+    response = await client.messages.create(
+        model=settings.LLM_CHAT_MODEL,
+        max_tokens=3000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    try:
+        result = _parse_json_response(response.content[0].text)
+        # Inject real metrics where available
+        for rm in real_metrics:
+            for pm in result.get("platform_metrics", []):
+                if pm.get("platform") == rm["platform"] and rm["followers"]:
+                    pm["followers"] = rm["followers"]
+                    pm["is_estimated"] = False
+                    if rm["avg_likes"]:
+                        pm["avg_likes"] = rm["avg_likes"]
+                    if rm["avg_comments"]:
+                        pm["avg_comments"] = rm["avg_comments"]
+        return result
+    except Exception:
+        return {
+            "company_profile": {"description": "", "industry": "", "estimated_size": "", "founded_estimate": "", "hq_location": "", "funding_stage": "unknown", "revenue_range": "Unknown", "business_model": ""},
+            "platform_metrics": [],
+            "growth_trajectory": [],
+            "revenue_trajectory": [],
+            "content_mix": [],
+            "vs_brand_scorecard": [],
+            "what_they_do_better": [],
+            "their_strategy": {"core_message": "", "content_pillars": [], "posting_cadence": "", "cta_strategy": "", "audience_focus": ""},
+            "opportunities": [],
+            "threat_assessment": {"overall_threat": "medium", "threat_rationale": "", "areas_of_direct_competition": [], "areas_of_no_overlap": []},
         }
 
 

@@ -205,6 +205,41 @@ async def get_strategy_plan(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/intelligence/competitors/{competitor_name}/report")
+async def get_competitor_report(
+    project_id: str,
+    competitor_name: str,
+    user: CurrentUser,
+):
+    """
+    Generate a comprehensive deep-dive report for a single competitor.
+    Uses stored snapshot + brand core for comparison.
+    """
+    project = get_project_as_member(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+
+    snapshot = await asyncio.to_thread(
+        firebase_service.get_competitor_snapshot, project_id, competitor_name
+    )
+
+    if not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No snapshot found for competitor '{competitor_name}'. Run analysis first.",
+        )
+
+    try:
+        result = await intelligence_service.generate_competitor_report(
+            competitor_snapshot=snapshot,
+            brand_core=brand_core,
+            brand_name=project.get("name", ""),
+        )
+        return result
+    except Exception as exc:
+        logger.error("Competitor report generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Brand Memory
 # ---------------------------------------------------------------------------
