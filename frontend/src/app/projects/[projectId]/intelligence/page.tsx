@@ -347,21 +347,24 @@ export default function IntelligencePage() {
 
         {/* ── Tabs ── */}
         {!refreshing && snapshots.length > 0 && (
-          <div className="flex gap-1 px-4 sm:px-6 pt-4 border-b border-border">
-            {(['snapshots', 'strategy'] as Tab[]).map(t => (
+          <div className="flex items-center gap-1 px-4 sm:px-6 pt-4 pb-0 border-b border-border">
+            {([
+              { key: 'snapshots', label: 'Competitor Profiles', icon: <BarChart2 className="w-3.5 h-3.5" /> },
+              { key: 'strategy',  label: 'Strategy Plan',       icon: <Sparkles className="w-3.5 h-3.5" /> },
+            ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(t => (
               <button
-                key={t}
+                key={t.key}
                 onClick={() => {
-                  if (t === 'strategy' && !strategy && !strategyLoading) handleGenerateStrategy()
-                  else setTab(t)
+                  if (t.key === 'strategy' && !strategy && !strategyLoading) handleGenerateStrategy()
+                  else setTab(t.key)
                 }}
-                className={`px-4 py-2 text-xs font-medium rounded-t-md border-b-2 transition-colors ${
-                  tab === t
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px ${
+                  tab === t.key
                     ? 'border-primary text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {t === 'snapshots' ? 'Competitor Profiles' : 'Strategy Plan'}
+                {t.icon}{t.label}
               </button>
             ))}
           </div>
@@ -375,7 +378,7 @@ export default function IntelligencePage() {
         ) : snapshots.length === 0 && !refreshing ? (
           <EmptyState onAdd={() => setShowAddForm(true)} />
         ) : tab === 'snapshots' ? (
-          <div className="px-4 sm:px-6 py-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl">
             {snapshots.map(snapshot => (
               <CompetitorCard key={snapshot.id} snapshot={snapshot} onOpenReport={handleOpenReport} />
             ))}
@@ -739,61 +742,112 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 // Competitor Card
 // ---------------------------------------------------------------------------
 
+const AVATAR_GRADIENTS = [
+  'from-violet-500 to-purple-600',
+  'from-blue-500 to-cyan-600',
+  'from-emerald-500 to-teal-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+]
+
+function getGradient(name: string) {
+  const code = name.charCodeAt(0) % AVATAR_GRADIENTS.length
+  return AVATAR_GRADIENTS[code]
+}
+
 function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapshot; onOpenReport: (s: CompetitorSnapshot) => void }) {
   const [expanded, setExpanded] = useState(true)
   const { analysis, web_analysis } = snapshot
   const platforms = Object.keys(snapshot.platforms || {})
+  const gradient = getGradient(snapshot.name)
 
   const scrapedDate = snapshot.scrapedAt
     ? new Date(snapshot.scrapedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
 
+  // Determine a threat vibe from the web_analysis or analysis
+  const threatLevel = (web_analysis as { threat_level?: string } | undefined)?.threat_level ?? 'medium'
+  const threat = THREAT_CONFIG[threatLevel as keyof typeof THREAT_CONFIG] ?? THREAT_CONFIG.medium
+
   return (
-    <div className="border border-border rounded-2xl bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/20 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+    <div className="border border-border rounded-2xl bg-card overflow-hidden group transition-all hover:border-border/80 hover:shadow-lg hover:shadow-black/10">
+
+      {/* ── Card header ── */}
+      <div className="relative px-5 pt-5 pb-4">
+        {/* Subtle gradient tint in top-right */}
+        <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-[80px] bg-gradient-to-bl ${gradient} opacity-[0.06] pointer-events-none`} />
+
+        <div className="flex items-start gap-3 relative">
+          {/* Avatar */}
+          <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base shrink-0 shadow-md`}>
             {snapshot.name.charAt(0).toUpperCase()}
           </div>
-          <div className="text-left">
-            <div className="text-sm font-semibold">{snapshot.name}</div>
-            <div className="flex items-center gap-2 mt-0.5">
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold leading-tight">{snapshot.name}</h3>
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${threat.bg} ${threat.color}`}>
+                {threat.icon}{threat.label}
+              </span>
+            </div>
+
+            {/* Platform badges */}
+            <div className="flex items-center flex-wrap gap-1.5 mt-2">
               {platforms.map(p => (
-                <span key={p} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${PLATFORM_COLORS[p] ?? 'text-muted-foreground bg-muted'}`}>
+                <span key={p} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${PLATFORM_COLORS[p] ?? 'text-muted-foreground bg-muted'}`}>
                   {PLATFORM_ICONS[p]} {p}
                 </span>
               ))}
-              {scrapedDate && <span className="text-[10px] text-muted-foreground">· {scrapedDate}</span>}
+              {scrapedDate && (
+                <span className="text-[10px] text-muted-foreground ml-auto">Updated {scrapedDate}</span>
+              )}
             </div>
           </div>
+
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="p-1.5 rounded-lg hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground shrink-0"
+          >
+            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-      </button>
-      <div className="px-4 pb-3 border-b border-border">
+      </div>
+
+      {/* ── Deep-dive CTA ── */}
+      <div className="px-5 pb-4">
         <button
           onClick={() => onOpenReport(snapshot)}
-          className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+          className={`w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-xl bg-gradient-to-r ${gradient} text-white shadow-sm hover:opacity-90 transition-opacity`}
         >
           <BarChart2 className="w-3.5 h-3.5" />
           View Deep-Dive Report
         </button>
       </div>
 
+      {/* ── Expanded body ── */}
       {expanded && (
-        <div className="px-5 pb-5 space-y-4 border-t border-border">
-          {/* Web intelligence banner */}
+        <div className="border-t border-border/60 px-5 pt-4 pb-5 space-y-4">
+
+          {/* Market position — redesigned as intelligence brief */}
           {web_analysis?.market_position && (
-            <div className="mt-4 rounded-lg bg-blue-500/5 border border-blue-500/20 px-3 py-2.5 flex items-start gap-2">
-              <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-medium text-blue-400 mb-0.5">Market Position</p>
-                <p className="text-xs text-foreground/80">{web_analysis.market_position}</p>
+            <div className="relative rounded-xl overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/8 to-violet-500/5 rounded-xl" />
+              <div className="relative border border-blue-500/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded-md bg-blue-500/15 flex items-center justify-center">
+                    <Globe className="w-3 h-3 text-blue-400" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Market Position</span>
+                </div>
+                <p className="text-xs text-foreground/85 leading-relaxed">{web_analysis.market_position}</p>
                 {web_analysis.opportunity && (
-                  <p className="text-xs text-emerald-400 mt-1">→ {web_analysis.opportunity}</p>
+                  <div className="mt-3 flex items-start gap-2 pt-2.5 border-t border-blue-500/15">
+                    <div className="w-4 h-4 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                      <ArrowRight className="w-2.5 h-2.5 text-emerald-400" />
+                    </div>
+                    <p className="text-xs text-emerald-400 leading-relaxed">{web_analysis.opportunity}</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -801,80 +855,101 @@ function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapsh
 
           {analysis && (
             <>
-              {/* Tone */}
-              {analysis.tone && analysis.tone !== 'Unknown' && (
-                <div className="pt-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Their Voice</p>
-                  <p className="text-sm text-foreground/80">{analysis.tone}</p>
+              {/* Voice + Themes row */}
+              {(analysis.tone && analysis.tone !== 'Unknown') || (analysis.key_themes?.length ?? 0) > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {analysis.tone && analysis.tone !== 'Unknown' && (
+                    <div className="rounded-xl bg-muted/30 border border-border/60 px-4 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Brand Voice</p>
+                      <p className="text-xs text-foreground/80 leading-relaxed">{analysis.tone}</p>
+                    </div>
+                  )}
+                  {(analysis.key_themes?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Key Themes</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analysis.key_themes.map((theme, i) => (
+                          <span key={i} className="text-[10px] px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-foreground/70 font-medium">
+                            {theme}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              ) : null}
 
-              {/* Key themes */}
-              {(analysis.key_themes?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Key Themes</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {analysis.key_themes.map((theme, i) => (
-                      <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-muted border border-border text-foreground/70">
-                        {theme}
-                      </span>
-                    ))}
-                  </div>
+              {/* Strengths vs Weaknesses */}
+              {((analysis.strengths?.length ?? 0) > 0 || (analysis.weaknesses?.length ?? 0) > 0) && (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {(analysis.strengths?.length ?? 0) > 0 && (
+                    <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3.5">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                          <TrendingUp className="w-2.5 h-2.5 text-emerald-500" />
+                        </div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">They Excel</p>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {analysis.strengths.slice(0, 4).map((s, i) => (
+                          <li key={i} className="text-[11px] text-foreground/75 flex items-start gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-emerald-500/60 shrink-0 mt-1.5" />
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(analysis.weaknesses?.length ?? 0) > 0 && (
+                    <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-3.5">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                          <AlertTriangle className="w-2.5 h-2.5 text-red-500" />
+                        </div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500">Weaknesses</p>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {analysis.weaknesses.slice(0, 4).map((w, i) => (
+                          <li key={i} className="text-[11px] text-foreground/75 flex items-start gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-red-500/60 shrink-0 mt-1.5" />
+                            {w}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Opportunities */}
               {(analysis.content_gaps?.length ?? 0) > 0 && (
-                <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-3.5 space-y-2">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-500 uppercase tracking-widest">
-                    <Lightbulb className="w-3.5 h-3.5" />
-                    Opportunities They&apos;re Missing
+                <div className="rounded-xl bg-amber-500/5 border border-amber-500/25 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-md bg-amber-500/20 flex items-center justify-center">
+                      <Lightbulb className="w-3 h-3 text-amber-500" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Gaps You Can Exploit</span>
                   </div>
-                  <ul className="space-y-1">
+                  <ul className="space-y-2">
                     {analysis.content_gaps.map((gap, i) => (
-                      <li key={i} className="text-xs text-foreground/80 flex gap-2">
-                        <ArrowRight className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
-                        {gap}
+                      <li key={i} className="flex items-start gap-2.5">
+                        <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-500 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-xs text-foreground/80 leading-relaxed">{gap}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                {(analysis.strengths?.length ?? 0) > 0 && (
-                  <div>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-2">
-                      <TrendingUp className="w-3 h-3" /> They do well
-                    </div>
-                    <ul className="space-y-1">
-                      {analysis.strengths.map((s, i) => (
-                        <li key={i} className="text-xs text-foreground/70">· {s}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {(analysis.weaknesses?.length ?? 0) > 0 && (
-                  <div>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">
-                      <AlertTriangle className="w-3 h-3" /> Weaknesses
-                    </div>
-                    <ul className="space-y-1">
-                      {analysis.weaknesses.map((w, i) => (
-                        <li key={i} className="text-xs text-foreground/70">· {w}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
               {/* Hashtags */}
               {(analysis.top_hashtags?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Top Hashtags</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Their Top Hashtags</p>
                   <div className="flex flex-wrap gap-1">
                     {analysis.top_hashtags.slice(0, 12).map((tag, i) => (
-                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 border border-border/50 text-muted-foreground font-mono">
                         #{tag.replace(/^#/, '')}
                       </span>
                     ))}
