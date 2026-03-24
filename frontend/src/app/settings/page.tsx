@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateProfile, deleteUser, signOut, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
-import { ArrowLeft, Sun, Moon, Monitor, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Sun, Moon, Monitor, Loader2, Trash2, Zap, ExternalLink, TrendingDown, TrendingUp } from 'lucide-react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { useAppStore } from '@/stores/app-store'
 import { auth } from '@/lib/firebase'
+import { api } from '@/lib/api'
+import type { CreditsStatus, CreditTransaction } from '@/types'
+import { PasswordInput } from '@/components/ui/password-input'
 import { cn } from '@/lib/utils'
 
 type ThemeOption = 'light' | 'dark' | 'system'
@@ -25,6 +28,15 @@ export default function SettingsPage() {
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [savingName, setSavingName] = useState(false)
+
+  // Credits
+  const [credits, setCredits] = useState<CreditsStatus | null>(null)
+  const [transactions, setTransactions] = useState<CreditTransaction[] | null>(null)
+
+  useEffect(() => {
+    api.credits.getBalance().then(setCredits).catch(() => {/* silently fail */})
+    api.credits.getHistory(15).then((r) => setTransactions(r.transactions)).catch(() => {/* silently fail */})
+  }, [])
 
   // Delete account flow
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -149,6 +161,118 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          {/* Credits & Plan */}
+          <section className="space-y-4">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Credits &amp; Plan</h2>
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              {credits ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Credits balance</span>
+                    </div>
+                    <span className="text-sm font-bold tabular-nums">
+                      {credits.balance.toLocaleString()}
+                      <span className="text-muted-foreground font-normal"> / {credits.planAllotment.toLocaleString()}</span>
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        credits.balance / credits.planAllotment <= 0.1
+                          ? 'bg-red-500'
+                          : credits.balance / credits.planAllotment <= 0.3
+                          ? 'bg-amber-500'
+                          : 'bg-primary',
+                      )}
+                      style={{ width: `${Math.min(100, (credits.balance / credits.planAllotment) * 100)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      Plan: <span className="font-medium capitalize text-foreground">{credits.plan}</span>
+                    </span>
+                    {credits.resetsAt && (
+                      <span>Resets {new Date(credits.resetsAt * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    )}
+                  </div>
+
+                  <a
+                    href="/billing"
+                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Upgrade plan
+                  </a>
+
+                  {/* Credit cost reference */}
+                  {credits.costs && Object.keys(credits.costs).length > 0 && (
+                    <details className="group">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground list-none flex items-center gap-1">
+                        <span className="border-b border-dashed border-muted-foreground/50">View credit costs</span>
+                      </summary>
+                      <div className="mt-2 rounded-lg border border-border bg-muted/30 divide-y divide-border">
+                        {Object.entries(credits.costs).map(([action, cost]) => (
+                          <div key={action} className="flex items-center justify-between px-3 py-1.5">
+                            <span className="text-xs text-muted-foreground capitalize">{action.replace(/_/g, ' ')}</span>
+                            <span className="text-xs font-medium tabular-nums">{cost} cr</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              ) : (
+                <div className="h-16 rounded-lg bg-muted/40 animate-pulse" />
+              )}
+            </div>
+          </section>
+
+          {/* Credit History */}
+          {transactions !== null && transactions.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Credit History</h2>
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
+                {transactions.map((tx, i) => (
+                  <div
+                    key={tx.id}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-2.5',
+                      i < transactions.length - 1 && 'border-b border-border',
+                    )}
+                  >
+                    <div className={cn(
+                      'w-6 h-6 rounded-full flex items-center justify-center shrink-0',
+                      tx.type === 'debit' ? 'bg-red-500/10' : 'bg-green-500/10',
+                    )}>
+                      {tx.type === 'debit'
+                        ? <TrendingDown className="w-3 h-3 text-red-500" />
+                        : <TrendingUp className="w-3 h-3 text-green-500" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium capitalize truncate">{tx.action.replace(/_/g, ' ')}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <span className={cn(
+                      'text-xs font-bold tabular-nums shrink-0',
+                      tx.type === 'debit' ? 'text-red-500' : 'text-green-500',
+                    )}>
+                      {tx.type === 'debit' ? '−' : '+'}{tx.amount}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Account */}
           <section className="space-y-4">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Account</h2>
@@ -184,12 +308,11 @@ export default function SettingsPage() {
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">Enter your password to confirm:</p>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
                     placeholder="Password"
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-destructive"
+                    className="focus:ring-destructive"
                   />
                   <div className="flex gap-2">
                     <button

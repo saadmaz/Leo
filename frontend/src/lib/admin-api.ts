@@ -31,6 +31,11 @@ export interface AdminUser {
   }
   adminOverrides: Record<string, number>
   projectCount?: number
+  credits?: {
+    balance: number
+    lifetimeUsed: number
+    resetsAt?: number
+  }
 }
 
 export interface DashboardStats {
@@ -277,6 +282,22 @@ export const adminApi = {
       post<{ ok: boolean }>(`/moderation/${flagId}/action`, { note }),
 
     abuse: () => get<AbuseReport>('/moderation/abuse'),
+  },
+
+  credits: {
+    /** Add credits to any user. Hits /credits/topup (not under /admin prefix). */
+    topup: async (uid: string, amount: number, reason: string) => {
+      const user = auth.currentUser
+      if (!user) throw new Error('Not authenticated')
+      const token = await user.getIdToken()
+      const res = await fetch('/api/backend/credits/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ uid, amount, reason }),
+      })
+      if (!res.ok) throw new Error(`Credits topup failed: ${res.status}`)
+      return res.json() as Promise<{ ok: boolean; uid: string; added: number }>
+    },
   },
 }
 

@@ -68,6 +68,7 @@ import type {
   PostCreate,
   PostUpdate,
   CreditsStatus,
+  CreditTransaction,
   DeepSearchHistory,
 } from '@/types'
 
@@ -105,12 +106,25 @@ async function authHeaders(): Promise<HeadersInit> {
 // Core HTTP helpers
 // ---------------------------------------------------------------------------
 
+async function extractErrorMessage(res: Response, path: string): Promise<string> {
+  const text = await res.text()
+  if (res.status === 402) {
+    try {
+      const json = JSON.parse(text)
+      const detail = json?.detail
+      if (typeof detail === 'object' && detail?.message) return detail.message as string
+      if (typeof detail === 'string') return detail
+    } catch { /* fall through */ }
+  }
+  return `${res.status === 402 ? 'Insufficient credits' : `${res.status}`}: ${text}`
+}
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     headers: await authHeaders(),
     signal,
   })
-  if (!res.ok) throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
   return res.json()
 }
 
@@ -121,7 +135,7 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(`POST ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
   return res.json()
 }
 
@@ -132,7 +146,7 @@ async function patch<T>(path: string, body: unknown, signal?: AbortSignal): Prom
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(`PATCH ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
   return res.json()
 }
 
@@ -142,7 +156,7 @@ async function del(path: string, signal?: AbortSignal): Promise<void> {
     headers: await authHeaders(),
     signal,
   })
-  if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +364,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No readable stream in response'); return }
@@ -428,7 +442,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }
@@ -509,7 +523,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }
@@ -830,7 +844,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(`${res.status}: ${await res.text()}`); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }
@@ -1248,6 +1262,7 @@ export const api = {
   // -------------------------------------------------------------------------
   credits: {
     getBalance: () => get<CreditsStatus>('/credits/balance'),
+    getHistory: (limit = 20) => get<{ transactions: CreditTransaction[] }>(`/credits/history?limit=${limit}`),
   },
 
   // -------------------------------------------------------------------------

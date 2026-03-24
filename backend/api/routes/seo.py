@@ -7,6 +7,7 @@ POST /projects/{id}/intelligence/discover-competitors — auto-discover competit
 POST /projects/{id}/influencers/discover    — discover relevant influencers
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -16,6 +17,7 @@ from typing import Optional
 from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,8 @@ async def analyse_content_gaps(
     Returns prioritised gap list with brand-specific content angles.
     """
     project = get_project_as_member(project_id, user["uid"])
+    import asyncio
+    await asyncio.to_thread(check_and_deduct, user["uid"], "seo_analysis")
     brand_core = project.get("brandCore") or {}
 
     from backend.services import seo_service

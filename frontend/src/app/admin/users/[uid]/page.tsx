@@ -19,6 +19,11 @@ import {
   FolderOpen,
   User,
   AlertTriangle,
+  Zap,
+  Crown,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -33,6 +38,12 @@ export default function AdminUserDetailPage() {
   const [error, setError] = useState('')
   const [acting, setActing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [topupAmount, setTopupAmount] = useState('500')
+  const [topupReason, setTopupReason] = useState('')
+  const [showOverrides, setShowOverrides] = useState(false)
+  const [overrideMsgs, setOverrideMsgs] = useState('')
+  const [overrideProjects, setOverrideProjects] = useState('')
+  const [overrideIngestions, setOverrideIngestions] = useState('')
 
   useEffect(() => {
     adminApi.users
@@ -81,6 +92,34 @@ export default function AdminUserDetailPage() {
       'User unsuspended',
       () => setUser((u) => u ? { ...u, suspended: false } : u),
     )
+
+  const handleGrantAdmin = () =>
+    act(() => adminApi.users.grantAdmin(uid), 'Super admin granted', () =>
+      setUser((u) => u ? { ...u, adminOverrides: { ...u.adminOverrides, isSuperAdmin: 1 } } : u),
+    )
+
+  const handleRevokeAdmin = () =>
+    act(() => adminApi.users.revokeAdmin(uid), 'Super admin revoked', () =>
+      setUser((u) => u ? { ...u, adminOverrides: { ...u.adminOverrides, isSuperAdmin: 0 } } : u),
+    )
+
+  const handleTopup = () => {
+    const amount = parseInt(topupAmount, 10)
+    if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return }
+    act(() => adminApi.credits.topup(uid, amount, topupReason || 'Admin topup'), `Added ${amount} credits`)
+    setTopupAmount('500')
+    setTopupReason('')
+  }
+
+  const handleOverrideLimits = () => {
+    const limits: Record<string, number> = {}
+    if (overrideMsgs) limits.messagesLimit = parseInt(overrideMsgs, 10)
+    if (overrideProjects) limits.projectsLimit = parseInt(overrideProjects, 10)
+    if (overrideIngestions) limits.ingestionsLimit = parseInt(overrideIngestions, 10)
+    if (Object.keys(limits).length === 0) { toast.error('Enter at least one override value'); return }
+    act(() => adminApi.users.overrideLimits(uid, limits), 'Limits overridden')
+    setOverrideMsgs(''); setOverrideProjects(''); setOverrideIngestions('')
+  }
 
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return }
@@ -195,7 +234,12 @@ export default function AdminUserDetailPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold">Usage (this month)</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-4 gap-4">
+          <UsageStat
+            icon={<Zap className="w-4 h-4" />}
+            label="Credits"
+            value={user.credits?.balance != null ? user.credits.balance.toLocaleString() : '—'}
+          />
           <UsageStat
             icon={<MessageSquare className="w-4 h-4" />}
             label="Messages"
@@ -258,6 +302,99 @@ export default function AdminUserDetailPage() {
               <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
               Reset
             </Button>
+          </div>
+
+          <Separator />
+
+          {/* Credits topup */}
+          <div>
+            <p className="text-sm font-medium mb-2 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              Add credits
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                type="number"
+                min={1}
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                placeholder="Amount"
+                className="w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <input
+                value={topupReason}
+                onChange={(e) => setTopupReason(e.target.value)}
+                placeholder="Reason (optional)"
+                className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button size="sm" variant="outline" disabled={acting} onClick={handleTopup}>
+                <Zap className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+                Topup
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Grant / revoke super admin */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-amber-500" />
+                Super admin access
+              </p>
+              <p className="text-xs text-muted-foreground">Grant or revoke the superAdmin Firebase custom claim.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={acting} onClick={handleGrantAdmin}>
+                Grant
+              </Button>
+              <Button size="sm" variant="outline" disabled={acting} onClick={handleRevokeAdmin}
+                className="text-destructive border-destructive/40 hover:bg-destructive/10">
+                Revoke
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Custom limit overrides */}
+          <div>
+            <button
+              onClick={() => setShowOverrides((v) => !v)}
+              className="flex items-center gap-1.5 text-sm font-medium w-full text-left"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Override limits
+              {showOverrides ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+            </button>
+            {showOverrides && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Leave blank to keep the plan default.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Messages/mo', value: overrideMsgs, set: setOverrideMsgs },
+                    { label: 'Projects', value: overrideProjects, set: setOverrideProjects },
+                    { label: 'Ingestions/mo', value: overrideIngestions, set: setOverrideIngestions },
+                  ].map(({ label, value, set }) => (
+                    <div key={label}>
+                      <label className="text-[10px] text-muted-foreground block mb-1">{label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
+                        placeholder="default"
+                        className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" variant="outline" disabled={acting} onClick={handleOverrideLimits}>
+                  Apply overrides
+                </Button>
+              </div>
+            )}
           </div>
 
           <Separator />

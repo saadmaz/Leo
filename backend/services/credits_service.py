@@ -31,6 +31,14 @@ CREDIT_COSTS: dict[str, int] = {
     "content_plan":       10,
     "brand_ingestion":    30,
     "competitor_report":  40,
+    "weekly_digest":       8,
+    "research_report":    50,
+    "blog_post":          12,
+    "email_sequence":     15,
+    "email_single":        5,
+    "style_guide":        10,
+    "seo_analysis":        8,
+    "website_copy":        6,
 }
 
 # ---------------------------------------------------------------------------
@@ -169,7 +177,7 @@ def check_and_deduct(uid: str, action: str, quantity: int = 1) -> None:
         )
 
     try:
-        firebase_service.deduct_user_credits(uid, total_cost)
+        firebase_service.deduct_user_credits(uid, total_cost, action=action)
     except Exception as exc:
         logger.warning("Failed to deduct %d credits for uid %s: %s", total_cost, uid, exc)
 
@@ -177,7 +185,7 @@ def check_and_deduct(uid: str, action: str, quantity: int = 1) -> None:
 def add_credits(uid: str, amount: int, reason: str = "") -> None:
     """Add credits to a user's balance (admin override, top-up, promotional)."""
     try:
-        firebase_service.add_user_credits(uid, amount)
+        firebase_service.add_user_credits(uid, amount, reason=reason)
         logger.info("Added %d credits to uid %s (reason: %s)", amount, uid, reason)
     except Exception as exc:
         logger.warning("Failed to add %d credits to uid %s: %s", amount, uid, exc)

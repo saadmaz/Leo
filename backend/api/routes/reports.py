@@ -11,9 +11,12 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
+import asyncio
+
 from backend.api.deps import get_project_as_member
 from backend.middleware.auth import CurrentUser
 from backend.services import analytics_service, intelligence_service, firebase_service
+from backend.services.credits_service import check_and_deduct
 from backend.config import settings
 from backend.services.llm_service import get_client
 
@@ -30,6 +33,7 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["reports"])
 async def get_weekly_digest(project_id: str, user: CurrentUser):
     """Generate an AI-powered weekly digest with trends and recommendations."""
     project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "weekly_digest")
     brand_core = project.get("brandCore") or {}
 
     overview = await analytics_service.get_overview(project_id)
@@ -249,6 +253,7 @@ async def start_research(
     Poll /reports/research/{id}/status for completion.
     """
     project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "research_report")
 
     from backend.services import research_service
     report_id = await research_service.start_research_report(

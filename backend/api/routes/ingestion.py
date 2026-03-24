@@ -26,6 +26,7 @@ from pydantic import BaseModel, field_validator
 from backend.api.deps import get_project_or_404, assert_editor
 from backend.middleware.auth import CurrentUser
 from backend.services.ingestion import pipeline
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["ingestion"])
@@ -96,6 +97,9 @@ async def ingest_brand(
     """
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
+
+    import asyncio
+    await asyncio.to_thread(check_and_deduct, user["uid"], "brand_ingestion")
 
     # Merge: explicit request values override stored project values
     def _pick(request_val: Optional[str], project_key: str) -> Optional[str]:

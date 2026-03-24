@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
 import { NotificationBell } from '@/components/layout/notification-bell'
+import { CommandPalette } from '@/components/layout/command-palette'
 import type { Project, Chat } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -46,9 +47,22 @@ export function Sidebar() {
   const [projectsLoading, setProjectsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
+  const [cmdOpen, setCmdOpen] = useState(false)
   const hasUnseenChangelog = useHasUnseenChangelog()
 
   useEffect(() => { setMounted(true) }, [])
+
+  // ⌘K / Ctrl+K to open command palette
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen((v) => !v)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -191,6 +205,13 @@ export function Sidebar() {
             <span className="text-base font-bold tracking-tight">LEO</span>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCmdOpen(true)}
+              title="Command palette (⌘K)"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
             {activeProject && (
               <NotificationBell projectId={activeProject.id} />
             )}
@@ -397,6 +418,7 @@ export function Sidebar() {
         </div>
       </aside>
       <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </>
   )
 }

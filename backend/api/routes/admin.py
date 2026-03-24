@@ -689,6 +689,7 @@ async def send_broadcast(body: BroadcastRequest, user: SuperAdminUser):
 
 def _safe_user(user: dict) -> dict:
     billing = user.get("billing", {})
+    credits = user.get("credits", {})
     return {
         "uid": user.get("uid") or user.get("id", ""),
         "email": user.get("email", ""),
@@ -706,6 +707,11 @@ def _safe_user(user: dict) -> dict:
             "currentPeriodEnd": billing.get("currentPeriodEnd"),
         },
         "adminOverrides": user.get("adminOverrides", {}),
+        "credits": {
+            "balance": credits.get("balance"),
+            "lifetimeUsed": credits.get("lifetimeUsed", 0),
+            "resetsAt": credits.get("resetsAt"),
+        } if credits else None,
     }
 
 

@@ -97,9 +97,10 @@ export default function AdminUsersPage() {
       {/* Table */}
       <div className="rounded-xl border border-border overflow-hidden">
         {/* Table header */}
-        <div className="grid grid-cols-[1fr_120px_140px_110px_44px] gap-4 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="grid grid-cols-[1fr_100px_120px_120px_110px_44px] gap-4 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
           <span>User</span>
           <span>Plan</span>
+          <span>Credits</span>
           <span>Messages (MTD)</span>
           <span>Joined</span>
           <span />
@@ -108,12 +109,13 @@ export default function AdminUsersPage() {
         {loading ? (
           <div className="divide-y divide-border">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="px-4 py-3 grid grid-cols-[1fr_120px_140px_110px_44px] gap-4 items-center">
+              <div key={i} className="px-4 py-3 grid grid-cols-[1fr_100px_120px_120px_110px_44px] gap-4 items-center">
                 <div className="space-y-1.5">
                   <Skeleton className="h-4 w-40" />
                   <Skeleton className="h-3 w-28" />
                 </div>
                 <Skeleton className="h-5 w-14" />
+                <Skeleton className="h-4 w-16" />
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-4 w-4 ml-auto" />
@@ -146,7 +148,7 @@ function UserRow({ user }: { user: AdminUser }) {
   return (
     <Link
       href={`/admin/users/${user.uid}`}
-      className="grid grid-cols-[1fr_120px_140px_110px_44px] gap-4 px-4 py-3 items-center hover:bg-muted/40 transition-colors"
+      className="grid grid-cols-[1fr_100px_120px_120px_110px_44px] gap-4 px-4 py-3 items-center hover:bg-muted/40 transition-colors"
     >
       {/* Identity */}
       <div className="min-w-0">
@@ -159,9 +161,16 @@ function UserRow({ user }: { user: AdminUser }) {
       {/* Tier */}
       <TierBadge tier={user.tier} />
 
+      {/* Credits balance */}
+      <span className="text-sm text-muted-foreground tabular-nums">
+        {user.credits?.balance != null
+          ? user.credits.balance.toLocaleString()
+          : '—'}
+      </span>
+
       {/* Messages used */}
-      <span className="text-sm text-muted-foreground">
-        {user.billing.messagesUsed.toLocaleString()} msgs
+      <span className="text-sm text-muted-foreground tabular-nums">
+        {user.billing.messagesUsed.toLocaleString()}
       </span>
 
       {/* Joined */}

@@ -210,21 +210,56 @@ def update_user_credits(uid: str, data: dict) -> None:
     db.collection("users").document(uid).update(updates)
 
 
-def deduct_user_credits(uid: str, amount: int) -> None:
-    """Atomically deduct credits from a user's balance."""
+def deduct_user_credits(uid: str, amount: int, action: str = "") -> None:
+    """Atomically deduct credits from a user's balance and log the transaction."""
+    import datetime as _dt
     db = get_db()
     db.collection("users").document(uid).update({
         "credits.balance": firestore.Increment(-amount),
         "credits.lifetimeUsed": firestore.Increment(amount),
     })
+    # Log transaction (best-effort, non-fatal)
+    try:
+        db.collection("users").document(uid).collection("creditTransactions").add({
+            "type": "debit",
+            "amount": amount,
+            "action": action,
+            "createdAt": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
 
 
-def add_user_credits(uid: str, amount: int) -> None:
-    """Atomically add credits to a user's balance."""
+def add_user_credits(uid: str, amount: int, reason: str = "") -> None:
+    """Atomically add credits to a user's balance and log the transaction."""
+    import datetime as _dt
     db = get_db()
     db.collection("users").document(uid).update({
         "credits.balance": firestore.Increment(amount),
     })
+    # Log transaction (best-effort, non-fatal)
+    try:
+        db.collection("users").document(uid).collection("creditTransactions").add({
+            "type": "credit",
+            "amount": amount,
+            "action": reason or "topup",
+            "createdAt": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
+
+
+def list_credit_transactions(uid: str, limit: int = 20) -> list[dict]:
+    """Return the most recent credit transactions for a user."""
+    db = get_db()
+    docs = (
+        db.collection("users").document(uid)
+        .collection("creditTransactions")
+        .order_by("createdAt", direction="DESCENDING")
+        .limit(limit)
+        .stream()
+    )
+    return [{**d.to_dict(), "id": d.id} for d in docs]
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import { BookOpen, Loader2, Copy, Check, Sparkles, Download } from 'lucide-react'
+import { BookOpen, Loader2, Copy, Check, Sparkles, Download, BookmarkPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -30,6 +30,7 @@ export default function StyleGuidePage() {
   const [guide, setGuide]           = useState<StyleGuide | null>(null)
   const [expanded, setExpanded]     = useState<Set<number>>(new Set())
   const [copiedIdx, setCopiedIdx]   = useState<number | null>(null)
+  const [saving, setSaving]         = useState(false)
 
   async function handleGenerate() {
     setLoading(true)
@@ -55,6 +56,33 @@ export default function StyleGuidePage() {
     setCopiedIdx(i)
     toast.success('Copied!')
     setTimeout(() => setCopiedIdx(null), 1500)
+  }
+
+  async function saveToLibrary() {
+    if (!guide) return
+    setSaving(true)
+    try {
+      const fullContent = [
+        `# ${activeProject?.name ?? 'Brand'} — Brand Style Guide`,
+        '',
+        guide.summary,
+        '',
+        ...guide.sections.flatMap((s) => [`## ${s.title}`, '', s.content, '']),
+      ].join('\n')
+      await api.contentLibrary.save(params.projectId, {
+        platform: 'Website',
+        type: 'ad_copy' as const,
+        content: fullContent,
+        hashtags: [],
+        metadata: { savedFromStyleGuide: true, contentType: 'style_guide', brandName: activeProject?.name },
+      })
+      toast.success('Style guide saved to library')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to save to library')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function downloadGuide() {
@@ -85,11 +113,18 @@ export default function StyleGuidePage() {
         <span className="text-sm font-semibold">Brand Style Guide</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}
         {guide && (
-          <button onClick={downloadGuide}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-            <Download className="w-3.5 h-3.5" />
-            Download .md
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={saveToLibrary} disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+              Save to Library
+            </button>
+            <button onClick={downloadGuide}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <Download className="w-3.5 h-3.5" />
+              Download .md
+            </button>
+          </div>
         )}
       </div>
 

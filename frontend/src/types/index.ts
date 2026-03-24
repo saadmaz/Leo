@@ -989,6 +989,14 @@ export interface CreditsStatus {
   costs: Record<string, number>
 }
 
+export interface CreditTransaction {
+  id: string
+  type: 'debit' | 'credit'
+  amount: number
+  action: string
+  createdAt: string
+}
+
 // ---------------------------------------------------------------------------
 // Deep Search
 // ---------------------------------------------------------------------------

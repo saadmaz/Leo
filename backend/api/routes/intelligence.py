@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from backend.api.deps import get_project_as_member, get_project_as_editor
 from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service, intelligence_service
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +219,8 @@ async def get_competitor_report(
     """
     project = get_project_as_member(project_id, user["uid"])
     brand_core = project.get("brandCore") or {}
+
+    await asyncio.to_thread(check_and_deduct, user["uid"], "competitor_report")
 
     snapshot = await asyncio.to_thread(
         firebase_service.get_competitor_snapshot, project_id, competitor_name

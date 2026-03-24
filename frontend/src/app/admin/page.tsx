@@ -97,13 +97,13 @@ export default function AdminDashboardPage() {
                   color="bg-muted-foreground/40"
                 />
                 <TierRow
-                  label="Pro — $29/mo"
+                  label="Pro — $49/mo"
                   count={stats?.usersByTier.pro ?? 0}
                   total={stats?.totalUsers ?? 1}
                   color="bg-primary"
                 />
                 <TierRow
-                  label="Agency — $99/mo"
+                  label="Agency — $149/mo"
                   count={stats?.usersByTier.agency ?? 0}
                   total={stats?.totalUsers ?? 1}
                   color="bg-violet-500"

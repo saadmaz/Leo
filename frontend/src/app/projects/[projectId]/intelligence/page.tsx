@@ -8,6 +8,7 @@ import {
   Globe, Instagram, Youtube, Linkedin, Facebook, Target,
   ArrowRight, CheckCircle2, Flame, Shield, Swords,
   TrendingDown, Minus, Activity, Sparkles, MapPin, DollarSign, Building2,
+  Users, Star, ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, type IntelligenceStreamEvent } from '@/lib/api'
@@ -20,6 +21,7 @@ import type {
   CompetitorReport,
   DiscoveredCompetitor,
   CompetitiveStrategy,
+  DiscoveredInfluencer,
 } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -38,7 +40,7 @@ type CompetitorForm = {
 
 type LogEntry = { id: number; message: string; icon: string; detail?: string; competitor?: string; ts: number }
 
-type Tab = 'snapshots' | 'strategy'
+type Tab = 'snapshots' | 'strategy' | 'influencers'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -346,11 +348,12 @@ export default function IntelligencePage() {
         )}
 
         {/* ── Tabs ── */}
-        {!refreshing && snapshots.length > 0 && (
+        {!refreshing && !loading && (
           <div className="flex items-center gap-1 px-4 sm:px-6 pt-4 pb-0 border-b border-border">
             {([
-              { key: 'snapshots', label: 'Competitor Profiles', icon: <BarChart2 className="w-3.5 h-3.5" /> },
-              { key: 'strategy',  label: 'Strategy Plan',       icon: <Sparkles className="w-3.5 h-3.5" /> },
+              { key: 'snapshots',   label: 'Competitor Profiles', icon: <BarChart2 className="w-3.5 h-3.5" /> },
+              { key: 'strategy',    label: 'Strategy Plan',       icon: <Sparkles className="w-3.5 h-3.5" /> },
+              { key: 'influencers', label: 'Influencers',         icon: <Users className="w-3.5 h-3.5" /> },
             ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(t => (
               <button
                 key={t.key}
@@ -375,7 +378,7 @@ export default function IntelligencePage() {
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
-        ) : snapshots.length === 0 && !refreshing ? (
+        ) : snapshots.length === 0 && !refreshing && tab !== 'influencers' ? (
           <EmptyState onAdd={() => setShowAddForm(true)} />
         ) : tab === 'snapshots' ? (
           <div className="px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl">
@@ -383,6 +386,8 @@ export default function IntelligencePage() {
               <CompetitorCard key={snapshot.id} snapshot={snapshot} onOpenReport={handleOpenReport} />
             ))}
           </div>
+        ) : tab === 'influencers' ? (
+          <InfluencersPanel projectId={params.projectId} />
         ) : (
           <StrategyPanel
             strategy={strategy}
@@ -1166,6 +1171,200 @@ function StrategyPanel({
               )
             })}
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Influencers Panel
+// ---------------------------------------------------------------------------
+
+const PLATFORMS_INF = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'X']
+const AUDIENCE_SIZES = [
+  { value: 'micro', label: 'Micro', desc: '1k–100k' },
+  { value: 'macro', label: 'Macro', desc: '100k–1M' },
+  { value: 'mega',  label: 'Mega',  desc: '1M+' },
+]
+
+function InfluencersPanel({ projectId }: { projectId: string }) {
+  const [topic, setTopic]         = useState('')
+  const [platform, setPlatform]   = useState('Instagram')
+  const [size, setSize]           = useState('micro')
+  const [location, setLocation]   = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [results, setResults]     = useState<DiscoveredInfluencer[]>([])
+  const [searched, setSearched]   = useState(false)
+
+  async function handleDiscover() {
+    if (!topic.trim()) { toast.error('Enter a topic or niche first.'); return }
+    setLoading(true)
+    setResults([])
+    setSearched(false)
+    try {
+      const data = await api.seoIntel.discoverInfluencers(
+        projectId,
+        topic.trim(),
+        platform,
+        size,
+        location.trim() || undefined,
+      )
+      setResults(data.influencers)
+      setSearched(true)
+    } catch (err) {
+      console.error(err)
+      toast.error('Influencer discovery failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="px-4 sm:px-6 py-5 max-w-3xl">
+      {/* Search form */}
+      <div className="border border-border rounded-xl bg-card p-4 space-y-4 mb-5">
+        <div>
+          <label className="block text-xs font-medium mb-1.5">Topic / Niche *</label>
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleDiscover()}
+            placeholder="e.g. sustainable fashion, B2B SaaS, fitness coaching"
+            className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium mb-1.5">Platform</label>
+          <div className="flex gap-1.5 flex-wrap">
+            {PLATFORMS_INF.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPlatform(p)}
+                className={cn(
+                  'px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
+                  platform === p
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1.5">Audience Size</label>
+            <div className="flex gap-1.5">
+              {AUDIENCE_SIZES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setSize(s.value)}
+                  className={cn(
+                    'flex-1 flex flex-col items-center px-2 py-1.5 rounded-lg text-[10px] font-medium border transition-colors',
+                    size === s.value
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+                  )}
+                >
+                  <span className="font-semibold text-xs">{s.label}</span>
+                  <span className="opacity-70">{s.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5">Location <span className="text-muted-foreground">(optional)</span></label>
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. United States, London"
+              className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={handleDiscover}
+          disabled={loading || !topic.trim()}
+          className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+          {loading ? 'Discovering influencers…' : 'Discover Influencers'}
+        </button>
+      </div>
+
+      {/* Results */}
+      {searched && results.length === 0 && (
+        <div className="text-center py-12 text-sm text-muted-foreground">
+          No influencers found for this topic and platform. Try a different niche or platform.
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            {results.length} Influencers Found
+          </p>
+          {results.map((inf, i) => (
+            <div key={i} className="border border-border rounded-xl bg-card p-4 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">{inf.name}</p>
+                    {inf.platform && (
+                      <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded capitalize">{inf.platform}</span>
+                    )}
+                  </div>
+                  {inf.handle && (
+                    <p className="text-xs text-muted-foreground">{inf.handle}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {inf.alignment_score != null && (
+                    <div className="flex items-center gap-1 text-xs">
+                      <Star className="w-3 h-3 text-amber-400" />
+                      <span className="font-semibold">{inf.alignment_score}%</span>
+                      <span className="text-muted-foreground">match</span>
+                    </div>
+                  )}
+                  {inf.url && (
+                    <a
+                      href={inf.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {inf.followers && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{inf.followers}</span> followers
+                </p>
+              )}
+
+              {inf.bio && (
+                <p className="text-xs text-muted-foreground line-clamp-2">{inf.bio}</p>
+              )}
+
+              {inf.content_themes && inf.content_themes.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {inf.content_themes.map((theme, j) => (
+                    <span key={j} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                      {theme}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

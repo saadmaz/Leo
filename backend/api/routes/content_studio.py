@@ -10,6 +10,7 @@ Endpoints:
   POST /projects/{id}/brand/style-guide    — generate brand style guide
 """
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 from backend.api.deps import get_project_as_member, get_project_as_editor
 from backend.middleware.auth import CurrentUser
 from backend.services import content_studio_service
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,7 @@ async def generate_blog_post(
 ):
     """Stream a full SEO-optimised blog post in markdown."""
     project = get_project_as_editor(project_id, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "blog_post")
     brand_core = project.get("brandCore") or {}
 
     async def event_stream():
@@ -131,6 +134,7 @@ async def generate_website_copy(
 ):
     """Generate website copy sections for a given page type."""
     project = get_project_as_editor(project_id, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "website_copy")
     brand_core = project.get("brandCore") or {}
 
     try:
@@ -158,6 +162,7 @@ async def generate_email_sequence(
 ):
     """Generate a complete email sequence (welcome, nurture, launch, etc.)."""
     project = get_project_as_editor(project_id, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "email_sequence")
     brand_core = project.get("brandCore") or {}
 
     try:
@@ -186,6 +191,7 @@ async def generate_single_email(
 ):
     """Generate a single one-off marketing email."""
     project = get_project_as_editor(project_id, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "email_single")
     brand_core = project.get("brandCore") or {}
 
     try:
@@ -219,6 +225,8 @@ async def generate_style_guide(
             status_code=400,
             detail="Brand Core not set up. Run brand ingestion first.",
         )
+
+    await asyncio.to_thread(check_and_deduct, user["uid"], "style_guide")
 
     try:
         result = await content_studio_service.generate_style_guide(
