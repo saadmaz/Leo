@@ -39,7 +39,7 @@ export default function IntelligencePage() {
     setLoading(true)
     try {
       const data = await api.intelligence.get(params.projectId)
-      setSnapshots(data.snapshots)
+      setSnapshots(data.snapshots ?? [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -70,7 +70,7 @@ export default function IntelligencePage() {
           tiktok: c.tiktok.trim() || undefined,
         })),
       )
-      toast.success(`Analysed ${result.refreshed.length} competitor(s).`)
+      toast.success(`Analysed ${(result.refreshed ?? []).length} competitor(s).`)
       await loadSnapshots()
       // Reset form
       setCompetitors([{ name: '', instagram: '', facebook: '', tiktok: '' }])
@@ -87,8 +87,9 @@ export default function IntelligencePage() {
     setDiscovered([])
     try {
       const result = await api.seoIntel.discoverCompetitors(params.projectId)
-      setDiscovered(result.competitors)
-      if (result.competitors.length === 0) {
+      const competitors = result.competitors ?? []
+      setDiscovered(competitors)
+      if (competitors.length === 0) {
         toast.info('No competitors found automatically. Add them manually.')
       }
     } catch {
