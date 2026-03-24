@@ -22,6 +22,7 @@ from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 from backend.schemas.message import MessageCreate
 from backend.services import billing_service, firebase_service, llm_service, moderation_service, intelligence_service
+from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,10 @@ async def send_message(
     # Verify project membership (raises 404/403 via deps).
     project = get_project_as_member(project_id, user["uid"])
 
-    # Check message quota before doing anything else.
+    # Check message quota and deduct credits before doing anything else.
     import asyncio
     await asyncio.to_thread(billing_service.assert_can_send_message, user["uid"])
+    await asyncio.to_thread(check_and_deduct, user["uid"], "chat_message")
 
     chat = firebase_service.get_chat(project_id, chat_id)
     if not chat:

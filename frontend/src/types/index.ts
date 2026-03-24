@@ -973,3 +973,44 @@ export interface CompetitorReport {
     areas_of_no_overlap: string[]
   }
 }
+
+// ---------------------------------------------------------------------------
+// Credits
+// ---------------------------------------------------------------------------
+
+export interface CreditsStatus {
+  balance: number
+  resetsAt: number       // Unix timestamp
+  lifetimeUsed: number
+  plan: PlanTier
+  planAllotment: number  // credits per period
+  period: 'daily' | 'monthly'
+  costs: Record<string, number>
+}
+
+// ---------------------------------------------------------------------------
+// Deep Search
+// ---------------------------------------------------------------------------
+
+export interface DeepSearchResult {
+  title: string
+  url: string
+  snippet: string
+  position: number
+  source: 'serp'
+}
+
+export interface DeepSearchScrapedPage {
+  source: 'firecrawl'
+  url: string
+  markdown: string
+  extract: Record<string, unknown>
+  metadata: Record<string, unknown>
+}
+
+export interface DeepSearchHistory {
+  id: string
+  query: string
+  createdAt: string
+  events: Array<{ type: string; data: unknown }>
+}

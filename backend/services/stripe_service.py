@@ -23,26 +23,43 @@ PLANS = {
     "free": {
         "label": "Free",
         "price_monthly": 0,
-        "projects_limit": 1,
-        "messages_limit": 20,
-        "ingestions_limit": 1,
+        "projects_limit": 2,
+        "messages_limit": 50,
+        "ingestions_limit": 2,
         "campaigns_limit": 3,
+        "credits_daily": 100,
+        "seats": 1,
+        "features": ["chat", "brand_ingestion", "bulk_generate", "content_planner"],
     },
     "pro": {
         "label": "Pro",
-        "price_monthly": 29,
-        "projects_limit": 10,
-        "messages_limit": 500,
-        "ingestions_limit": 999,  # effectively unlimited
-        "campaigns_limit": 999,   # effectively unlimited
+        "price_monthly": 49,
+        "projects_limit": 5,
+        "messages_limit": 9999,   # credits-gated instead
+        "ingestions_limit": 999,
+        "campaigns_limit": 999,
+        "credits_monthly": 3000,
+        "seats": 3,
+        "features": [
+            "chat", "brand_ingestion", "bulk_generate", "content_planner",
+            "image_generation", "deep_search", "analytics", "posts",
+        ],
     },
     "agency": {
         "label": "Agency",
-        "price_monthly": 99,
-        "projects_limit": 999,
+        "price_monthly": 149,
+        "projects_limit": 25,
         "messages_limit": 9999,
         "ingestions_limit": 9999,
         "campaigns_limit": 9999,
+        "credits_monthly": 15000,
+        "seats": 5,
+        "features": [
+            "chat", "brand_ingestion", "bulk_generate", "content_planner",
+            "image_generation", "deep_search", "analytics", "posts",
+            "white_label", "client_portal", "pdf_export", "api_access",
+            "priority_support",
+        ],
     },
 }
 

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # --- Web Search & Research ---
     EXA_API_KEY: Optional[str] = None
     TAVILY_API_KEY: Optional[str] = None
+    SERPAPI_API_KEY: Optional[str] = None
 
     # --- Search Cost Controls ---
     EXA_DAILY_SEARCH_LIMIT: int = 100

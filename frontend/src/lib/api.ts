@@ -67,6 +67,8 @@ import type {
   Post,
   PostCreate,
   PostUpdate,
+  CreditsStatus,
+  DeepSearchHistory,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -1224,5 +1226,54 @@ export const api = {
         `/projects/${projectId}/influencers/discover`,
         { topic, platform, audience_size: audience_size ?? 'micro', location },
       ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Credits
+  // -------------------------------------------------------------------------
+  credits: {
+    getBalance: () => get<CreditsStatus>('/credits/balance'),
+  },
+
+  // -------------------------------------------------------------------------
+  // Deep Search
+  // -------------------------------------------------------------------------
+  deepSearch: {
+    run: async (
+      projectId: string,
+      query: string,
+      scrapeTopN: number = 3,
+      onEvent: (event: Record<string, unknown>) => void,
+      onDone: () => void,
+      onError: (msg: string) => void,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/deep-search`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query, scrape_top_n: scrapeTopN }),
+      })
+      if (!res.ok) throw new Error(`Deep search failed: ${res.status}`)
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (payload === '[DONE]') { onDone(); return }
+          try { onEvent(JSON.parse(payload)) } catch { /* skip */ }
+        }
+      }
+      onDone()
+    },
+    history: (projectId: string) =>
+      get<{ results: DeepSearchHistory[] }>(`/projects/${projectId}/deep-search/history`),
   },
 }

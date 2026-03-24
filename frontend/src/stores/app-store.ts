@@ -26,6 +26,7 @@ import type {
   BrandCore,
   Campaign,
   Chat,
+  CreditsStatus,
   IngestionStep,
   OptimisticMessage,
   Project,
@@ -158,6 +159,12 @@ interface AppState {
   upgradeModalReason: string
   openUpgradeModal: (reason?: string) => void
   closeUpgradeModal: () => void
+
+  // ---------------------------------------------------------------------------
+  // Credits
+  // ---------------------------------------------------------------------------
+  credits: CreditsStatus | null
+  setCredits: (credits: CreditsStatus | null) => void
 
   // ---------------------------------------------------------------------------
   // Brand Voice Scorer panel
@@ -340,6 +347,12 @@ export const useAppStore = create<AppState>((set) => ({
   upgradeModalReason: '',
   openUpgradeModal: (reason = '') => set({ upgradeModalOpen: true, upgradeModalReason: reason }),
   closeUpgradeModal: () => set({ upgradeModalOpen: false, upgradeModalReason: '' }),
+
+  // ---------------------------------------------------------------------------
+  // Credits
+  // ---------------------------------------------------------------------------
+  credits: null,
+  setCredits: (credits) => set({ credits }),
 
   // ---------------------------------------------------------------------------
   // Brand Voice Scorer panel

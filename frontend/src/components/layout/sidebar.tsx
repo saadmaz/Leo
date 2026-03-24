@@ -33,7 +33,7 @@ export function Sidebar() {
   const {
     user, projects, setProjects, activeProject, setActiveProject,
     chats, setChats, setActiveChat,
-    billingStatus,
+    billingStatus, credits, setCredits,
     upsertProject, removeProject, upsertChat, removeChat,
     sidebarOpen, setSidebarOpen,
     setWizardOpen,
@@ -57,7 +57,8 @@ export function Sidebar() {
       .then(setProjects)
       .catch(console.error)
       .finally(() => setProjectsLoading(false))
-  }, [user, setProjects])
+    api.credits.getBalance().then(setCredits).catch(console.error)
+  }, [user, setProjects, setCredits])
 
   useEffect(() => {
     if (!activeProject) { setChats([]); return }
@@ -280,7 +281,7 @@ export function Sidebar() {
               <NavGroup label="Intelligence" storageKey="nav_intelligence">
                 <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />}   label="Analytics"        onClick={() => router.push(`/projects/${activeProject.id}/analytics`)} />
                 <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="AI Digest"        onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="Deep Research"    onClick={() => router.push(`/projects/${activeProject.id}/reports/research`)} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="Deep Search"      onClick={() => router.push(`/projects/${activeProject.id}/deep-search`)} />
                 <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Intelligence"     onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
                 <NavItem icon={<Bell className="w-3.5 h-3.5" />}        label="Monitoring"       onClick={() => router.push(`/projects/${activeProject.id}/intelligence/monitoring`)} />
                 <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Voice Scorer"     onClick={() => setBrandVoiceScorerOpen(true)} />
@@ -300,8 +301,26 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="border-t border-border p-3 space-y-1">
-          {/* Usage bar */}
-          {billingStatus && (
+          {/* Credits bar */}
+          {credits ? (
+            <div className="px-1 mb-2 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span className="capitalize">{credits.plan} plan</span>
+                <span>{credits.balance.toLocaleString()} / {credits.planAllotment.toLocaleString()} cr</span>
+              </div>
+              <div className="h-1 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    credits.balance / credits.planAllotment <= 0.1 ? 'bg-red-500'
+                    : credits.balance / credits.planAllotment <= 0.3 ? 'bg-amber-500'
+                    : 'bg-primary',
+                  )}
+                  style={{ width: `${Math.min((credits.balance / credits.planAllotment) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          ) : billingStatus && (
             <div className="px-1 mb-2 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span className="capitalize">{billingStatus.plan} plan</span>

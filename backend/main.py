@@ -15,7 +15,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio, templates, planner, analytics, reports, monitoring, seo, posts
+from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio, templates, planner, analytics, reports, monitoring, seo, posts, credits, deep_search
 from backend.middleware.rate_limit import limiter
 from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
@@ -71,6 +71,11 @@ async def lifespan(app: FastAPI):
         logger.warning("TAVILY_API_KEY is not set — real-time web search and news monitoring disabled.")
     else:
         logger.info("Tavily API key loaded — web search, news monitoring, content enrichment enabled.")
+
+    if not settings.SERPAPI_API_KEY:
+        logger.warning("SERPAPI_API_KEY is not set — Deep Search SERP results disabled.")
+    else:
+        logger.info("SerpAPI key loaded — Deep Search SERP results enabled.")
 
     yield  # server is running
 
@@ -141,6 +146,8 @@ app.include_router(reports.router)
 app.include_router(monitoring.router)
 app.include_router(seo.router)
 app.include_router(posts.router)
+app.include_router(credits.router)
+app.include_router(deep_search.router)
 
 # ---------------------------------------------------------------------------
 # Health endpoints

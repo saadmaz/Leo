@@ -199,6 +199,60 @@ def reset_monthly_usage(uid: str) -> None:
     })
 
 
+# ---------------------------------------------------------------------------
+# Credits
+# ---------------------------------------------------------------------------
+
+def update_user_credits(uid: str, data: dict) -> None:
+    """Merge credit fields into the user's `credits` sub-map."""
+    db = get_db()
+    updates = {f"credits.{k}": v for k, v in data.items()}
+    db.collection("users").document(uid).update(updates)
+
+
+def deduct_user_credits(uid: str, amount: int) -> None:
+    """Atomically deduct credits from a user's balance."""
+    db = get_db()
+    db.collection("users").document(uid).update({
+        "credits.balance": firestore.Increment(-amount),
+        "credits.lifetimeUsed": firestore.Increment(amount),
+    })
+
+
+def add_user_credits(uid: str, amount: int) -> None:
+    """Atomically add credits to a user's balance."""
+    db = get_db()
+    db.collection("users").document(uid).update({
+        "credits.balance": firestore.Increment(amount),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Deep Search
+# ---------------------------------------------------------------------------
+
+def save_deep_search_result(project_id: str, data: dict) -> str:
+    """Save a deep search result under projects/{project_id}/deepSearchResults."""
+    db = get_db()
+    ref = db.collection("projects").document(project_id).collection("deepSearchResults").document()
+    data["id"] = ref.id
+    ref.set(data)
+    return ref.id
+
+
+def list_deep_search_results(project_id: str, limit: int = 20) -> list:
+    """Return the most recent deep search results for a project."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("deepSearchResults")
+        .order_by("createdAt", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+        .stream()
+    )
+    return [d.to_dict() for d in docs]
+
+
 def get_user(uid: str) -> Optional[dict]:
     """Return the user profile dict, or None if the document does not exist."""
     db = get_db()
@@ -776,7 +830,7 @@ def get_platform_stats() -> dict:
     total_users = sum(tier_counts.values())
 
     # Estimated MRR (based on tier counts × plan price)
-    mrr = (tier_counts.get("pro", 0) * 29) + (tier_counts.get("agency", 0) * 99)
+    mrr = (tier_counts.get("pro", 0) * 49) + (tier_counts.get("agency", 0) * 149)
 
     return {
         "totalUsers": total_users,

@@ -8,6 +8,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -62,9 +63,8 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-sm font-medium">
               Password
             </label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="current-password"
               placeholder="••••••••"
               value={password}
