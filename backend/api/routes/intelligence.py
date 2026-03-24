@@ -132,29 +132,30 @@ async def refresh_intelligence(
     user: CurrentUser,
 ):
     """
-    Scrape competitor social profiles and store intelligence snapshots.
-    This is a synchronous operation that may take 30–90 seconds per competitor.
+    Scrape + analyse competitors with live SSE progress stream.
+    Uses Apify (all 5 platforms), Firecrawl (website), Exa+Tavily (web), Claude.
     """
-    get_project_as_editor(project_id, user["uid"])
+    import json as _json
+    from fastapi.responses import StreamingResponse as _SR
+    from backend.services.intelligence_service import stream_refresh_competitor_intelligence as _stream
 
+    get_project_as_editor(project_id, user["uid"])
     competitors = [c.model_dump() for c in body.competitors]
-    try:
-        result = await intelligence_service.refresh_competitor_intelligence(
-            project_id, competitors
-        )
-        # Run web enrichment in parallel (non-blocking) when search keys are available
-        from backend.config import settings as _settings
-        if _settings.EXA_API_KEY or _settings.TAVILY_API_KEY:
-            import asyncio as _asyncio
-            _asyncio.create_task(
-                intelligence_service.refresh_competitor_intelligence_web(project_id, competitors)
-            )
-        return result
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:
-        logger.error("Intelligence refresh failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+
+    async def event_stream():
+        try:
+            async for event in _stream(project_id=project_id, competitors=competitors):
+                yield f"data: {_json.dumps(event)}\n\n"
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return _SR(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/intelligence")

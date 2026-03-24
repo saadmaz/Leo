@@ -966,6 +966,225 @@ async def refresh_competitor_intelligence_web(
     return {"web_refreshed": results}
 
 
+async def stream_refresh_competitor_intelligence(
+    project_id: str,
+    competitors: list[dict],
+):
+    """
+    Streaming version of competitor intelligence refresh.
+    Yields SSE-style event dicts with live progress updates.
+    Uses Apify (Instagram, Facebook, TikTok, LinkedIn, YouTube),
+    Firecrawl (website), Exa+Tavily (web intelligence), then Claude analysis.
+    """
+    import asyncio as _asyncio
+    from backend.services import firebase_service
+    from backend.services.ingestion.apify_client import (
+        scrape_instagram, scrape_facebook, scrape_tiktok,
+        scrape_linkedin, scrape_youtube,
+    )
+    from backend.config import settings as _settings
+
+    def _evt(message: str, icon: str = "activity", detail: str = "", competitor: str = "") -> dict:
+        return {"type": "step", "message": message, "icon": icon, "detail": detail, "competitor": competitor}
+
+    if not _settings.APIFY_API_KEY:
+        yield _evt("Apify API key not configured — skipping social scraping", "warn")
+
+    results = []
+    total = min(len(competitors), 5)
+
+    for idx, competitor in enumerate(competitors[:5]):
+        name = competitor.get("name", "Unknown")
+        scraped: dict = {"name": name, "platforms": {}, "website": competitor.get("website", "")}
+
+        yield _evt(f"[{idx+1}/{total}] Starting analysis of {name}", "zap", competitor=name)
+
+        # Instagram
+        if competitor.get("instagram") and _settings.APIFY_API_KEY:
+            handle = competitor["instagram"].lstrip("@")
+            yield _evt(f"Scraping @{handle} on Instagram…", "instagram", f"Fetching last 15 posts", name)
+            try:
+                data = await scrape_instagram(competitor["instagram"], _settings.APIFY_API_KEY, max_posts=15)
+                profile = data.get("profile", {})
+                followers = profile.get("followers", 0)
+                post_count = len(data.get("posts", []))
+                scraped["platforms"]["instagram"] = {
+                    "posts": data.get("posts", [])[:10],
+                    "profile": profile,
+                    "followers": followers,
+                    "raw_captions": (data.get("raw_captions") or "")[:3000],
+                }
+                yield _evt(
+                    f"Instagram: {followers:,} followers · {post_count} posts scraped",
+                    "check", f"@{handle}", name,
+                )
+            except Exception as exc:
+                yield _evt(f"Instagram scrape failed for {name}", "warn", str(exc)[:80], name)
+
+        # Facebook
+        if competitor.get("facebook") and _settings.APIFY_API_KEY:
+            yield _evt(f"Reading {name}'s Facebook page…", "facebook", competitor["facebook"][:60], name)
+            try:
+                data = await scrape_facebook(competitor["facebook"], _settings.APIFY_API_KEY)
+                page_likes = data.get("likes", 0)
+                scraped["platforms"]["facebook"] = {
+                    "posts": data.get("posts", [])[:10],
+                    "name": data.get("name", ""),
+                    "followers": page_likes,
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+                yield _evt(f"Facebook: {page_likes:,} page likes", "check", data.get("name",""), name)
+            except Exception as exc:
+                yield _evt(f"Facebook scrape failed for {name}", "warn", str(exc)[:80], name)
+
+        # TikTok
+        if competitor.get("tiktok") and _settings.APIFY_API_KEY:
+            yield _evt(f"Scanning {name}'s TikTok…", "video", competitor["tiktok"][:60], name)
+            try:
+                data = await scrape_tiktok(competitor["tiktok"], _settings.APIFY_API_KEY, max_videos=10)
+                followers = data.get("followers", 0)
+                scraped["platforms"]["tiktok"] = {
+                    "videos": data.get("videos", [])[:10],
+                    "followers": followers,
+                    "top_hashtags": data.get("top_hashtags", []),
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+                yield _evt(f"TikTok: {followers:,} followers · {len(data.get('videos',[]))} videos", "check", "", name)
+            except Exception as exc:
+                yield _evt(f"TikTok scrape failed for {name}", "warn", str(exc)[:80], name)
+
+        # LinkedIn
+        if competitor.get("linkedin") and _settings.APIFY_API_KEY:
+            yield _evt(f"Reading {name}'s LinkedIn company page…", "linkedin", "", name)
+            try:
+                data = await scrape_linkedin(competitor["linkedin"], _settings.APIFY_API_KEY)
+                followers = data.get("followers", 0)
+                employees = data.get("employees", 0)
+                scraped["platforms"]["linkedin"] = {
+                    "posts": data.get("posts", [])[:10],
+                    "followers": followers,
+                    "tagline": data.get("tagline", ""),
+                    "industry": data.get("industry", ""),
+                    "employees": employees,
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+                yield _evt(
+                    f"LinkedIn: {followers:,} followers · {employees:,} employees",
+                    "check", data.get("tagline","")[:60], name,
+                )
+            except Exception as exc:
+                yield _evt(f"LinkedIn scrape failed for {name}", "warn", str(exc)[:80], name)
+
+        # YouTube
+        if competitor.get("youtube") and _settings.APIFY_API_KEY:
+            yield _evt(f"Scanning {name}'s YouTube channel…", "youtube", "", name)
+            try:
+                data = await scrape_youtube(competitor["youtube"], _settings.APIFY_API_KEY, max_videos=10)
+                subs = data.get("subscribers", 0)
+                scraped["platforms"]["youtube"] = {
+                    "videos": data.get("videos", [])[:10],
+                    "channel_name": data.get("channel_name", ""),
+                    "subscribers": subs,
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+                yield _evt(f"YouTube: {subs:,} subscribers · {len(data.get('videos',[]))} videos", "check", data.get("channel_name",""), name)
+            except Exception as exc:
+                yield _evt(f"YouTube scrape failed for {name}", "warn", str(exc)[:80], name)
+
+        # Website — Firecrawl
+        if competitor.get("website") and _settings.FIRECRAWL_API_KEY:
+            url = competitor["website"]
+            if not url.startswith("http"):
+                url = f"https://{url}"
+            yield _evt(f"Reading {url}…", "read", "Extracting website content", name)
+            try:
+                from backend.services.ingestion.firecrawl_client import scrape_url
+                scraped_web = await scrape_url(url, _settings.FIRECRAWL_API_KEY)
+                content = scraped_web.get("markdown") or scraped_web.get("content") or ""
+                if content:
+                    scraped["platforms"]["website"] = {
+                        "raw_text": content[:3000],
+                        "url": url,
+                    }
+                    yield _evt(f"Website content extracted", "check", f"{len(content)} chars from {url}", name)
+            except Exception as exc:
+                yield _evt(f"Could not read {url}", "warn", str(exc)[:60], name)
+
+        # Web enrichment — Exa + Tavily
+        from backend.config import settings as _s
+        if _s.EXA_API_KEY or _s.TAVILY_API_KEY:
+            from backend.services.integrations import exa_client, tavily_client
+            yield _evt(f"Web intelligence search for {name}…", "globe", "Exa + Tavily", name)
+            try:
+                web_tasks = []
+                if _s.TAVILY_API_KEY:
+                    web_tasks.append(tavily_client.search_news(
+                        query=f"{name} brand news announcement product launch",
+                        days=60, max_results=4, project_id=project_id,
+                    ))
+                if _s.EXA_API_KEY:
+                    web_tasks.append(exa_client.search_companies(
+                        f"{name} company brand", num_results=3, project_id=project_id,
+                    ))
+                web_results = await _asyncio.gather(*web_tasks, return_exceptions=True)
+                news_count = 0
+                for wr in web_results:
+                    if isinstance(wr, Exception):
+                        continue
+                    if isinstance(wr, dict):  # Tavily news result
+                        news = wr.get("results", [])
+                        news_count += len(news)
+                        if news:
+                            scraped["web"] = scraped.get("web", {})
+                            scraped["web"]["recent_news"] = [
+                                {"title": r.get("title",""), "snippet": r.get("content","")[:200]}
+                                for r in news[:4]
+                            ]
+                yield _evt(f"Found {news_count} recent news items for {name}", "check", "", name)
+            except Exception as exc:
+                yield _evt(f"Web enrichment skipped for {name}", "warn", str(exc)[:60], name)
+
+        # Claude analysis
+        if scraped["platforms"]:
+            yield _evt(f"Analysing {name}'s content strategy with Claude AI…", "brain", f"{len(scraped['platforms'])} platforms", name)
+            try:
+                scraped["analysis"] = await _analyse_competitor(name, scraped["platforms"])
+                themes_found = scraped["analysis"].get("key_themes", [])
+                yield _evt(
+                    f"Analysis complete for {name}",
+                    "check",
+                    f"Themes: {', '.join(themes_found[:3])}" if themes_found else "Strategy extracted",
+                    name,
+                )
+            except Exception as exc:
+                yield _evt(f"Analysis failed for {name}", "warn", str(exc)[:60], name)
+
+        # Save
+        yield _evt(f"Saving {name} intelligence to database…", "save", "", name)
+        try:
+            firebase_service.save_competitor_snapshot(project_id, scraped)
+            yield _evt(f"{name} saved ✓", "check", "", name)
+        except Exception as exc:
+            yield _evt(f"Save failed for {name}", "warn", str(exc)[:60], name)
+
+        results.append({
+            "name": name,
+            "platforms_scraped": list(scraped["platforms"].keys()),
+        })
+
+    # Web analysis in background for all competitors
+    if (_settings.EXA_API_KEY or _settings.TAVILY_API_KEY) and results:
+        yield _evt("Running deep web analysis in background…", "globe", "Exa + Tavily enrichment")
+        try:
+            import asyncio as _a
+            _a.create_task(refresh_competitor_intelligence_web(project_id, competitors))
+        except Exception:
+            pass
+
+    yield _evt(f"All done — {len(results)} competitor(s) analysed", "done")
+    yield {"type": "result", "refreshed": results}
+
+
 async def _analyse_competitor_web(name: str, web_data: dict) -> dict:
     client = get_client()
 
@@ -1365,3 +1584,242 @@ IMPORTANT:
                 if c.get("name") and c["name"] not in existing
             ]
         }
+
+
+# ---------------------------------------------------------------------------
+# Streaming Competitor Auto-Discovery
+# ---------------------------------------------------------------------------
+
+async def stream_discover_competitors(
+    project_id: str,
+    brand_core: dict,
+    website_url: Optional[str] = None,
+):
+    """
+    Streaming version of competitor discovery. Yields SSE-style event dicts.
+    Uses Tavily, Exa findSimilar, Exa company search, Exa answer,
+    and Firecrawl to scrape competitor websites for rich profiles.
+    """
+    import asyncio as _asyncio
+    from backend.services.integrations import exa_client, tavily_client
+    from backend.config import settings as _settings
+
+    brand_name = brand_core.get("brandName") or brand_core.get("name") or "this brand"
+    industry   = brand_core.get("industry") or ""
+    themes     = brand_core.get("themes") or []
+    existing   = set(brand_core.get("competitors") or [])
+
+    def _evt(message: str, icon: str = "search", detail: str = "") -> dict:
+        return {"type": "step", "message": message, "icon": icon, "detail": detail}
+
+    raw_web_results: list[str] = []
+    candidates: list[dict] = []
+
+    # ── 1. Tavily: "{brand} competitors" ────────────────────────────────────
+    yield _evt(f'Searching the web for "{brand_name} competitors"…', "search")
+    try:
+        resp = await tavily_client.search_advanced(
+            query=f"{brand_name} {industry} top competitors alternatives similar companies",
+            max_results=8,
+            include_answer=True,
+            project_id=project_id,
+        )
+        answer = resp.get("answer", "")
+        results = resp.get("results") or []
+        snippets = [f"{r.get('title','')}: {r.get('content','')[:400]}" for r in results[:6]]
+        if answer:
+            raw_web_results.append(answer)
+        raw_web_results.extend(snippets)
+        yield _evt(
+            f"Found {len(results)} web sources",
+            "check",
+            answer[:120] if answer else f"{len(results)} articles indexed",
+        )
+    except Exception as exc:
+        yield _evt("Web search unavailable — trying other sources", "warn", str(exc)[:80])
+
+    # ── 2. Tavily: industry competitor landscape ─────────────────────────────
+    if industry or themes:
+        industry_q = industry or (themes[0] if themes else brand_name)
+        yield _evt(f'Analysing "{industry_q}" competitive landscape…', "map")
+        try:
+            resp2 = await tavily_client.search_basic(
+                query=f"best {industry_q} companies startups competitive analysis 2024 2025",
+                max_results=6,
+                include_answer=True,
+                project_id=project_id,
+            )
+            answer2 = resp2.get("answer", "")
+            results2 = resp2.get("results") or []
+            snippets2 = [f"{r.get('title','')}: {r.get('content','')[:300]}" for r in results2[:5]]
+            if answer2:
+                raw_web_results.append(answer2)
+            raw_web_results.extend(snippets2)
+            yield _evt(f"Indexed {len(results2)} industry sources", "check", answer2[:100] if answer2 else "")
+        except Exception as exc:
+            yield _evt("Industry search skipped", "warn", str(exc)[:80])
+
+    # ── 3. Exa: answer "{brand} top competitors" directly ───────────────────
+    yield _evt(f'Deep-diving "{brand_name}" competitive position via Exa…', "brain")
+    try:
+        exa_answer = await exa_client.answer_question(
+            query=f"Who are the top 6 competitors of {brand_name}? List their names, websites, locations, and what they do.",
+            project_id=project_id,
+        )
+        answer_text = exa_answer.get("answer", "")
+        if answer_text:
+            raw_web_results.append(answer_text)
+            yield _evt("Exa intelligence retrieved", "check", answer_text[:120])
+    except Exception as exc:
+        yield _evt("Exa answer unavailable", "warn", str(exc)[:80])
+
+    # ── 4. Exa findSimilar on brand website ──────────────────────────────────
+    if website_url:
+        yield _evt(f"Finding similar companies to {website_url}…", "globe")
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(website_url).netloc
+            similar = await exa_client.find_similar(
+                url=website_url, num_results=8,
+                exclude_domains=[domain], project_id=project_id,
+            )
+            found = [
+                {
+                    "name": r.get("title","").split("|")[0].strip()[:60],
+                    "url": r.get("url",""),
+                    "snippet": r.get("summary") or (r.get("highlights") or [""])[0],
+                }
+                for r in similar if r.get("title")
+            ]
+            candidates.extend(found)
+            yield _evt(f"Found {len(found)} similar companies", "check", ", ".join(c["name"] for c in found[:4]))
+        except Exception as exc:
+            yield _evt("findSimilar skipped", "warn", str(exc)[:80])
+
+    # ── 5. Exa company search by themes ──────────────────────────────────────
+    if themes or industry:
+        q = f"{' '.join(themes[:2])} {industry} company startup brand".strip()
+        yield _evt(f'Searching Exa company database for "{q[:50]}"…', "database")
+        try:
+            results = await exa_client.search_companies(q, num_results=8, project_id=project_id)
+            found = [
+                {
+                    "name": r.get("title","").split("|")[0].strip()[:60],
+                    "url": r.get("url",""),
+                    "snippet": r.get("summary") or "",
+                }
+                for r in results if r.get("title")
+            ]
+            candidates.extend(found)
+            yield _evt(f"Found {len(found)} companies in Exa database", "check", ", ".join(c["name"] for c in found[:4]))
+        except Exception as exc:
+            yield _evt("Exa company search skipped", "warn", str(exc)[:80])
+
+    # ── 6. Firecrawl: scrape candidate websites for deeper info ─────────────
+    if _settings.FIRECRAWL_API_KEY and candidates:
+        from backend.services.ingestion.firecrawl_client import scrape_url
+        # Pick top 3 unique candidate URLs to scrape
+        scraped_domains: set[str] = set()
+        scrape_targets = []
+        for c in candidates[:8]:
+            if c.get("url"):
+                try:
+                    from urllib.parse import urlparse as _up
+                    d = _up(c["url"]).netloc
+                    if d and d not in scraped_domains:
+                        scraped_domains.add(d)
+                        scrape_targets.append(c)
+                        if len(scrape_targets) >= 3:
+                            break
+                except Exception:
+                    pass
+
+        for target in scrape_targets:
+            url = target["url"]
+            name = target["name"]
+            yield _evt(f"Reading {url}…", "read", f"Scraping {name}'s website")
+            try:
+                scraped = await scrape_url(url, _settings.FIRECRAWL_API_KEY)
+                content = scraped.get("markdown") or scraped.get("content") or ""
+                if content:
+                    raw_web_results.append(f"WEBSITE CONTENT for {name} ({url}):\n{content[:800]}")
+                    yield _evt(f"Extracted content from {name}.com", "check", f"{len(content)} chars scraped")
+            except Exception as exc:
+                yield _evt(f"Could not read {name}'s website", "warn", str(exc)[:60])
+
+    # ── 7. Claude synthesises everything ─────────────────────────────────────
+    yield _evt("Synthesising all intelligence with Claude AI…", "brain")
+
+    client = get_client()
+    brand_context = build_brand_core_context(brand_core)
+    web_context = "\n\n".join(filter(None, raw_web_results[:10]))
+    candidate_list = "\n".join(
+        f"- {c['name']} ({c['url']}): {c['snippet'][:200]}"
+        for c in candidates[:10]
+        if c.get("name") and c["name"] not in existing
+    )
+
+    prompt = f"""You are a competitive intelligence analyst. Identify the top 6 genuine competitors for this brand from the research below.
+
+OUR BRAND: {brand_name}
+BRAND CORE: {brand_context}
+
+WEB RESEARCH:
+{web_context[:4000] or "No web results"}
+
+ADDITIONAL CANDIDATES:
+{candidate_list[:2000] or "None"}
+
+Extract the 6 most relevant competitors. For each, extract REAL data from the research — don't fabricate data not in the sources.
+
+Return ONLY valid JSON:
+{{
+  "competitors": [
+    {{
+      "name": "<company name>",
+      "url": "<website URL — use real URL from research>",
+      "description": "<1-2 sentence description>",
+      "what_they_do": "<their core product/service>",
+      "key_advantage": "<their main competitive advantage>",
+      "location": "<city, country — from research or unknown>",
+      "founded": "<year — from research or unknown>",
+      "employee_count": "<e.g. 11-50 — from research or unknown>",
+      "funding_stage": "<bootstrapped|pre-seed|seed|series-a|series-b|public|unknown>",
+      "funding_amount": "<e.g. $300K — from research only, else unknown>",
+      "industry": "<industry>",
+      "why_competitor": "<1 sentence: why they directly compete>",
+      "relevance_score": <0.0-1.0>,
+      "social_hints": {{
+        "instagram": "<handle if found in research, else null>",
+        "linkedin": "<LinkedIn URL if found, else null>",
+        "twitter": "<handle if found, else null>"
+      }}
+    }}
+  ]
+}}
+
+Order by relevance_score. Only include genuine competitors."""
+
+    try:
+        response = await client.messages.create(
+            model=settings.LLM_CHAT_MODEL,
+            max_tokens=2500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = _parse_json_response(response.content[0].text)
+        competitors = [c for c in result.get("competitors", []) if c.get("name") and c["name"] not in existing]
+        yield _evt(f"Analysis complete — {len(competitors)} competitors identified", "done")
+        yield {"type": "result", "competitors": competitors[:6]}
+    except Exception as exc:
+        yield _evt("Synthesis failed — returning raw candidates", "warn", str(exc)[:80])
+        fallback = [
+            {
+                "name": c["name"], "url": c["url"],
+                "description": c.get("snippet",""),
+                "why_competitor": "Similar company in the same space",
+                "relevance_score": 0.6,
+            }
+            for c in candidates[:6] if c.get("name") and c["name"] not in existing
+        ]
+        yield _evt(f"Returning {len(fallback)} candidates", "done")
+        yield {"type": "result", "competitors": fallback}

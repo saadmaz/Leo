@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   BarChart2, RefreshCw, Plus, X, Loader2, ChevronDown, ChevronUp,
   TrendingUp, AlertTriangle, Lightbulb, Zap, Bell, Search,
   Globe, Instagram, Youtube, Linkedin, Facebook, Target,
-  ArrowRight, CheckCircle2, Clock, Flame, Shield, Swords,
+  ArrowRight, CheckCircle2, Flame, Shield, Swords,
   TrendingDown, Minus, Activity, Sparkles, MapPin, DollarSign, Building2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, type IntelligenceStreamEvent } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
@@ -36,11 +36,7 @@ type CompetitorForm = {
   youtube: string
 }
 
-type ProgressStep = {
-  id: string
-  label: string
-  status: 'pending' | 'active' | 'done' | 'error'
-}
+type LogEntry = { id: number; message: string; icon: string; detail?: string; competitor?: string; ts: number }
 
 type Tab = 'snapshots' | 'strategy'
 
@@ -108,7 +104,8 @@ export default function IntelligencePage() {
   const [discovered, setDiscovered] = useState<DiscoveredCompetitor[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [competitors, setCompetitors] = useState<CompetitorForm[]>([emptyForm()])
-  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([])
+  const [liveLog, setLiveLog] = useState<LogEntry[]>([])
+  const logIdRef = useRef(0)
   const [reportSnapshot, setReportSnapshot] = useState<CompetitorSnapshot | null>(null)
   const [report, setReport] = useState<CompetitorReport | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
@@ -130,31 +127,13 @@ export default function IntelligencePage() {
   }, [params.projectId, loadSnapshots])
 
   // ---------------------------------------------------------------------------
-  // Animated progress for analysis
+  // Helpers
   // ---------------------------------------------------------------------------
 
-  function buildProgressSteps(comps: CompetitorForm[]): ProgressStep[] {
-    const steps: ProgressStep[] = []
-    for (const c of comps) {
-      if (c.instagram) steps.push({ id: `${c.name}-ig`,  label: `${c.name} — Instagram`,  status: 'pending' })
-      if (c.facebook)  steps.push({ id: `${c.name}-fb`,  label: `${c.name} — Facebook`,   status: 'pending' })
-      if (c.tiktok)    steps.push({ id: `${c.name}-tt`,  label: `${c.name} — TikTok`,     status: 'pending' })
-      if (c.linkedin)  steps.push({ id: `${c.name}-li`,  label: `${c.name} — LinkedIn`,   status: 'pending' })
-      if (c.youtube)   steps.push({ id: `${c.name}-yt`,  label: `${c.name} — YouTube`,    status: 'pending' })
-    }
-    steps.push({ id: 'analyse', label: 'Analysing with Claude AI', status: 'pending' })
-    steps.push({ id: 'save',    label: 'Saving intelligence',      status: 'pending' })
-    return steps
-  }
-
-  async function runProgressAnimation(steps: ProgressStep[], totalMs: number) {
-    const interval = totalMs / (steps.length + 1)
-    for (let i = 0; i < steps.length; i++) {
-      await new Promise(r => setTimeout(r, interval * 0.2))
-      setProgressSteps(prev => prev.map((s, idx) => idx === i ? { ...s, status: 'active' } : s))
-      await new Promise(r => setTimeout(r, interval * 0.8))
-      setProgressSteps(prev => prev.map((s, idx) => idx === i ? { ...s, status: 'done' } : s))
-    }
+  function pushLog(event: IntelligenceStreamEvent) {
+    if (event.type !== 'step') return
+    const id = ++logIdRef.current
+    setLiveLog(prev => [...prev.slice(-40), { id, message: event.message, icon: event.icon, detail: event.detail, competitor: event.competitor, ts: Date.now() }])
   }
 
   // ---------------------------------------------------------------------------
@@ -163,33 +142,16 @@ export default function IntelligencePage() {
 
   async function handleRefresh() {
     const valid = competitors.filter(c => c.name.trim())
-    if (valid.length === 0) {
-      toast.error('Add at least one competitor name.')
-      return
-    }
-    const hasAnyPlatform = valid.some(c =>
-      c.instagram || c.facebook || c.tiktok || c.linkedin || c.youtube || c.website
-    )
-    if (!hasAnyPlatform) {
-      toast.error('Add at least one platform handle or URL for a competitor.')
-      return
-    }
+    if (valid.length === 0) { toast.error('Add at least one competitor name.'); return }
+    const hasAnyPlatform = valid.some(c => c.instagram || c.facebook || c.tiktok || c.linkedin || c.youtube || c.website)
+    if (!hasAnyPlatform) { toast.error('Add at least one platform handle or URL.'); return }
 
     setRefreshing(true)
     setShowAddForm(false)
-    const steps = buildProgressSteps(valid)
-    setProgressSteps(steps)
+    setLiveLog([])
 
-    // Estimate ~20s per competitor platform, kick off animation
-    const estimatedMs = valid.reduce((acc, c) => {
-      const platforms = [c.instagram, c.facebook, c.tiktok, c.linkedin, c.youtube].filter(Boolean).length
-      return acc + platforms * 20_000
-    }, 5_000)
-
-    const animPromise = runProgressAnimation(steps, estimatedMs)
-
-    try {
-      const result = await api.intelligence.refresh(
+    await new Promise<void>((resolve) => {
+      api.intelligence.refresh(
         params.projectId,
         valid.map(c => ({
           name: c.name.trim(),
@@ -200,44 +162,57 @@ export default function IntelligencePage() {
           linkedin:  c.linkedin.trim()  || undefined,
           youtube:   c.youtube.trim()   || undefined,
         })),
-      )
+        (event) => {
+          pushLog(event)
+          if (event.type === 'result' && event.refreshed) {
+            toast.success(`Analysed ${event.refreshed.length} competitor(s).`)
+            setCompetitors([emptyForm()])
+            setStrategy(null)
+            loadSnapshots()
+          }
+          if (event.type === 'error') {
+            toast.error(event.message || 'Analysis failed.')
+          }
+        },
+        () => resolve(),
+      ).catch(err => {
+        toast.error('Analysis failed. Check handles and try again.')
+        console.error(err)
+        resolve()
+      })
+    })
 
-      // Complete all remaining steps instantly
-      setProgressSteps(prev => prev.map(s => ({ ...s, status: 'done' })))
-      await new Promise(r => setTimeout(r, 500))
-
-      toast.success(`Analysed ${(result.refreshed ?? []).length} competitor(s).`)
-      setProgressSteps([])
-      setCompetitors([emptyForm()])
-      await loadSnapshots()
-      setStrategy(null) // invalidate cached strategy
-    } catch (err) {
-      setProgressSteps(prev => prev.map(s => s.status === 'active' ? { ...s, status: 'error' } : s))
-      await new Promise(r => setTimeout(r, 800))
-      setProgressSteps([])
-      toast.error('Analysis failed. Check handles and try again.')
-      console.error(err)
-    } finally {
-      setRefreshing(false)
-      void animPromise
-    }
+    setRefreshing(false)
   }
 
   async function handleDiscover() {
     setDiscovering(true)
     setDiscovered([])
-    try {
-      const result = await api.seoIntel.discoverCompetitors(params.projectId)
-      const found = result.competitors ?? []
-      setDiscovered(found)
-      if (found.length === 0) {
-        toast.info('No competitors found automatically. Add them manually.')
-      }
-    } catch {
-      toast.error('Auto-discovery requires an Exa API key.')
-    } finally {
-      setDiscovering(false)
-    }
+    setLiveLog([])
+
+    await new Promise<void>((resolve) => {
+      api.seoIntel.discoverCompetitors(
+        params.projectId,
+        (event) => {
+          pushLog(event)
+          if (event.type === 'result' && event.competitors) {
+            const found = event.competitors
+            setDiscovered(found)
+            if (found.length === 0) toast.info('No competitors found. Add them manually.')
+          }
+          if (event.type === 'error') {
+            toast.error(event.message || 'Discovery failed.')
+          }
+        },
+        () => resolve(),
+      ).catch(err => {
+        toast.error('Auto-discovery requires Exa/Tavily API keys.')
+        console.error(err)
+        resolve()
+      })
+    })
+
+    setDiscovering(false)
   }
 
   async function handleGenerateStrategy() {
@@ -360,9 +335,9 @@ export default function IntelligencePage() {
           />
         )}
 
-        {/* ── Progress overlay ── */}
-        {refreshing && progressSteps.length > 0 && (
-          <ProgressPanel steps={progressSteps} />
+        {/* ── Live log ── */}
+        {(refreshing || discovering) && liveLog.length > 0 && (
+          <LiveLogPanel log={liveLog} active={refreshing || discovering} />
         )}
 
         {/* ── Auto-discovered suggestions ── */}
@@ -534,41 +509,86 @@ function AddCompetitorForm({
 }
 
 // ---------------------------------------------------------------------------
-// Progress Panel
+// Live Log Panel
 // ---------------------------------------------------------------------------
 
-function ProgressPanel({ steps }: { steps: ProgressStep[] }) {
+const ICON_MAP: Record<string, React.ReactNode> = {
+  search:   <Search className="w-3.5 h-3.5" />,
+  globe:    <Globe className="w-3.5 h-3.5" />,
+  brain:    <Sparkles className="w-3.5 h-3.5" />,
+  check:    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
+  warn:     <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />,
+  done:     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
+  read:     <Globe className="w-3.5 h-3.5" />,
+  instagram:<Instagram className="w-3.5 h-3.5 text-pink-400" />,
+  facebook: <Facebook className="w-3.5 h-3.5 text-blue-400" />,
+  linkedin: <Linkedin className="w-3.5 h-3.5 text-sky-400" />,
+  youtube:  <Youtube className="w-3.5 h-3.5 text-red-400" />,
+  video:    <Activity className="w-3.5 h-3.5" />,
+  database: <BarChart2 className="w-3.5 h-3.5" />,
+  map:      <Target className="w-3.5 h-3.5" />,
+  zap:      <Zap className="w-3.5 h-3.5 text-primary" />,
+  save:     <CheckCircle2 className="w-3.5 h-3.5" />,
+  activity: <Activity className="w-3.5 h-3.5" />,
+}
+
+function LiveLogPanel({ log, active }: { log: LogEntry[]; active: boolean }) {
+  const bottomRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [log.length])
+
   return (
-    <div className="mx-4 sm:mx-6 my-6 rounded-2xl border border-border bg-card p-6">
-      <div className="flex items-center gap-2 mb-5">
-        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-        <span className="text-sm font-semibold">Analysing competitors…</span>
-        <span className="text-xs text-muted-foreground ml-1">This takes 1–3 minutes</span>
+    <div className="mx-4 sm:mx-6 my-4 rounded-2xl border border-border bg-[#0d0d0d] overflow-hidden">
+      {/* Terminal header */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-muted/10">
+        <div className="flex gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
+        </div>
+        <span className="text-[10px] font-mono text-muted-foreground ml-1">leo — intelligence engine</span>
+        {active && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[10px] text-emerald-400 font-mono">running</span>
+          </div>
+        )}
       </div>
-      <div className="space-y-2">
-        {steps.map(step => (
-          <div key={step.id} className="flex items-center gap-3">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${
-              step.status === 'done'   ? 'bg-emerald-500/20 text-emerald-500' :
-              step.status === 'active' ? 'bg-primary/20 text-primary' :
-              step.status === 'error'  ? 'bg-red-500/20 text-red-500' :
-              'bg-muted text-muted-foreground/30'
-            }`}>
-              {step.status === 'done'   ? <CheckCircle2 className="w-3.5 h-3.5" /> :
-               step.status === 'active' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
-               step.status === 'error'  ? <X className="w-3.5 h-3.5" /> :
-               <Clock className="w-3 h-3" />}
-            </div>
-            <span className={`text-xs transition-all ${
-              step.status === 'done'   ? 'text-foreground/60 line-through' :
-              step.status === 'active' ? 'text-foreground font-medium' :
-              step.status === 'error'  ? 'text-red-500' :
-              'text-muted-foreground/40'
-            }`}>
-              {step.label}
+
+      {/* Log lines */}
+      <div className="px-4 py-3 space-y-1.5 max-h-72 overflow-y-auto font-mono text-xs">
+        {log.map((entry, i) => (
+          <div
+            key={entry.id}
+            className={`flex items-start gap-2.5 transition-all ${
+              i === log.length - 1 ? 'opacity-100' : 'opacity-60'
+            }`}
+          >
+            <span className={`shrink-0 mt-0.5 ${entry.icon === 'check' || entry.icon === 'done' ? 'text-emerald-400' : entry.icon === 'warn' ? 'text-amber-400' : 'text-muted-foreground'}`}>
+              {ICON_MAP[entry.icon] ?? <Activity className="w-3.5 h-3.5" />}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className={`${entry.icon === 'check' || entry.icon === 'done' ? 'text-foreground/90' : entry.icon === 'warn' ? 'text-amber-300' : 'text-foreground/70'}`}>
+                {entry.message}
+              </span>
+              {entry.detail && (
+                <span className="block text-[10px] text-muted-foreground/50 mt-0.5 truncate">
+                  {entry.detail}
+                </span>
+              )}
+            </span>
+            <span className="text-[9px] text-muted-foreground/30 shrink-0 mt-0.5 tabular-nums">
+              {new Date(entry.ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
         ))}
+        {active && (
+          <div className="flex items-center gap-2 text-muted-foreground/40">
+            <span className="inline-block w-2 h-3.5 bg-muted-foreground/40 animate-pulse rounded-sm" />
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
     </div>
   )

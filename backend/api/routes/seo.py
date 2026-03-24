@@ -95,21 +95,35 @@ async def discover_competitors(
     user: CurrentUser,
 ):
     """
-    Auto-discover competitors using Exa findSimilar on the brand website.
-    Triggered automatically when Brand Core has fewer than 3 competitors,
-    or called manually for competitor suggestions.
+    Auto-discover competitors with live SSE progress stream.
+    Uses Tavily, Exa (findSimilar + company search + answer), and Firecrawl.
     """
+    import json as _json
+    from fastapi.responses import StreamingResponse as _SR
+    from backend.services.intelligence_service import stream_discover_competitors as _stream
+
     project = get_project_as_member(project_id, user["uid"])
     brand_core = project.get("brandCore") or {}
     website_url = project.get("websiteUrl") or project.get("website_url") or None
 
-    from backend.services.intelligence_service import discover_competitors as _discover
-    result = await _discover(
-        project_id=project_id,
-        brand_core=brand_core,
-        website_url=website_url,
+    async def event_stream():
+        try:
+            async for event in _stream(
+                project_id=project_id,
+                brand_core=brand_core,
+                website_url=website_url,
+            ):
+                yield f"data: {_json.dumps(event)}\n\n"
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return _SR(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-    return result
 
 
 # ---------------------------------------------------------------------------

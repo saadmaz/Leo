@@ -71,6 +71,15 @@ import type {
 const API = '/api/backend'
 
 // ---------------------------------------------------------------------------
+// Intelligence stream event type
+// ---------------------------------------------------------------------------
+
+export type IntelligenceStreamEvent =
+  | { type: 'step'; message: string; icon: string; detail?: string; competitor?: string }
+  | { type: 'result'; competitors?: DiscoveredCompetitor[]; refreshed?: { name: string; platforms_scraped: string[] }[] }
+  | { type: 'error'; message: string }
+
+// ---------------------------------------------------------------------------
 // Auth headers
 // ---------------------------------------------------------------------------
 
@@ -193,6 +202,43 @@ async function readSSEStream<TEvent>(
 
   // Stream closed without an explicit [DONE] — treat as completion.
   onDone()
+}
+
+// ---------------------------------------------------------------------------
+// SSE streaming helpers
+// ---------------------------------------------------------------------------
+
+async function streamPost<TEvent>(
+  path: string,
+  body: unknown,
+  onEvent: (event: TEvent) => void,
+  onDone: () => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { ...(await authHeaders()), 'Accept': 'text/event-stream' },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok) throw new Error(`POST ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.body) { onDone(); return }
+  await readSSEStream(res.body.getReader(), onEvent, onDone)
+}
+
+async function streamGet<TEvent>(
+  path: string,
+  onEvent: (event: TEvent) => void,
+  onDone: () => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API}${path}`, {
+    headers: { ...(await authHeaders()), 'Accept': 'text/event-stream' },
+    signal,
+  })
+  if (!res.ok) throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.body) { onDone(); return }
+  await readSSEStream(res.body.getReader(), onEvent, onDone)
 }
 
 // ---------------------------------------------------------------------------
@@ -555,13 +601,10 @@ export const api = {
     refresh: (
       projectId: string,
       competitors: { name: string; website?: string; instagram?: string; facebook?: string; tiktok?: string; linkedin?: string; youtube?: string }[],
+      onEvent: (event: IntelligenceStreamEvent) => void,
+      onDone: () => void,
       signal?: AbortSignal,
-    ) =>
-      post<{ refreshed: { name: string; platforms_scraped: string[] }[] }>(
-        `/projects/${projectId}/intelligence/refresh`,
-        { competitors },
-        signal,
-      ),
+    ) => streamPost(`/projects/${projectId}/intelligence/refresh`, { competitors }, onEvent, onDone, signal),
 
     strategy: (projectId: string, signal?: AbortSignal) =>
       get<CompetitiveStrategy>(`/projects/${projectId}/intelligence/strategy`, signal),
@@ -1141,10 +1184,12 @@ export const api = {
         `/projects/${projectId}/seo/content-topics`,
         { gaps, num_topics },
       ),
-    discoverCompetitors: (projectId: string) =>
-      get<{ competitors: DiscoveredCompetitor[]; source: string }>(
-        `/projects/${projectId}/intelligence/discover-competitors`,
-      ),
+    discoverCompetitors: (
+      projectId: string,
+      onEvent: (event: IntelligenceStreamEvent) => void,
+      onDone: () => void,
+      signal?: AbortSignal,
+    ) => streamGet(`/projects/${projectId}/intelligence/discover-competitors`, onEvent, onDone, signal),
     discoverInfluencers: (
       projectId: string,
       topic: string,
