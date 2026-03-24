@@ -470,6 +470,10 @@ export const api = {
       get<Campaign[]>(`/projects/${projectId}/campaigns`, signal),
     get: (projectId: string, campaignId: string, signal?: AbortSignal) =>
       get<Campaign>(`/projects/${projectId}/campaigns/${campaignId}`, signal),
+    update: (projectId: string, campaignId: string, body: { contentPacks?: Record<string, unknown>; name?: string }, signal?: AbortSignal) =>
+      patch<Campaign>(`/projects/${projectId}/campaigns/${campaignId}`, body, signal),
+    duplicate: (projectId: string, campaignId: string, signal?: AbortSignal) =>
+      post<Campaign>(`/projects/${projectId}/campaigns/${campaignId}/duplicate`, {}, signal),
     delete: (projectId: string, campaignId: string, signal?: AbortSignal) =>
       del(`/projects/${projectId}/campaigns/${campaignId}`, signal),
   },

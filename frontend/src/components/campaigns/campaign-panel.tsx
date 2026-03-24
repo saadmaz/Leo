@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Zap, Plus, Trash2, ChevronRight, ChevronLeft,
   Copy, Check, Target, Users, Calendar, BarChart2, Download,
+  Pencil, BookmarkPlus, RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/stores/app-store'
@@ -107,7 +108,7 @@ const CHANNEL_ICONS: Record<string, string> = {
 export function CampaignPanel() {
   const {
     campaignPanelOpen, setCampaignPanelOpen,
-    campaigns, setCampaigns, removeCampaign,
+    campaigns, setCampaigns, removeCampaign, upsertCampaign,
     activeCampaign, setActiveCampaign,
     activeProject, setCampaignGeneratorOpen,
   } = useAppStore()
@@ -135,6 +136,17 @@ export function CampaignPanel() {
     }
   }
 
+  async function handleDuplicate(campaign: Campaign) {
+    if (!activeProject) return
+    try {
+      const copy = await api.campaigns.duplicate(activeProject.id, campaign.id)
+      upsertCampaign(copy)
+      toast.success(`"${copy.name}" created`)
+    } catch {
+      toast.error('Failed to duplicate campaign')
+    }
+  }
+
   return (
     <AnimatePresence>
       {campaignPanelOpen && (
@@ -150,12 +162,19 @@ export function CampaignPanel() {
             className="fixed right-0 top-0 h-full w-full max-w-md bg-card border-l border-border z-50 flex flex-col shadow-2xl"
           >
             {activeCampaign
-              ? <CampaignDetail campaign={activeCampaign} onBack={() => setActiveCampaign(null)} onDelete={handleDelete} />
+              ? <CampaignDetail
+                  campaign={activeCampaign}
+                  projectId={activeProject?.id ?? ''}
+                  onBack={() => setActiveCampaign(null)}
+                  onDelete={handleDelete}
+                  onSaved={upsertCampaign}
+                />
               : <CampaignList
                   campaigns={campaigns}
                   loading={loading}
                   onSelect={setActiveCampaign}
                   onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
                   onClose={() => setCampaignPanelOpen(false)}
                   onNew={() => { setCampaignPanelOpen(false); setCampaignGeneratorOpen(true) }}
                 />
@@ -172,12 +191,13 @@ export function CampaignPanel() {
 // ---------------------------------------------------------------------------
 
 function CampaignList({
-  campaigns, loading, onSelect, onDelete, onClose, onNew,
+  campaigns, loading, onSelect, onDelete, onDuplicate, onClose, onNew,
 }: {
   campaigns: Campaign[]
   loading: boolean
   onSelect: (c: Campaign) => void
   onDelete: (c: Campaign) => void
+  onDuplicate: (c: Campaign) => void
   onClose: () => void
   onNew: () => void
 }) {
@@ -250,6 +270,13 @@ function CampaignList({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
+                  onClick={(e) => { e.stopPropagation(); onDuplicate(campaign) }}
+                  className="p-1 rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-all"
+                  title="Duplicate campaign"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+                <button
                   onClick={(e) => { e.stopPropagation(); onDelete(campaign) }}
                   className="p-1 rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
                 >
@@ -269,20 +296,55 @@ function CampaignList({
 // Campaign detail view
 // ---------------------------------------------------------------------------
 
-function CampaignDetail({ campaign, onBack, onDelete }: {
+function CampaignDetail({ campaign, projectId, onBack, onDelete, onSaved }: {
   campaign: Campaign
+  projectId: string
   onBack: () => void
   onDelete: (c: Campaign) => void
+  onSaved: (c: Campaign) => void
 }) {
   const [activeChannel, setActiveChannel] = useState<string | null>(
     campaign.channels?.[0] ?? null
   )
+  // edits: keyed by `${channel}-${type}-${index}`, value = edited text
+  const [edits, setEdits] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const brief = campaign.brief
   const packs = campaign.contentPacks ?? {}
   const channelsWithContent = Object.keys(packs).filter(
     (ch) => (packs[ch]?.captions?.length ?? 0) > 0 || (packs[ch]?.adCopy?.length ?? 0) > 0
   )
+
+  const hasEdits = Object.keys(edits).length > 0
+
+  async function saveEdits() {
+    if (!hasEdits) return
+    setSaving(true)
+    try {
+      // Merge edits back into contentPacks
+      const updatedPacks = JSON.parse(JSON.stringify(packs)) as typeof packs
+      for (const [key, value] of Object.entries(edits)) {
+        const [ch, type, idxStr] = key.split('-')
+        const idx = parseInt(idxStr, 10)
+        if (type === 'caption' && updatedPacks[ch]?.captions?.[idx]) {
+          updatedPacks[ch].captions![idx].text = value
+        } else if (type === 'headline' && updatedPacks[ch]?.adCopy?.[idx]) {
+          updatedPacks[ch].adCopy![idx].headline = value
+        } else if (type === 'body' && updatedPacks[ch]?.adCopy?.[idx]) {
+          updatedPacks[ch].adCopy![idx].body = value
+        }
+      }
+      const updated = await api.campaigns.update(projectId, campaign.id, { contentPacks: updatedPacks as Record<string, unknown> })
+      onSaved(updated)
+      setEdits({})
+      toast.success('Campaign saved')
+    } catch {
+      toast.error('Failed to save changes')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <>
@@ -295,6 +357,16 @@ function CampaignDetail({ campaign, onBack, onDelete }: {
           <h2 className="font-semibold text-sm truncate">{campaign.name}</h2>
           <StatusBadge status={campaign.status} />
         </div>
+        {hasEdits && (
+          <button
+            onClick={saveEdits}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {saving ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Check className="w-3 h-3" />}
+            Save changes
+          </button>
+        )}
         <button
           onClick={() => {
             const md = buildCampaignMarkdown(campaign)
@@ -381,7 +453,14 @@ function CampaignDetail({ campaign, onBack, onDelete }: {
 
             {/* Pack content */}
             {activeChannel && packs[activeChannel] && (
-              <ContentPackView channel={activeChannel} pack={packs[activeChannel]} />
+              <ContentPackView
+                channel={activeChannel}
+                pack={packs[activeChannel]}
+                campaignId={campaign.id}
+                projectId={projectId}
+                edits={edits}
+                onEdit={(key, value) => setEdits((prev) => ({ ...prev, [key]: value }))}
+              />
             )}
           </div>
         )}
@@ -398,43 +477,171 @@ function CampaignDetail({ campaign, onBack, onDelete }: {
 }
 
 // ---------------------------------------------------------------------------
-// Content pack view
+// Content pack view — with inline editing + save to library
 // ---------------------------------------------------------------------------
 
-function ContentPackView({ pack }: { channel: string; pack: CampaignContentPack }) {
+function ContentPackView({
+  channel, pack, campaignId, projectId, edits, onEdit,
+}: {
+  channel: string
+  pack: CampaignContentPack
+  campaignId: string
+  projectId: string
+  edits: Record<string, string>
+  onEdit: (key: string, value: string) => void
+}) {
   const captions = pack.captions ?? []
   const adCopy = pack.adCopy ?? []
 
+  async function saveToLibrary(content: string, hashtags: string[], type: 'caption' | 'ad_copy') {
+    try {
+      await api.contentLibrary.save(projectId, {
+        platform: channel,
+        type,
+        content,
+        hashtags,
+        metadata: { savedFromCampaign: campaignId },
+        status: 'draft',
+        tags: ['campaign'],
+      })
+      toast.success('Saved to library')
+    } catch {
+      toast.error('Failed to save to library')
+    }
+  }
+
   return (
     <div className="space-y-3">
-      {captions.map((cap, i) => (
-        <div key={i} className="group relative rounded-lg border border-border bg-background p-3">
-          <p className="text-sm leading-relaxed pr-8">{cap.text}</p>
-          {cap.hashtags.length > 0 && (
-            <p className="mt-1.5 text-xs text-primary/70">
-              {cap.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
-            </p>
-          )}
-          <CopyBtn text={cap.text + (cap.hashtags.length ? '\n\n' + cap.hashtags.map((h) => `#${h}`).join(' ') : '')} />
-        </div>
-      ))}
+      {captions.map((cap, i) => {
+        const key = `${channel}-caption-${i}`
+        const text = edits[key] ?? cap.text
+        return (
+          <EditableBlock
+            key={i}
+            editKey={key}
+            edits={edits}
+            onEdit={onEdit}
+            copyText={text + (cap.hashtags.length ? '\n\n' + cap.hashtags.map((h) => `#${h}`).join(' ') : '')}
+            onSaveToLibrary={() => saveToLibrary(text, cap.hashtags, 'caption')}
+          >
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Caption {i + 1}</p>
+            <ContentEditableText editKey={key} value={text} edits={edits} onEdit={onEdit} />
+            {cap.hashtags.length > 0 && (
+              <p className="mt-1.5 text-xs text-primary/70">
+                {cap.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
+              </p>
+            )}
+          </EditableBlock>
+        )
+      })}
 
-      {adCopy.map((v, i) => (
-        <div key={i} className="group relative rounded-lg border border-border bg-background p-3 space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Headline</p>
-          <p className="text-sm font-medium pr-8">{v.headline}</p>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Body</p>
-          <p className="text-sm leading-relaxed pr-8">{v.body}</p>
-          {v.cta && (
-            <>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">CTA</p>
-              <span className="inline-block px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">{v.cta}</span>
-            </>
-          )}
-          <CopyBtn text={`Headline: ${v.headline}\n\n${v.body}${v.cta ? `\n\nCTA: ${v.cta}` : ''}`} />
-        </div>
-      ))}
+      {adCopy.map((v, i) => {
+        const headlineKey = `${channel}-headline-${i}`
+        const bodyKey = `${channel}-body-${i}`
+        const headline = edits[headlineKey] ?? v.headline
+        const body = edits[bodyKey] ?? v.body
+        const copyText = `Headline: ${headline}\n\n${body}${v.cta ? `\n\nCTA: ${v.cta}` : ''}`
+        return (
+          <EditableBlock
+            key={i}
+            editKey={headlineKey}
+            edits={edits}
+            onEdit={onEdit}
+            copyText={copyText}
+            onSaveToLibrary={() => saveToLibrary(body, [], 'ad_copy')}
+          >
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Headline</p>
+            <ContentEditableText editKey={headlineKey} value={headline} edits={edits} onEdit={onEdit} isOneLine />
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-1.5">Body</p>
+            <ContentEditableText editKey={bodyKey} value={body} edits={edits} onEdit={onEdit} />
+            {v.cta && (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-1.5">CTA</p>
+                <span className="inline-block px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">{v.cta}</span>
+              </>
+            )}
+          </EditableBlock>
+        )
+      })}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Editable block wrapper
+// ---------------------------------------------------------------------------
+
+function EditableBlock({
+  children, editKey, edits, onEdit: _onEdit, copyText, onSaveToLibrary,
+}: {
+  children: React.ReactNode
+  editKey: string
+  edits: Record<string, string>
+  onEdit: (key: string, value: string) => void
+  copyText: string
+  onSaveToLibrary: () => void
+}) {
+  const isEdited = Object.keys(edits).some((k) => k.startsWith(editKey.split('-').slice(0, 2).join('-')))
+  return (
+    <div className={cn(
+      'group relative rounded-lg border bg-background p-3',
+      isEdited ? 'border-primary/50' : 'border-border',
+    )}>
+      {children}
+      {/* Action buttons — visible on hover */}
+      <div className="absolute top-2.5 right-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={onSaveToLibrary}
+          className="p-1.5 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground hover:text-primary"
+          title="Save to library"
+        >
+          <BookmarkPlus className="w-3 h-3" />
+        </button>
+        <CopyBtn text={copyText} />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Inline editable text
+// ---------------------------------------------------------------------------
+
+function ContentEditableText({
+  editKey, value, edits, onEdit, isOneLine = false,
+}: {
+  editKey: string
+  value: string
+  edits: Record<string, string>
+  onEdit: (key: string, value: string) => void
+  isOneLine?: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+
+  if (!editing) {
+    return (
+      <div className="flex items-start gap-1 group/text">
+        <p className={cn('text-sm leading-relaxed flex-1', isOneLine && 'font-medium')}>{value}</p>
+        <button
+          onClick={() => setEditing(true)}
+          className="p-0.5 rounded opacity-0 group-hover/text:opacity-100 text-muted-foreground hover:text-foreground transition-opacity shrink-0 mt-0.5"
+          title="Edit"
+        >
+          <Pencil className="w-2.5 h-2.5" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <textarea
+      autoFocus
+      rows={isOneLine ? 1 : 4}
+      value={edits[editKey] ?? value}
+      onChange={(e) => onEdit(editKey, e.target.value)}
+      onBlur={() => setEditing(false)}
+      className="w-full text-sm leading-relaxed bg-muted/40 border border-primary/30 rounded-md p-2 focus:outline-none resize-none"
+    />
   )
 }
 
@@ -484,7 +691,7 @@ function CopyBtn({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="absolute top-2.5 right-2.5 p-1.5 rounded-md opacity-0 group-hover:opacity-100 bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all"
+      className="p-1.5 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all"
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
     </button>

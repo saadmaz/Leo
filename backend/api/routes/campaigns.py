@@ -10,7 +10,7 @@ Endpoints:
 
 import json
 import logging
-from typing import AsyncIterator, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -36,6 +36,11 @@ class CampaignGenerateRequest(BaseModel):
     timeline: str = "4 weeks"
     kpis: List[str] = []
     budgetGuidance: str = ""
+
+
+class CampaignUpdateRequest(BaseModel):
+    contentPacks: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +72,34 @@ def get_campaign(project_id: str, campaign_id: str, user: CurrentUser) -> dict:
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
     return campaign
+
+
+@router.patch("/{project_id}/campaigns/{campaign_id}")
+def update_campaign(project_id: str, campaign_id: str, body: CampaignUpdateRequest, user: CurrentUser) -> dict:
+    """Partially update a campaign (e.g. edited contentPacks or name)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    campaign = firebase_service.get_campaign(project_id, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+    updates = body.model_dump(exclude_none=True)
+    if updates:
+        firebase_service.update_campaign(project_id, campaign_id, updates)
+    return firebase_service.get_campaign(project_id, campaign_id)
+
+
+@router.post("/{project_id}/campaigns/{campaign_id}/duplicate")
+def duplicate_campaign(project_id: str, campaign_id: str, user: CurrentUser) -> dict:
+    """Duplicate an existing campaign with a 'Copy of…' name."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    original = firebase_service.get_campaign(project_id, campaign_id)
+    if not original:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+    data = {k: v for k, v in original.items() if k not in ("id", "createdAt", "updatedAt")}
+    data["name"] = f"Copy of {original.get('name', 'Campaign')}"
+    data["status"] = "ready"
+    return firebase_service.create_campaign(project_id, data)
 
 
 @router.delete("/{project_id}/campaigns/{campaign_id}", status_code=204)

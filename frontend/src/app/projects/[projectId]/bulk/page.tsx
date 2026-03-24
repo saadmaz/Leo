@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { Zap, Check, X, Loader2, BookmarkPlus, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Zap, Check, X, Loader2, BookmarkPlus, ChevronRight, ChevronLeft, Pencil, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -28,6 +28,13 @@ export default function BulkGeneratePage() {
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set())
   const [rejectedIds, setRejectedIds] = useState<Set<number>>(new Set())
 
+  // Inline editing state
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [edits, setEdits] = useState<Record<number, string>>({})
+
+  // Per-item regen state
+  const [regenIdx, setRegenIdx] = useState<number | null>(null)
+
   const togglePlatform = useCallback((p: string) => {
     setSelectedPlatforms((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
@@ -45,6 +52,8 @@ export default function BulkGeneratePage() {
     setCurrentIdx(0)
     setSavedIds(new Set())
     setRejectedIds(new Set())
+    setEdits({})
+    setEditingIdx(null)
 
     api.streamBulkGenerate(
       params.projectId,
@@ -69,14 +78,55 @@ export default function BulkGeneratePage() {
     })
   }
 
+  async function handleRegenItem(idx: number) {
+    const item = items[idx]
+    setRegenIdx(idx)
+    setEditingIdx(null)
+
+    try {
+      await api.streamBulkGenerate(
+        params.projectId,
+        {
+          platforms: [item.platform],
+          count_per_platform: 1,
+          goal: goal.trim() || undefined,
+        },
+        {
+          onItem: (event) => {
+            setItems((prev) => {
+              const next = [...prev]
+              next[idx] = event.item
+              return next
+            })
+            setEdits((prev) => {
+              const next = { ...prev }
+              delete next[idx]
+              return next
+            })
+          },
+          onProgress: () => {},
+          onDone: () => setRegenIdx(null),
+          onError: (err) => {
+            toast.error(err)
+            setRegenIdx(null)
+          },
+        },
+      )
+    } catch {
+      toast.error('Failed to regenerate item')
+      setRegenIdx(null)
+    }
+  }
+
   async function handleApprove(idx: number) {
     const item = items[idx]
+    const content = edits[idx] ?? item.content
     setSaving(true)
     try {
       await api.contentLibrary.save(params.projectId, {
         platform: item.platform,
         type: item.type as 'caption' | 'ad_copy' | 'video_script' | 'email' | 'image_prompt',
-        content: item.content,
+        content,
         hashtags: item.hashtags,
         metadata: { hook: item.hook, headline: item.headline, cta: item.cta, bulkGenerated: true },
       })
@@ -98,6 +148,7 @@ export default function BulkGeneratePage() {
   const current = items[currentIdx]
   const pending = items.filter((_, i) => !savedIds.has(i) && !rejectedIds.has(i)).length
   const done = savedIds.size + rejectedIds.size
+  const isRegening = regenIdx === currentIdx
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -235,23 +286,60 @@ export default function BulkGeneratePage() {
 
               {/* Card */}
               <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-3">
-                {(current.hook || current.headline) && (
-                  <div className="text-xs font-semibold text-primary uppercase tracking-wide">
-                    {current.hook || current.headline}
+                {isRegening ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Regenerating…</span>
                   </div>
+                ) : (
+                  <>
+                    {(current.hook || current.headline) && (
+                      <div className="text-xs font-semibold text-primary uppercase tracking-wide">
+                        {current.hook || current.headline}
+                      </div>
+                    )}
+
+                    {/* Editable content area */}
+                    <div className="relative group/edit">
+                      {editingIdx === currentIdx ? (
+                        <textarea
+                          autoFocus
+                          value={edits[currentIdx] ?? current.content}
+                          onChange={(e) => setEdits((prev) => ({ ...prev, [currentIdx]: e.target.value }))}
+                          rows={5}
+                          className="w-full text-sm leading-relaxed bg-muted/40 border border-primary/30 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        />
+                      ) : (
+                        <p className="text-sm leading-relaxed">
+                          {edits[currentIdx] ?? current.content}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => setEditingIdx(editingIdx === currentIdx ? null : currentIdx)}
+                        className="absolute top-0 right-0 p-1 rounded opacity-0 group-hover/edit:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                        title={editingIdx === currentIdx ? 'Done editing' : 'Edit content'}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {edits[currentIdx] !== undefined && edits[currentIdx] !== current.content && (
+                      <p className="text-[10px] text-primary/60 italic">Edited — will save with your changes</p>
+                    )}
+
+                    {current.hashtags.length > 0 && (
+                      <p className="text-xs text-primary/70">
+                        {current.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
+                      </p>
+                    )}
+                    {current.cta && (
+                      <p className="text-xs text-muted-foreground italic">CTA: {current.cta}</p>
+                    )}
+                    <div className="text-[10px] text-muted-foreground/60 capitalize">
+                      {current.type.replace('_', ' ')} · {current.platform}
+                    </div>
+                  </>
                 )}
-                <p className="text-sm leading-relaxed">{current.content}</p>
-                {current.hashtags.length > 0 && (
-                  <p className="text-xs text-primary/70">
-                    {current.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
-                  </p>
-                )}
-                {current.cta && (
-                  <p className="text-xs text-muted-foreground italic">CTA: {current.cta}</p>
-                )}
-                <div className="text-[10px] text-muted-foreground/60 capitalize">
-                  {current.type.replace('_', ' ')} · {current.platform}
-                </div>
               </div>
 
               {/* Actions */}
@@ -266,7 +354,7 @@ export default function BulkGeneratePage() {
 
                 <button
                   onClick={() => handleReject(currentIdx)}
-                  disabled={saving || rejectedIds.has(currentIdx) || savedIds.has(currentIdx)}
+                  disabled={saving || isRegening || rejectedIds.has(currentIdx) || savedIds.has(currentIdx)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium border border-destructive/30 text-destructive rounded-lg hover:bg-destructive/5 disabled:opacity-40 transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -274,8 +362,17 @@ export default function BulkGeneratePage() {
                 </button>
 
                 <button
+                  onClick={() => handleRegenItem(currentIdx)}
+                  disabled={saving || isRegening || savedIds.has(currentIdx)}
+                  className="p-2.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                  title="Regenerate this item"
+                >
+                  {isRegening ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                </button>
+
+                <button
                   onClick={() => handleApprove(currentIdx)}
-                  disabled={saving || savedIds.has(currentIdx)}
+                  disabled={saving || isRegening || savedIds.has(currentIdx)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-40 transition-colors"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkPlus className="w-4 h-4" />}
@@ -326,6 +423,8 @@ export default function BulkGeneratePage() {
                   setSavedIds(new Set())
                   setRejectedIds(new Set())
                   setCurrentIdx(0)
+                  setEdits({})
+                  setEditingIdx(null)
                 }}
                 className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
