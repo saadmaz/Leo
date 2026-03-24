@@ -22,10 +22,6 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'LEO — Your Brand. One Chat. Every Channel.',
   description: 'Brand-aware AI marketing co-pilot. Build your Brand Core and create on-brand campaigns, content, and copy — all in one chat.',
-  icons: {
-    icon: '/Leo-agent.png',
-    apple: '/Leo-agent.png',
-  },
   manifest: '/manifest.json',
   themeColor: '#7c3aed',
   appleWebApp: {
