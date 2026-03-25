@@ -1,14 +1,16 @@
 import logging
 import os
 import sys
+import traceback
 from contextlib import asynccontextmanager
 
 # Ensure the repo root is on the path so `backend.xxx` imports resolve
 # regardless of the working directory from which the server is launched.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -97,6 +99,13 @@ app = FastAPI(
 # Rate limiting — 60 req/min global, 10/min on AI routes (set per-route).
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    logger.error("Unhandled exception on %s %s: %s\n%s", request.method, request.url.path, exc, tb)
+    return JSONResponse(status_code=500, content={"detail": str(exc) or "Internal Server Error"})
 
 # ---------------------------------------------------------------------------
 # CORS

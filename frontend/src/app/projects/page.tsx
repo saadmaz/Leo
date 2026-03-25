@@ -156,6 +156,11 @@ export default function ProjectsPage() {
   const router = useRouter()
   const { user, projects, setProjects, setChats, setActiveChat, setWizardOpen } = useAppStore()
   const [loading, setLoading] = useState(true)
+  const [greetingText, setGreetingText] = useState('')
+
+  useEffect(() => {
+    setGreetingText(greeting(user?.displayName ?? null))
+  }, [user?.displayName])
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return }
@@ -203,7 +208,7 @@ export default function ProjectsPage() {
             {/* Greeting */}
             <div>
               <h1 className="text-xl font-bold">
-                {greeting(user?.displayName ?? null)}
+                {greetingText}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {loading

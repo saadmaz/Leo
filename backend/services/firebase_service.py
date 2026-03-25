@@ -362,10 +362,11 @@ def list_all_users(limit: int = 500) -> list[dict]:
 
 def get_user_project_count(uid: str) -> int:
     """Return the number of projects the user owns."""
+    from google.cloud.firestore_v1.base_query import FieldFilter
     db = get_db()
     docs = (
         db.collection("projects")
-        .where(f"members.{uid}", "in", ["admin", "editor", "viewer"])
+        .where(filter=FieldFilter(f"members.{uid}", "in", ["admin", "editor", "viewer"]))
         .stream()
     )
     return sum(1 for _ in docs)
@@ -961,10 +962,11 @@ def list_projects(uid: str) -> list[dict]:
     """
     from backend.config import settings
 
+    from google.cloud.firestore_v1.base_query import FieldFilter
     db = get_db()
     docs = (
         db.collection("projects")
-        .where(f"members.{uid}", "in", ["admin", "editor", "viewer"])
+        .where(filter=FieldFilter(f"members.{uid}", "in", ["admin", "editor", "viewer"]))
         .limit(settings.PROJECTS_LIMIT)
         .stream()
     )
