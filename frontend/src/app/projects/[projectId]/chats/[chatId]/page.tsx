@@ -3,7 +3,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone, Globe, Search } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone } from 'lucide-react'
+import { ThinkingIndicator } from '@/components/chat/thinking-indicator'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
 import { PromptComposer } from '@/components/chat/prompt-composer'
@@ -428,57 +429,11 @@ export default function ChatPage() {
               </AnimatePresence>
             )}
 
-            {/* Status / tool-use indicator */}
-            <AnimatePresence>
-              {(activeToolCall || streamStatus) && (
-                <motion.div
-                  key={activeToolCall ? `tool-${activeToolCall.tool}` : `status-${streamStatus}`}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border bg-muted/30 max-w-[420px]"
-                >
-                  {activeToolCall ? (
-                    activeToolCall.tool.includes('news') || activeToolCall.tool.includes('monitor') ? (
-                      <Globe className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
-                    ) : (
-                      <Search className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
-                    )
-                  ) : (
-                    <motion.div
-                      animate={{ opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                      className="w-3.5 h-3.5 rounded-full bg-primary shrink-0"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground">
-                      {activeToolCall
-                        ? (activeToolCall.tool === 'web_search' ? 'Searching the web' :
-                           activeToolCall.tool === 'find_similar_companies' ? 'Finding similar companies' :
-                           activeToolCall.tool === 'research_topic' ? 'Researching topic' :
-                           activeToolCall.tool === 'get_brand_news' ? 'Fetching brand news' :
-                           'Searching')
-                        : streamStatus}
-                      <span className="inline-flex gap-0.5 ml-1">
-                        {[0, 1, 2].map((i) => (
-                          <motion.span
-                            key={i}
-                            animate={{ opacity: [0, 1, 0] }}
-                            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-                            className="text-primary"
-                          >·</motion.span>
-                        ))}
-                      </span>
-                    </p>
-                    {activeToolCall?.query && (
-                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{activeToolCall.query}</p>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Thinking / tool-use indicator */}
+            <ThinkingIndicator
+              activeToolCall={activeToolCall}
+              streamStatus={streamStatus}
+            />
 
             <div ref={bottomRef} />
           </div>
