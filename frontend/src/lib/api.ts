@@ -1235,11 +1235,18 @@ export const api = {
   // Brand Monitoring (Exa + Tavily)
   // ---------------------------------------------------------------------------
   monitoring: {
-    run: (projectId: string) =>
-      post<{ alerts_saved: number; scan_summary: { total: number; new_alerts: number } }>(
-        `/projects/${projectId}/monitor/run`,
-        {},
-      ),
+    run: (
+      projectId: string,
+      onEvent: (event: { type: string; message?: string; alert?: MonitorAlert; new_alerts?: number; targets?: string[] }) => void,
+      onDone: () => void,
+      signal?: AbortSignal,
+    ) => streamPost(
+      `/projects/${projectId}/monitor/run`,
+      {},
+      onEvent,
+      onDone,
+      signal,
+    ),
     alerts: (projectId: string, params?: { unread_only?: boolean; days?: number; limit?: number }) => {
       const qs = new URLSearchParams()
       if (params?.unread_only) qs.set('unread_only', 'true')

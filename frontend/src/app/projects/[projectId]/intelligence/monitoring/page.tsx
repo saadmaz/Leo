@@ -71,9 +71,19 @@ export default function MonitoringPage() {
 
   async function handleScan() {
     setScanning(true)
+    let newAlerts = 0
     try {
-      const result = await api.monitoring.run(params.projectId)
-      toast.success(`Scan complete — ${result.scan_summary.new_alerts} new alert(s) found.`)
+      await new Promise<void>((resolve) => {
+        api.monitoring.run(
+          params.projectId,
+          (event) => {
+            if (event.type === 'done') newAlerts = event.new_alerts ?? 0
+            if (event.type === 'error') toast.error(event.message ?? 'Monitoring scan failed.')
+          },
+          resolve,
+        )
+      })
+      toast.success(`Scan complete — ${newAlerts} new alert(s) found.`)
       await loadAlerts()
     } catch (err) {
       console.error(err)
