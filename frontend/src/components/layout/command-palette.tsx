@@ -176,7 +176,7 @@ function buildCommands(
     {
       id: 'reports',
       label: 'Reports',
-      description: 'Weekly digest & research',
+      description: 'AI digest & research reports',
       icon: <FileText className="w-4 h-4" />,
       section: 'navigation',
       projectRequired: true,

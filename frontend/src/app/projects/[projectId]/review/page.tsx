@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   ClipboardCheck, Loader2, RefreshCw, Check, X, RotateCcw,
-  ChevronDown, ChevronUp, Clock,
+  ChevronDown, ChevronUp, Clock, Sparkles, TrendingUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -12,7 +12,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
-import type { ContentLibraryItem, ReviewDecision, ReviewHistoryEntry } from '@/types'
+import type { ContentLibraryItem, ReviewDecision, ReviewHistoryEntry, ContentPrediction } from '@/types'
 
 const PLATFORM_COLORS: Record<string, string> = {
   instagram: 'bg-pink-500/10 text-pink-600',
@@ -115,12 +115,15 @@ function ReviewCard({ item, projectId, onDecision }: {
   projectId: string
   onDecision: (itemId: string, decision: ReviewDecision) => void
 }) {
-  const [expanded, setExpanded]     = useState(false)
+  const [expanded, setExpanded]       = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [history, setHistory]       = useState<ReviewHistoryEntry[]>([])
+  const [history, setHistory]         = useState<ReviewHistoryEntry[]>([])
   const [histLoading, setHistLoading] = useState(false)
-  const [note, setNote]             = useState('')
-  const [deciding, setDeciding]     = useState<ReviewDecision | null>(null)
+  const [note, setNote]               = useState('')
+  const [deciding, setDeciding]       = useState<ReviewDecision | null>(null)
+  const [prediction, setPrediction]   = useState<ContentPrediction | null>(null)
+  const [predicting, setPredicting]   = useState(false)
+  const [showPrediction, setShowPrediction] = useState(false)
 
   const platformKey = item.platform?.toLowerCase() ?? ''
 
@@ -133,6 +136,17 @@ function ReviewCard({ item, projectId, onDecision }: {
       setShowHistory(true)
     } catch { toast.error('Failed to load history') }
     finally { setHistLoading(false) }
+  }
+
+  async function handlePredict() {
+    if (prediction) { setShowPrediction((v) => !v); return }
+    setPredicting(true)
+    try {
+      const data = await api.contentPredict.predict(projectId, item.content, item.platform ?? 'Instagram')
+      setPrediction(data)
+      setShowPrediction(true)
+    } catch { toast.error('Prediction failed — Brand Core required') }
+    finally { setPredicting(false) }
   }
 
   async function handleDecide(decision: ReviewDecision) {
@@ -213,12 +227,84 @@ function ReviewCard({ item, projectId, onDecision }: {
           Reject
         </button>
 
-        <button onClick={loadHistory} disabled={histLoading}
-          className="ml-auto text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
-          {histLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
-          History
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={handlePredict} disabled={predicting}
+            className={cn('text-[10px] flex items-center gap-1 transition-colors', showPrediction ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
+            {predicting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            Predict
+          </button>
+          <button onClick={loadHistory} disabled={histLoading}
+            className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+            {histLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+            History
+          </button>
+        </div>
       </div>
+
+      {/* Performance prediction */}
+      {showPrediction && prediction && (
+        <div className="border-t border-border/50 px-4 py-3 bg-muted/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-primary" />
+              Performance Prediction
+            </p>
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                'text-xs font-semibold px-2 py-0.5 rounded-full capitalize',
+                prediction.estimated_engagement === 'high' ? 'bg-green-500/10 text-green-600' :
+                prediction.estimated_engagement === 'medium' ? 'bg-amber-500/10 text-amber-600' :
+                'bg-red-500/10 text-red-500',
+              )}>
+                {prediction.estimated_engagement} engagement
+              </span>
+              <span className="text-sm font-bold tabular-nums">{prediction.score}/100</span>
+            </div>
+          </div>
+
+          {/* Sub-scores */}
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { label: 'Hook',      value: prediction.hook_strength },
+              { label: 'Clarity',   value: prediction.clarity },
+              { label: 'CTA',       value: prediction.cta_strength },
+              { label: 'Brand fit', value: prediction.brand_alignment },
+            ] as { label: string; value: number }[]).map(({ label, value }) => (
+              <div key={label} className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground w-14 shrink-0">{label}</span>
+                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn('h-full rounded-full', value >= 70 ? 'bg-green-500' : value >= 45 ? 'bg-amber-500' : 'bg-red-500')}
+                    style={{ width: `${value}%` }}
+                  />
+                </div>
+                <span className="text-[10px] tabular-nums text-muted-foreground w-5 text-right">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {prediction.best_posting_time && (
+            <p className="text-[10px] text-muted-foreground">
+              <TrendingUp className="w-3 h-3 inline mr-1 text-primary" />
+              Best time to post: <span className="font-medium">{prediction.best_posting_time}</span>
+            </p>
+          )}
+
+          {prediction.improvements.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground mb-1">Suggestions</p>
+              <ul className="space-y-0.5">
+                {prediction.improvements.slice(0, 3).map((s, i) => (
+                  <li key={i} className="text-[10px] text-foreground/70 flex gap-1.5">
+                    <span className="text-primary shrink-0">•</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Review history */}
       {showHistory && history.length > 0 && (

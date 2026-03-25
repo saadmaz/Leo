@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import {
   Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp,
   Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck, Zap, CalendarRange,
+  ShieldAlert, ShieldCheck, AlertTriangle, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -12,7 +13,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
-import type { ContentLibraryItem, ContentLibraryStatus } from '@/types'
+import type { ContentLibraryItem, ContentLibraryStatus, BrandDriftResult } from '@/types'
 import { RecycleModal } from '@/components/content-ops/recycle-modal'
 import { TransformModal } from '@/components/content-ops/transform-modal'
 import { PerformanceModal } from '@/components/content-ops/performance-modal'
@@ -71,6 +72,8 @@ export default function LibraryPage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduling, setScheduling] = useState(false)
+  const [driftResult, setDriftResult] = useState<BrandDriftResult | null>(null)
+  const [driftChecking, setDriftChecking] = useState(false)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -178,6 +181,21 @@ export default function LibraryPage() {
     }
   }
 
+  async function handleCheckDrift() {
+    const selectedItems = items.filter((i) => selectedIds.has(i.id))
+    if (selectedItems.length === 0) return
+    setDriftChecking(true)
+    try {
+      const content = selectedItems.map((i) => i.content)
+      const result = await api.drift.check(params.projectId, content)
+      setDriftResult(result)
+    } catch {
+      toast.error('Drift check failed — Brand Core required')
+    } finally {
+      setDriftChecking(false)
+    }
+  }
+
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const s = new Set(prev)
@@ -210,6 +228,13 @@ export default function LibraryPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 <CalendarRange className="w-3.5 h-3.5" /> Schedule
+              </button>
+              <button
+                onClick={handleCheckDrift}
+                disabled={driftChecking}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 transition-colors"
+              >
+                {driftChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldAlert className="w-3.5 h-3.5" />} Drift Check
               </button>
             </>
           )}
@@ -350,6 +375,115 @@ export default function LibraryPage() {
           platform={metricsItem.platform}
           onClose={() => setMetricsItem(null)}
         />
+      )}
+
+      {/* Brand Drift Modal */}
+      {driftResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card border border-border rounded-xl w-full max-w-md shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                {driftResult.status === 'on_track'
+                  ? <ShieldCheck className="w-4 h-4 text-green-600" />
+                  : <ShieldAlert className="w-4 h-4 text-amber-500" />}
+                <span className="text-sm font-semibold">Brand Drift Report</span>
+              </div>
+              <button onClick={() => setDriftResult(null)} className="p-1 rounded hover:bg-muted text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Score + status */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Drift Score</p>
+                  <p className="text-2xl font-bold tabular-nums">{driftResult.drift_score}<span className="text-sm font-normal text-muted-foreground">/100</span></p>
+                </div>
+                <span className={cn(
+                  'text-xs font-semibold px-3 py-1 rounded-full capitalize',
+                  driftResult.status === 'on_track' ? 'bg-green-500/10 text-green-600' :
+                  driftResult.status === 'minor_drift' ? 'bg-amber-500/10 text-amber-600' :
+                  driftResult.status === 'significant_drift' ? 'bg-orange-500/10 text-orange-600' :
+                  driftResult.status === 'off_brand' ? 'bg-red-500/10 text-red-600' :
+                  'bg-muted text-muted-foreground',
+                )}>
+                  {driftResult.status.replace('_', ' ')}
+                </span>
+              </div>
+
+              {/* Drift dimensions */}
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { label: 'Tone', value: driftResult.tone_drift },
+                  { label: 'Theme', value: driftResult.theme_drift },
+                  { label: 'Voice', value: driftResult.voice_drift },
+                ] as { label: string; value: boolean }[]).map(({ label, value }) => (
+                  <div key={label} className={cn(
+                    'text-center rounded-lg p-2 border',
+                    value ? 'border-red-500/20 bg-red-500/5' : 'border-green-500/20 bg-green-500/5',
+                  )}>
+                    <p className="text-[10px] text-muted-foreground">{label}</p>
+                    <p className={cn('text-xs font-semibold mt-0.5', value ? 'text-red-600' : 'text-green-600')}>
+                      {value ? 'Drifted' : 'Aligned'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Issues */}
+              {driftResult.issues.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-500" /> Issues
+                  </p>
+                  <ul className="space-y-1">
+                    {driftResult.issues.map((issue, i) => (
+                      <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                        <span className="text-amber-500 shrink-0">•</span>{issue}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {driftResult.recommendations.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Recommendations</p>
+                  <ul className="space-y-1">
+                    {driftResult.recommendations.map((rec, i) => (
+                      <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                        <span className="text-primary shrink-0">→</span>{rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Positive observations */}
+              {driftResult.positive_observations.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">What&apos;s Working</p>
+                  <ul className="space-y-1">
+                    {driftResult.positive_observations.map((obs, i) => (
+                      <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                        <span className="text-green-600 shrink-0">✓</span>{obs}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-border">
+              <button
+                onClick={() => setDriftResult(null)}
+                className="w-full py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Bulk Schedule Modal */}

@@ -301,7 +301,7 @@ export function Sidebar() {
 
               <NavGroup label="Intelligence" storageKey="nav_intelligence">
                 <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />}   label="Analytics"        onClick={() => router.push(`/projects/${activeProject.id}/analytics`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="AI Digest"        onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="Reports"          onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
                 <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="Deep Search"      onClick={() => router.push(`/projects/${activeProject.id}/deep-search`)} />
                 <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Intelligence"     onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
                 <NavItem icon={<Bell className="w-3.5 h-3.5" />}        label="Monitoring"       onClick={() => router.push(`/projects/${activeProject.id}/intelligence/monitoring`)} />
