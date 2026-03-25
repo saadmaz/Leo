@@ -772,7 +772,7 @@ export default function CompetitorProfilesPage() {
   // ---------------------------------------------------------------------------
   async function handleDelete(profile: CompetitorProfile) {
     if (!profile.id) return
-    setDeletingIds(prev => new Set([...prev, profile.id]))
+    setDeletingIds(prev => { const s = new Set(prev); s.add(profile.id); return s })
     try {
       await api.competitorProfiles.delete(params.projectId, profile.id)
       setProfiles(prev => prev.filter(p => p.id !== profile.id))
@@ -790,7 +790,7 @@ export default function CompetitorProfilesPage() {
   // ---------------------------------------------------------------------------
   async function handleRefresh(profile: CompetitorProfile) {
     if (!profile.id) return
-    setRefreshingIds(prev => new Set([...prev, profile.id]))
+    setRefreshingIds(prev => { const s = new Set(prev); s.add(profile.id); return s })
 
     // Optimistically mark as analyzing in the list
     setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, status: 'analyzing' } : p))
