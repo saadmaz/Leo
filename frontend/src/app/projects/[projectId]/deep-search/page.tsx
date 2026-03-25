@@ -49,7 +49,7 @@ export default function DeepSearchPage() {
         query.trim(),
         scrapeN,
         (raw) => {
-          const ev = raw as SearchEvent
+          const ev = raw as unknown as SearchEvent
           setEvents((prev) => [...prev, ev])
         },
         () => {
