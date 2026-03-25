@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Globe, Search, BookOpen, Newspaper, Sparkles, Brain, Loader2, Database } from 'lucide-react'
+import { Globe, Search, BookOpen, Newspaper, Sparkles, Brain, Database } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 

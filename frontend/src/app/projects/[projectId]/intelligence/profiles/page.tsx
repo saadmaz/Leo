@@ -13,7 +13,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
-import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
 import type {
@@ -682,8 +681,6 @@ function AddCompetitorModal({
 
 export default function CompetitorProfilesPage() {
   const params = useParams<{ projectId: string }>()
-  const { activeProject } = useAppStore()
-
   const [profiles, setProfiles] = useState<CompetitorProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -918,7 +915,7 @@ export default function CompetitorProfilesPage() {
             search ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Search className="w-8 h-8 text-muted-foreground/40 mb-3" />
-                <p className="text-sm text-muted-foreground">No competitors match "{search}"</p>
+                <p className="text-sm text-muted-foreground">No competitors match &ldquo;{search}&rdquo;</p>
                 <button onClick={() => setSearch('')} className="text-xs text-primary mt-2 hover:underline">Clear search</button>
               </div>
             ) : (
