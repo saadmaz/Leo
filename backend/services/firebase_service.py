@@ -1344,6 +1344,80 @@ def get_competitor_snapshots(project_id: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Competitor Profiles (5-dimension classification)
+# ---------------------------------------------------------------------------
+
+def save_competitor_profile(project_id: str, profile: dict) -> dict:
+    """
+    Persist or update a competitor profile (5-dimension classification).
+    Stored under projects/{id}/competitor_profiles/{profile_id}.
+    If profile has no 'id', a new document is created.
+    """
+    db = get_db()
+    now = _utcnow()
+    col = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_profiles")
+    )
+    if profile.get("id"):
+        ref = col.document(profile["id"])
+        data = {**profile, "updatedAt": now}
+        ref.set(data, merge=True)
+        return {"id": ref.id, **data}
+    else:
+        data = {**profile, "createdAt": now, "updatedAt": now}
+        ref = col.document()
+        ref.set(data)
+        return {"id": ref.id, **data}
+
+
+def get_competitor_profile(project_id: str, profile_id: str) -> Optional[dict]:
+    """Return a single competitor profile by ID, or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_profiles").document(profile_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def get_competitor_profiles(project_id: str) -> list[dict]:
+    """Return all classified competitor profiles for a project, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_profiles")
+        .order_by("createdAt", direction=firestore.Query.DESCENDING)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def delete_competitor_profile(project_id: str, profile_id: str) -> None:
+    """Permanently delete a competitor profile."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("competitor_profiles").document(profile_id)
+        .delete()
+    )
+
+
+def update_competitor_profile_status(project_id: str, profile_id: str, status: str, error: Optional[str] = None) -> None:
+    """Update the processing status of a competitor profile."""
+    db = get_db()
+    updates: dict = {"status": status, "updatedAt": _utcnow()}
+    if error:
+        updates["error"] = error
+    (
+        db.collection("projects").document(project_id)
+        .collection("competitor_profiles").document(profile_id)
+        .update(updates)
+    )
+
+
+# ---------------------------------------------------------------------------
 # Content Library
 # ---------------------------------------------------------------------------
 

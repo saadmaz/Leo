@@ -1,14 +1,21 @@
 """
-Intelligence routes — Phase 1.
+Intelligence routes — Phase 1 + Competitor Profiles.
 
 Endpoints:
-  POST /projects/{id}/brand-voice/score     — Score text against Brand Core
-  POST /projects/{id}/content/predict       — Predict content performance
-  POST /projects/{id}/intelligence/refresh  — Scrape + analyse competitors (SSE)
-  GET  /projects/{id}/intelligence          — Get stored competitor snapshots
-  POST /projects/{id}/memory/feedback       — Record user feedback on AI output
-  GET  /projects/{id}/memory                — Get brand memory summary
-  POST /projects/{id}/drift/check           — Check for brand voice drift
+  POST /projects/{id}/brand-voice/score               — Score text against Brand Core
+  POST /projects/{id}/content/predict                 — Predict content performance
+  POST /projects/{id}/intelligence/refresh            — Scrape + analyse competitors (SSE)
+  GET  /projects/{id}/intelligence                    — Get stored competitor snapshots
+  POST /projects/{id}/memory/feedback                 — Record user feedback on AI output
+  GET  /projects/{id}/memory                          — Get brand memory summary
+  POST /projects/{id}/drift/check                     — Check for brand voice drift
+
+  # Competitor Profiles (5-dimension classification)
+  POST /projects/{id}/competitors/profiles/classify           — Classify competitor (SSE)
+  GET  /projects/{id}/competitors/profiles                    — List all profiles
+  GET  /projects/{id}/competitors/profiles/{profile_id}       — Get single profile
+  DELETE /projects/{id}/competitors/profiles/{profile_id}     — Delete profile
+  POST /projects/{id}/competitors/profiles/{profile_id}/refresh — Re-classify
 """
 
 import asyncio
@@ -381,3 +388,145 @@ async def get_insights(
     except Exception as exc:
         logger.error("Insights generation failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Competitor Profiles — 5-Dimension Classification
+# ---------------------------------------------------------------------------
+
+class ClassifyCompetitorRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    website: Optional[str] = Field(None, max_length=300)
+
+
+@router.post("/competitors/profiles/classify")
+async def classify_competitor(
+    project_id: str,
+    body: ClassifyCompetitorRequest,
+    user: CurrentUser,
+):
+    """
+    Classify a competitor across 5 dimensions using public web data + Claude.
+    Returns a live SSE stream with step progress events and a final 'complete' event.
+    """
+    import json as _json
+    from fastapi.responses import StreamingResponse as _SR
+    from backend.services.competitor_classifier_service import classify_competitor as _classify
+
+    project = get_project_as_editor(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+    brand_name = project.get("name", "")
+
+    async def event_stream():
+        try:
+            async for event in _classify(
+                name=body.name,
+                website=body.website,
+                brand_core=brand_core,
+                brand_name=brand_name,
+                project_id=project_id,
+            ):
+                yield f"data: {_json.dumps(event)}\n\n"
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return _SR(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/competitors/profiles")
+async def list_competitor_profiles(
+    project_id: str,
+    user: CurrentUser,
+):
+    """Return all classified competitor profiles for this project."""
+    get_project_as_member(project_id, user["uid"])
+    profiles = await asyncio.to_thread(
+        firebase_service.get_competitor_profiles, project_id
+    )
+    return {"profiles": profiles}
+
+
+@router.get("/competitors/profiles/{profile_id}")
+async def get_competitor_profile(
+    project_id: str,
+    profile_id: str,
+    user: CurrentUser,
+):
+    """Return a single competitor profile by ID."""
+    get_project_as_member(project_id, user["uid"])
+    profile = await asyncio.to_thread(
+        firebase_service.get_competitor_profile, project_id, profile_id
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Competitor profile not found.")
+    return profile
+
+
+@router.delete("/competitors/profiles/{profile_id}", status_code=204)
+async def delete_competitor_profile(
+    project_id: str,
+    profile_id: str,
+    user: CurrentUser,
+):
+    """Permanently delete a competitor profile."""
+    get_project_as_editor(project_id, user["uid"])
+    await asyncio.to_thread(
+        firebase_service.delete_competitor_profile, project_id, profile_id
+    )
+
+
+@router.post("/competitors/profiles/{profile_id}/refresh")
+async def refresh_competitor_profile(
+    project_id: str,
+    profile_id: str,
+    user: CurrentUser,
+):
+    """
+    Re-run the 5-dimension classification for an existing competitor profile.
+    Returns a live SSE stream identical to /classify.
+    """
+    import json as _json
+    from fastapi.responses import StreamingResponse as _SR
+    from backend.services.competitor_classifier_service import classify_competitor as _classify
+
+    project = get_project_as_editor(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+    brand_name = project.get("name", "")
+
+    existing = await asyncio.to_thread(
+        firebase_service.get_competitor_profile, project_id, profile_id
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Competitor profile not found.")
+
+    # Delete the old profile so classify() creates a fresh one
+    await asyncio.to_thread(
+        firebase_service.delete_competitor_profile, project_id, profile_id
+    )
+
+    async def event_stream():
+        try:
+            async for event in _classify(
+                name=existing.get("competitor_name", ""),
+                website=existing.get("website") or None,
+                brand_core=brand_core,
+                brand_name=brand_name,
+                project_id=project_id,
+            ):
+                yield f"data: {_json.dumps(event)}\n\n"
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return _SR(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

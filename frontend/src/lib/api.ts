@@ -70,6 +70,8 @@ import type {
   CreditsStatus,
   CreditTransaction,
   DeepSearchHistory,
+  CompetitorProfile,
+  ClassifyStreamEvent,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -653,6 +655,49 @@ export const api = {
 
     report: (projectId: string, competitorName: string, signal?: AbortSignal) =>
       get<CompetitorReport>(`/projects/${projectId}/intelligence/competitors/${encodeURIComponent(competitorName)}/report`, signal),
+  },
+
+  // -------------------------------------------------------------------------
+  // Competitor Profiles — 5-Dimension Classification
+  // -------------------------------------------------------------------------
+  competitorProfiles: {
+    list: (projectId: string, signal?: AbortSignal) =>
+      get<{ profiles: CompetitorProfile[] }>(`/projects/${projectId}/competitors/profiles`, signal),
+
+    get: (projectId: string, profileId: string, signal?: AbortSignal) =>
+      get<CompetitorProfile>(`/projects/${projectId}/competitors/profiles/${profileId}`, signal),
+
+    delete: (projectId: string, profileId: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/competitors/profiles/${profileId}`, signal),
+
+    classify: (
+      projectId: string,
+      name: string,
+      website: string | undefined,
+      onEvent: (event: ClassifyStreamEvent) => void,
+      onDone: () => void,
+      signal?: AbortSignal,
+    ) => streamPost<ClassifyStreamEvent>(
+      `/projects/${projectId}/competitors/profiles/classify`,
+      { name, website },
+      onEvent,
+      onDone,
+      signal,
+    ),
+
+    refresh: (
+      projectId: string,
+      profileId: string,
+      onEvent: (event: ClassifyStreamEvent) => void,
+      onDone: () => void,
+      signal?: AbortSignal,
+    ) => streamPost<ClassifyStreamEvent>(
+      `/projects/${projectId}/competitors/profiles/${profileId}/refresh`,
+      {},
+      onEvent,
+      onDone,
+      signal,
+    ),
   },
 
   // -------------------------------------------------------------------------

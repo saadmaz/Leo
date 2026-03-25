@@ -8,7 +8,7 @@ import {
   PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen, Users, FileText,
-  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Bell, Search, ClipboardList,
+  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Bell, Search, ClipboardList, Crosshair,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -304,6 +304,7 @@ export function Sidebar() {
                 <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="Reports"          onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
                 <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="Deep Search"      onClick={() => router.push(`/projects/${activeProject.id}/deep-search`)} />
                 <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Intelligence"     onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
+                <NavItem icon={<Crosshair className="w-3.5 h-3.5" />}   label="Competitor Profiles" onClick={() => router.push(`/projects/${activeProject.id}/intelligence/profiles`)} />
                 <NavItem icon={<Bell className="w-3.5 h-3.5" />}        label="Monitoring"       onClick={() => router.push(`/projects/${activeProject.id}/intelligence/monitoring`)} />
                 <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Voice Scorer"     onClick={() => setBrandVoiceScorerOpen(true)} />
                 <NavItem icon={<Hash className="w-3.5 h-3.5" />}        label="Hashtag Research" onClick={() => setHashtagPanelOpen(true)} />

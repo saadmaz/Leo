@@ -456,6 +456,63 @@ export interface CompetitiveStrategy {
   quick_wins: string[]
 }
 
+// ---------------------------------------------------------------------------
+// Competitor Profiles — 5-Dimension Classification
+// ---------------------------------------------------------------------------
+
+export type GeographicScope = 'Local' | 'Regional' | 'National' | 'Global'
+export type SizeTier = 'Micro' | 'SMB' | 'Mid-Market' | 'Enterprise'
+export type Directness = 'Direct' | 'Indirect' | 'Substitute'
+export type MarketPosition = 'Market Leader' | 'Challenger' | 'Niche Player' | 'New Entrant'
+export type OverlapScore = 'Low' | 'Medium' | 'High'
+export type ConfidenceScore = 'Low' | 'Medium' | 'High'
+export type ProfileStatus = 'analyzing' | 'complete' | 'error'
+
+export interface CompetitorProfile {
+  id: string
+  competitor_name: string
+  website: string
+  status: ProfileStatus
+
+  // Dimension 1 — Geographic Scope
+  geographic_scope?: GeographicScope
+  geographic_locations?: string[]
+  geographic_evidence?: string
+
+  // Dimension 2 — Size & Revenue
+  size_tier?: SizeTier
+  employee_count?: string
+  revenue_range?: string
+  size_evidence?: string
+
+  // Dimension 3 — Directness
+  directness?: Directness
+  directness_reason?: string
+  overlap_score?: OverlapScore
+
+  // Dimension 4 — Market Position
+  market_position?: MarketPosition
+  market_position_signals?: string[]
+
+  // Dimension 5 — Customer Segment
+  customer_segment_tags?: string[]
+  segment_evidence?: string
+
+  // Meta
+  confidence_score?: ConfidenceScore
+  sources_used?: string[]
+  executive_summary?: string
+  error?: string
+  last_updated?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type ClassifyStreamEvent =
+  | { type: 'step'; step: string; message: string; profile_id?: string }
+  | { type: 'complete'; profile: CompetitorProfile }
+  | { type: 'error'; message: string; profile_id?: string }
+
 export interface MemoryFeedbackItem {
   id: string
   type: 'edit' | 'approve' | 'reject' | 'instruction'
