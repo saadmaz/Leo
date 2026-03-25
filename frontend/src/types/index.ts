@@ -599,6 +599,7 @@ export interface BlogPostMeta {
   description: string
   slug: string
   outline: string[]
+  keywords?: string[]
 }
 
 export interface MetaTagsResult {

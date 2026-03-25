@@ -364,7 +364,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res)); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No readable stream in response'); return }
@@ -442,7 +442,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res)); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }
@@ -523,7 +523,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res)); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }
@@ -844,7 +844,7 @@ export const api = {
       return
     }
 
-    if (!res.ok) { callbacks.onError(await extractErrorMessage(res, 'stream')); return }
+    if (!res.ok) { callbacks.onError(await extractErrorMessage(res)); return }
 
     const reader = res.body?.getReader()
     if (!reader) { callbacks.onError('No stream'); return }

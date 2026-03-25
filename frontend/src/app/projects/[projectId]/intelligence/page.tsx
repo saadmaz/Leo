@@ -11,6 +11,7 @@ import {
   Users, Star, ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { api, type IntelligenceStreamEvent } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
