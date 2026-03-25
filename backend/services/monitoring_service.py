@@ -86,7 +86,7 @@ async def run_brand_monitor(
                     "source": "tavily",
                 })
         except Exception as exc:
-            logger.debug("Tavily monitor search failed for %s: %s", target, exc)
+            logger.warning("Tavily monitor search failed for %s: %s", target, exc)
 
         # Exa news (1 request)
         try:
@@ -107,7 +107,7 @@ async def run_brand_monitor(
                     "source": "exa",
                 })
         except Exception as exc:
-            logger.debug("Exa monitor search failed for %s: %s", target, exc)
+            logger.warning("Exa monitor search failed for %s: %s", target, exc)
 
         return local_results
 

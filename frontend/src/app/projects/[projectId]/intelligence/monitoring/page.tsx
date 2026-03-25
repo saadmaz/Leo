@@ -73,7 +73,7 @@ export default function MonitoringPage() {
     setScanning(true)
     let newAlerts = 0
     try {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         api.monitoring.run(
           params.projectId,
           (event) => {
@@ -81,13 +81,20 @@ export default function MonitoringPage() {
             if (event.type === 'error') toast.error(event.message ?? 'Monitoring scan failed.')
           },
           resolve,
-        )
+        ).catch(reject)
       })
       toast.success(`Scan complete — ${newAlerts} new alert(s) found.`)
       await loadAlerts()
     } catch (err) {
       console.error(err)
-      toast.error('Monitoring scan failed. Check your API keys.')
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(
+        msg.includes('401') || msg.includes('403') ? 'Authentication error — please refresh and try again.' :
+        msg.includes('400') ? 'Project setup incomplete. Add your brand name in project settings.' :
+        msg.includes('429') ? 'Too many requests — wait a minute and try again.' :
+        msg.includes('EXA_API_KEY') || msg.includes('TAVILY_API_KEY') ? 'Search API keys not configured. Check EXA_API_KEY and TAVILY_API_KEY in your backend .env.' :
+        `Monitoring scan failed: ${msg}`
+      )
     } finally {
       setScanning(false)
     }
