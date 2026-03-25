@@ -106,7 +106,7 @@ async function authHeaders(): Promise<HeadersInit> {
 // Core HTTP helpers
 // ---------------------------------------------------------------------------
 
-async function extractErrorMessage(res: Response, path: string): Promise<string> {
+async function extractErrorMessage(res: Response, _path: string): Promise<string> {
   const text = await res.text()
   if (res.status === 402) {
     try {

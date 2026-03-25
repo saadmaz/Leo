@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Search, Loader2, Globe, FileText, ChevronDown, ChevronRight, Clock, Zap, ExternalLink } from 'lucide-react'
 import { api } from '@/lib/api'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DeepSearchHistory } from '@/types'
 
