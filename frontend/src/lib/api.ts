@@ -106,7 +106,7 @@ async function authHeaders(): Promise<HeadersInit> {
 // Core HTTP helpers
 // ---------------------------------------------------------------------------
 
-async function extractErrorMessage(res: Response, _path: string): Promise<string> {
+async function extractErrorMessage(res: Response): Promise<string> {
   const text = await res.text()
   if (res.status === 402) {
     try {
@@ -124,7 +124,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     headers: await authHeaders(),
     signal,
   })
-  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
+  if (!res.ok) throw new Error(await extractErrorMessage(res))
   return res.json()
 }
 
@@ -135,7 +135,7 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
+  if (!res.ok) throw new Error(await extractErrorMessage(res))
   return res.json()
 }
 
@@ -146,7 +146,7 @@ async function patch<T>(path: string, body: unknown, signal?: AbortSignal): Prom
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
+  if (!res.ok) throw new Error(await extractErrorMessage(res))
   return res.json()
 }
 
@@ -156,7 +156,7 @@ async function del(path: string, signal?: AbortSignal): Promise<void> {
     headers: await authHeaders(),
     signal,
   })
-  if (!res.ok) throw new Error(await extractErrorMessage(res, path))
+  if (!res.ok) throw new Error(await extractErrorMessage(res))
 }
 
 // ---------------------------------------------------------------------------
