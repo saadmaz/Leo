@@ -33,6 +33,7 @@ export default function ChatPage() {
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [activeToolCall, setActiveToolCall] = useState<{ tool: string; query: string } | null>(null)
+  const [streamStatus, setStreamStatus] = useState<string | null>(null)
 
   const MESSAGES_PAGE_SIZE = 50
 
@@ -142,10 +143,13 @@ export default function ChatPage() {
       {
         onDelta: (text) => appendDelta(assistantId, text),
 
-        onToolCall: (tool, query) => setActiveToolCall({ tool, query }),
+        onStatus: (message) => setStreamStatus(message),
+
+        onToolCall: (tool, query) => { setStreamStatus(null); setActiveToolCall({ tool, query }) },
         onToolResult: () => setActiveToolCall(null),
 
         onDone: () => {
+          setStreamStatus(null)
           setActiveToolCall(null)
           // Read the final accumulated content from the store.
           const current = useAppStore.getState().messages.find((m) => m.id === assistantId)
@@ -164,6 +168,7 @@ export default function ChatPage() {
 
         onError: (err) => {
           console.error('Stream error:', err)
+          setStreamStatus(null)
           setActiveToolCall(null)
           setIsStreaming(false)
           setStreamController(null)
@@ -202,6 +207,8 @@ export default function ChatPage() {
     if (current) {
       finaliseMessage(current.id, current.content || '_(generation stopped)_')
     }
+    setStreamStatus(null)
+    setActiveToolCall(null)
     setIsStreaming(false)
     setStreamController(null)
   }
@@ -421,29 +428,39 @@ export default function ChatPage() {
               </AnimatePresence>
             )}
 
-            {/* Tool-use indicator — shown while LEO is searching the web */}
+            {/* Status / tool-use indicator */}
             <AnimatePresence>
-              {activeToolCall && (
+              {(activeToolCall || streamStatus) && (
                 <motion.div
-                  key="tool-indicator"
+                  key={activeToolCall ? `tool-${activeToolCall.tool}` : `status-${streamStatus}`}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.2 }}
                   className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border bg-muted/30 max-w-[420px]"
                 >
-                  {activeToolCall.tool.includes('news') || activeToolCall.tool.includes('monitor') ? (
-                    <Globe className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+                  {activeToolCall ? (
+                    activeToolCall.tool.includes('news') || activeToolCall.tool.includes('monitor') ? (
+                      <Globe className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+                    ) : (
+                      <Search className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+                    )
                   ) : (
-                    <Search className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+                    <motion.div
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="w-3.5 h-3.5 rounded-full bg-primary shrink-0"
+                    />
                   )}
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-foreground">
-                      {activeToolCall.tool === 'web_search' ? 'Searching the web' :
-                       activeToolCall.tool === 'find_similar_companies' ? 'Finding similar companies' :
-                       activeToolCall.tool === 'research_topic' ? 'Researching topic' :
-                       activeToolCall.tool === 'get_brand_news' ? 'Fetching brand news' :
-                       'Searching'}
+                      {activeToolCall
+                        ? (activeToolCall.tool === 'web_search' ? 'Searching the web' :
+                           activeToolCall.tool === 'find_similar_companies' ? 'Finding similar companies' :
+                           activeToolCall.tool === 'research_topic' ? 'Researching topic' :
+                           activeToolCall.tool === 'get_brand_news' ? 'Fetching brand news' :
+                           'Searching')
+                        : streamStatus}
                       <span className="inline-flex gap-0.5 ml-1">
                         {[0, 1, 2].map((i) => (
                           <motion.span
@@ -455,7 +472,7 @@ export default function ChatPage() {
                         ))}
                       </span>
                     </p>
-                    {activeToolCall.query && (
+                    {activeToolCall?.query && (
                       <p className="text-[11px] text-muted-foreground truncate mt-0.5">{activeToolCall.query}</p>
                     )}
                   </div>

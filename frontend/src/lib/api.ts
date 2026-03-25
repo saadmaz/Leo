@@ -335,6 +335,7 @@ export const api = {
       onError: (err: string) => void
       onToolCall?: (tool: string, query: string) => void
       onToolResult?: (tool: string, preview: string) => void
+      onStatus?: (message: string) => void
     },
     signal?: AbortSignal,
     channel?: string | null,
@@ -376,6 +377,7 @@ export const api = {
         if (event.type === 'error') callbacks.onError(event.error)
         if (event.type === 'tool_call') callbacks.onToolCall?.(event.tool, event.query)
         if (event.type === 'tool_result') callbacks.onToolResult?.(event.tool, event.preview)
+        if (event.type === 'status') callbacks.onStatus?.(event.message)
       },
       callbacks.onDone,
     )

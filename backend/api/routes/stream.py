@@ -108,6 +108,10 @@ async def send_message(
         )
 
         try:
+            import json as _json
+            yield f"data: {_json.dumps({'type': 'status', 'message': 'Analyzing your request'})}\n\n"
+            yield f"data: {_json.dumps({'type': 'status', 'message': 'Loading brand context'})}\n\n"
+
             # Use tool-enabled streaming when search keys are configured.
             # Falls back gracefully if neither key is set (tools simply won't fire).
             from backend.config import settings as _settings
@@ -125,6 +129,7 @@ async def send_message(
             )
             if _use_tools:
                 _kwargs["project_id"] = project_id
+            yield f"data: {_json.dumps({'type': 'status', 'message': 'Thinking'})}\n\n"
             async for chunk in _stream_fn(**_kwargs):
                 yield chunk
 

@@ -172,7 +172,12 @@ export interface StreamToolResult {
   preview: string
 }
 
-export type StreamEvent = StreamDelta | StreamError | StreamToolCall | StreamToolResult
+export interface StreamStatus {
+  type: 'status'
+  message: string
+}
+
+export type StreamEvent = StreamDelta | StreamError | StreamToolCall | StreamToolResult | StreamStatus
 
 // ---------------------------------------------------------------------------
 // SSE Ingestion events
