@@ -126,7 +126,8 @@ function SectionCard({ section, defaultOpen }: { section: StrategySection; defau
   const meta = getSectionMeta(section.heading)
 
   // Strip leading emoji from heading (we re-render it from meta)
-  const cleanHeading = section.heading.replace(/^[\p{Emoji}\s]+/u, '').trim()
+  // Strip leading emoji / whitespace (any non-letter, non-digit chars at start)
+  const cleanHeading = section.heading.replace(/^[^a-zA-Z0-9]+/, '').trim()
 
   function handleCopy() {
     navigator.clipboard.writeText(section.content)
