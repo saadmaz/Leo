@@ -20,6 +20,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { FunnelSelector } from './funnel-selector'
 import { QuestionCard } from './question-card'
+import { IntakeSummary } from './intake-summary'
 import { ResearchProgress } from './research-progress'
 import { StrategyDocument, StrategyStreamPreview } from './strategy-document'
 import { StrategyActionButtons } from './strategy-action-buttons'
@@ -36,7 +37,7 @@ interface StrategyModeProps {
 }
 
 export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessage }: StrategyModeProps) {
-  const { strategySession, updateStrategySession, resetStrategySession } = useAppStore()
+  const { strategySession, updateStrategySession, resetStrategySession, user } = useAppStore()
   const abortRef = useRef<AbortController | null>(null)
 
   // Cleanup on unmount
@@ -75,10 +76,17 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
   if (strategySession.status === 'researching') {
     return (
       <LeoMessageWrapper>
-        <ResearchProgress
-          steps={strategySession.researchSteps}
-          searches={strategySession.researchSearches}
-        />
+        <div className="space-y-4 w-full">
+          <IntakeSummary
+            qaList={strategySession.intakeQA ?? []}
+            userPhotoURL={user?.photoURL}
+            userDisplayName={user?.displayName}
+          />
+          <ResearchProgress
+            steps={strategySession.researchSteps}
+            searches={strategySession.researchSearches}
+          />
+        </div>
       </LeoMessageWrapper>
     )
   }
@@ -87,7 +95,14 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
   if (strategySession.status === 'generating') {
     return (
       <LeoMessageWrapper>
-        <StrategyStreamPreview markdown={strategySession.streamedMarkdown} />
+        <div className="space-y-4 w-full">
+          <IntakeSummary
+            qaList={strategySession.intakeQA ?? []}
+            userPhotoURL={user?.photoURL}
+            userDisplayName={user?.displayName}
+          />
+          <StrategyStreamPreview markdown={strategySession.streamedMarkdown} />
+        </div>
       </LeoMessageWrapper>
     )
   }
@@ -96,7 +111,12 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
   if (strategySession.status === 'complete' && strategySession.savedStrategy) {
     return (
       <LeoMessageWrapper>
-        <div className="space-y-3 w-full">
+        <div className="space-y-4 w-full">
+          <IntakeSummary
+            qaList={strategySession.intakeQA ?? []}
+            userPhotoURL={user?.photoURL}
+            userDisplayName={user?.displayName}
+          />
           <StrategyDocument strategy={strategySession.savedStrategy} />
           <StrategyActionButtons
             strategy={strategySession.savedStrategy}
@@ -117,8 +137,8 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
   async function handleQuestionAnswer(answer: string) {
     if (!strategySession?.currentQuestion) return
 
-    // Echo the user's choice into the chat
-    onUserMessage?.(answer)
+    const questionText = strategySession.currentQuestion.text
+    const newQA = [...(strategySession.intakeQA ?? []), { questionText, answer }]
 
     try {
       const res = await api.strategy.answer(projectId, strategySession.sessionId, {
@@ -127,11 +147,7 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
       })
 
       if (res.status === 'research_ready') {
-        onLeoMessage?.(
-          res.message ??
-            "Got it. Give me a moment — I'm going to research your industry, check what's trending, and look at what's working for similar brands.",
-        )
-        updateStrategySession({ currentQuestion: null })
+        updateStrategySession({ currentQuestion: null, intakeQA: newQA })
         await runStrategyResearchAndGenerate(projectId, strategySession.sessionId, updateStrategySession)
       } else {
         updateStrategySession({
@@ -142,6 +158,7 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
             ...strategySession.intakeAnswers,
             [`q${strategySession.currentQuestion.index}`]: answer,
           },
+          intakeQA: newQA,
         })
       }
     } catch {

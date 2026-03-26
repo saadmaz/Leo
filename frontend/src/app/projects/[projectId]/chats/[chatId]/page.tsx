@@ -151,6 +151,7 @@ export default function ChatPage() {
           status: 'intake',
           funnelType: null,
           intakeAnswers: {},
+          intakeQA: [],
           currentQuestion: res.next_question,
           questionNumber: 0,
           totalQuestions: 6,

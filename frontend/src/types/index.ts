@@ -1109,11 +1109,17 @@ export interface MarketingStrategy {
   createdAt: string
 }
 
+export interface StrategyQAPair {
+  questionText: string
+  answer: string
+}
+
 export interface StrategySession {
   sessionId: string
   status: StrategyStatus
   funnelType: FunnelType | null
   intakeAnswers: Record<string, string>
+  intakeQA: StrategyQAPair[]
   currentQuestion: StrategyQuestion | null
   questionNumber: number
   totalQuestions: number
