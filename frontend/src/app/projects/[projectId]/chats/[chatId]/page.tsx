@@ -141,6 +141,7 @@ export default function ChatPage() {
     setInput('')
 
     // ── Strategy trigger: new strategy session ──────────────────────────────
+    const sess = useAppStore.getState().strategySession
     if (!sess && isStrategyIntent(content) && attachments.length === 0) {
       addMessage({ id: newId(), role: 'user', content })
       try {
