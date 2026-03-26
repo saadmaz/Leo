@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { ImageAttachment, OptimisticMessage } from '@/types'
-import { StrategyMode, runStrategyResearchAndGenerate } from '@/components/strategy/strategy-mode'
+import { StrategyMode } from '@/components/strategy/strategy-mode'
 
 /** Generate a unique ephemeral id for optimistic messages. */
 function newId() {
@@ -49,7 +49,7 @@ export default function ChatPage() {
     upsertChat, openUpgradeModal,
     activeChannel, setActiveChannel,
     setCampaignPanelOpen,
-    strategySession, setStrategySession, updateStrategySession,
+    strategySession, setStrategySession,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
