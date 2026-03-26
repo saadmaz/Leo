@@ -128,9 +128,9 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
   // -------------------------------------------------------------------------
   if (!isAssistant) {
     return (
-      <div className="w-full py-2 flex justify-end px-4">
-        <div className="flex items-end gap-2.5 max-w-[78%]">
-          <div className="bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-br-sm text-[14px] leading-relaxed whitespace-pre-wrap shadow-sm">
+      <div className="w-full py-3 flex justify-end px-4">
+        <div className="flex items-end gap-3 max-w-[75%]">
+          <div className="bg-primary text-primary-foreground px-4 py-3 rounded-2xl rounded-br-sm text-[14.5px] leading-[1.7] whitespace-pre-wrap shadow-sm">
             {message.content}
           </div>
           <div className="w-7 h-7 shrink-0 rounded-full bg-secondary border border-border/40 flex items-center justify-center mb-0.5">
@@ -145,8 +145,8 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
   // Assistant message
   // -------------------------------------------------------------------------
   return (
-    <div className="w-full py-3 px-4">
-      <div className="flex gap-3 max-w-3xl mx-auto">
+    <div className="w-full py-5 px-4">
+      <div className="flex gap-4 max-w-3xl mx-auto">
         {/* Avatar */}
         <div className="w-8 h-8 shrink-0 rounded-xl bg-primary/5 border border-border/50 flex items-center justify-center mt-0.5 overflow-hidden">
           <Image src="/Leo-agent.png" alt="LEO" width={20} height={20} className="rounded-md" />
@@ -155,10 +155,7 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
         {/* Content */}
         <div className="flex-1 min-w-0 group/msg">
           {(clean || message.pending) && (
-            <div className={cn(
-              'prose prose-sm dark:prose-invert max-w-none',
-              'text-[14px] leading-[1.75] text-foreground',
-            )}>
+            <div className="text-[14.5px] leading-[1.8] text-foreground space-y-0">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -170,44 +167,81 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
                       : <InlineCode {...props}>{children}</InlineCode>
                   },
 
-                  // Paragraphs
+                  // Paragraphs — generous bottom margin, no top margin
                   p({ children }) {
-                    return <p className="mb-3.5 last:mb-0 leading-[1.75] text-[14px]">{children}</p>
+                    return (
+                      <p className="mb-4 last:mb-0 leading-[1.8] text-[14.5px] text-foreground">
+                        {children}
+                      </p>
+                    )
                   },
 
-                  // Lists — ul uses dot marker, ol uses native counter
+                  // Unordered list
                   ul({ children }) {
-                    return <ul className="mb-3.5 space-y-1.5 pl-1 list-none">{children}</ul>
+                    return (
+                      <ul className="mb-4 last:mb-0 space-y-2 pl-0 list-none">
+                        {children}
+                      </ul>
+                    )
                   },
+                  // Ordered list
                   ol({ children }) {
-                    return <ol className="mb-3.5 space-y-1.5 list-decimal list-outside ml-5">{children}</ol>
+                    return (
+                      <ol className="mb-4 last:mb-0 space-y-2 list-none counter-reset-[item] pl-0">
+                        {children}
+                      </ol>
+                    )
                   },
-                  li({ ordered, children }: { ordered?: boolean; children?: React.ReactNode }) {
+                  li({ ordered, index, children }: { ordered?: boolean; index?: number; children?: React.ReactNode }) {
                     return ordered ? (
-                      <li className="text-[14px] leading-relaxed pl-1">{children}</li>
+                      <li className="flex gap-3 items-start text-[14.5px] leading-[1.8] text-foreground">
+                        <span className="shrink-0 min-w-[1.5rem] text-right text-muted-foreground font-medium tabular-nums">
+                          {(index ?? 0) + 1}.
+                        </span>
+                        <span className="flex-1">{children}</span>
+                      </li>
                     ) : (
-                      <li className="text-[14px] leading-relaxed flex gap-2 items-start">
-                        <span className="mt-[0.58em] w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0 flex-none" />
-                        <span>{children}</span>
+                      <li className="flex gap-3 items-start text-[14.5px] leading-[1.8] text-foreground">
+                        <span className="shrink-0 mt-[0.55em] w-[5px] h-[5px] rounded-full bg-foreground/40 flex-none" />
+                        <span className="flex-1">{children}</span>
                       </li>
                     )
                   },
 
-                  // Headings
+                  // Headings — clear hierarchy with generous spacing
                   h1({ children }) {
-                    return <h1 className="text-[18px] font-bold mb-3 mt-5 first:mt-0 text-foreground tracking-tight">{children}</h1>
+                    return (
+                      <h1 className="text-[20px] font-bold mb-3 mt-7 first:mt-0 text-foreground tracking-tight leading-tight">
+                        {children}
+                      </h1>
+                    )
                   },
                   h2({ children }) {
-                    return <h2 className="text-[15px] font-semibold mb-2.5 mt-4 first:mt-0 text-foreground tracking-tight">{children}</h2>
+                    return (
+                      <h2 className="text-[17px] font-semibold mb-2.5 mt-6 first:mt-0 text-foreground tracking-tight leading-snug">
+                        {children}
+                      </h2>
+                    )
                   },
                   h3({ children }) {
-                    return <h3 className="text-[13.5px] font-semibold mb-2 mt-3 first:mt-0 text-foreground/90">{children}</h3>
+                    return (
+                      <h3 className="text-[15px] font-semibold mb-2 mt-5 first:mt-0 text-foreground leading-snug">
+                        {children}
+                      </h3>
+                    )
+                  },
+                  h4({ children }) {
+                    return (
+                      <h4 className="text-[14px] font-semibold mb-1.5 mt-4 first:mt-0 text-foreground/90">
+                        {children}
+                      </h4>
+                    )
                   },
 
                   // Blockquote
                   blockquote({ children }) {
                     return (
-                      <blockquote className="my-3 pl-3.5 border-l-[3px] border-primary/40 text-muted-foreground italic text-[13.5px] leading-relaxed bg-muted/20 py-1 rounded-r-lg">
+                      <blockquote className="my-4 pl-4 border-l-[3px] border-primary/50 text-foreground/70 text-[14px] leading-[1.8] bg-muted/30 py-2.5 pr-3 rounded-r-lg">
                         {children}
                       </blockquote>
                     )
@@ -223,31 +257,53 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
 
                   // HR
                   hr() {
-                    return <hr className="my-4 border-border/50" />
+                    return <hr className="my-6 border-border/40" />
                   },
 
-                  // Tables
+                  // Tables — scrollable, clean borders, no text cramming
                   table({ children }) {
                     return (
-                      <div className="my-3 overflow-x-auto rounded-xl border border-border">
-                        <table className="w-full text-[13px] border-collapse">{children}</table>
+                      <div className="my-5 w-full overflow-x-auto rounded-xl border border-border/70 shadow-sm">
+                        <table className="w-full text-[13.5px] border-collapse">
+                          {children}
+                        </table>
                       </div>
                     )
                   },
                   thead({ children }) {
-                    return <thead className="bg-muted/50 border-b border-border">{children}</thead>
+                    return (
+                      <thead className="bg-muted/60 border-b border-border/70">
+                        {children}
+                      </thead>
+                    )
                   },
                   tbody({ children }) {
-                    return <tbody className="divide-y divide-border/50">{children}</tbody>
+                    return (
+                      <tbody className="divide-y divide-border/40">
+                        {children}
+                      </tbody>
+                    )
                   },
                   tr({ children }) {
-                    return <tr className="hover:bg-muted/20 transition-colors">{children}</tr>
+                    return (
+                      <tr className="hover:bg-muted/20 transition-colors">
+                        {children}
+                      </tr>
+                    )
                   },
                   th({ children }) {
-                    return <th className="px-3.5 py-2.5 text-left font-semibold text-foreground text-[12px] uppercase tracking-wide">{children}</th>
+                    return (
+                      <th className="px-4 py-3 text-left font-semibold text-foreground/80 text-[12px] uppercase tracking-wider whitespace-nowrap">
+                        {children}
+                      </th>
+                    )
                   },
                   td({ children }) {
-                    return <td className="px-3.5 py-2.5 text-foreground/80">{children}</td>
+                    return (
+                      <td className="px-4 py-3 text-foreground/80 align-top leading-relaxed">
+                        {children}
+                      </td>
+                    )
                   },
 
                   // Links

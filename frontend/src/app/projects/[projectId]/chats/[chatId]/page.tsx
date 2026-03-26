@@ -367,7 +367,7 @@ export default function ChatPage() {
 
         {/* Messages */}
         <ScrollArea className="flex-1">
-          <div className="mx-auto max-w-3xl px-4 py-8 space-y-1">
+          <div className="mx-auto max-w-3xl px-4 py-8">
             {/* Skeleton loaders while history is fetching */}
             {messagesLoading && (
               <div className="space-y-6 py-4">
