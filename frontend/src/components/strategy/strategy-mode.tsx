@@ -61,6 +61,7 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessag
     return (
       <LeoMessageWrapper>
         <QuestionCard
+          key={strategySession.currentQuestion.index}
           question={strategySession.currentQuestion}
           questionNumber={strategySession.questionNumber}
           totalQuestions={strategySession.totalQuestions}
