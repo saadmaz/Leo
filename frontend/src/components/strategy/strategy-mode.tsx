@@ -184,7 +184,7 @@ export async function runStrategyResearchAndGenerate(
         md += text
         updateStrategySession({ streamedMarkdown: md })
       },
-      (strategyId, _title, _version) => {
+      (strategyId) => {
         // Strategy saved — fetch it and move to complete
         api.strategy.list(projectId).then((res) => {
           const saved = res.strategies.find((s) => s.id === strategyId)
