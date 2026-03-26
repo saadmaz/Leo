@@ -650,6 +650,14 @@ export const api = {
       signal?: AbortSignal,
     ) => streamPost(`/projects/${projectId}/intelligence/refresh`, { competitors }, onEvent, onDone, signal),
 
+    addDiscovered: (
+      projectId: string,
+      competitor: import('@/types').DiscoveredCompetitor,
+      onEvent: (event: IntelligenceStreamEvent) => void,
+      onDone: () => void,
+      signal?: AbortSignal,
+    ) => streamPost(`/projects/${projectId}/intelligence/add-discovered`, { competitor }, onEvent, onDone, signal),
+
     strategy: (projectId: string, signal?: AbortSignal) =>
       get<CompetitiveStrategy>(`/projects/${projectId}/intelligence/strategy`, signal),
 

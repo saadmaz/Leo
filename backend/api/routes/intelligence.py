@@ -63,6 +63,10 @@ class RefreshIntelligenceRequest(BaseModel):
     competitors: list[CompetitorProfile] = Field(..., min_length=1, max_length=5)
 
 
+class AddDiscoveredRequest(BaseModel):
+    competitor: dict  # DiscoveredCompetitor fields from the frontend
+
+
 class MemoryFeedbackRequest(BaseModel):
     type: str = Field(..., pattern="^(edit|approve|reject|instruction)$")
     original: Optional[str] = Field(None, max_length=500)
@@ -153,6 +157,39 @@ async def refresh_intelligence(
     async def event_stream():
         try:
             async for event in _stream(project_id=project_id, competitors=competitors):
+                yield f"data: {_json.dumps(event)}\n\n"
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return _SR(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/intelligence/add-discovered")
+async def add_discovered_competitor(
+    project_id: str,
+    body: AddDiscoveredRequest,
+    user: CurrentUser,
+):
+    """
+    Auto-add a discovered competitor: scrape their website for social links,
+    then run the full intelligence refresh stream.
+    """
+    import json as _json
+    from fastapi.responses import StreamingResponse as _SR
+    from backend.services.intelligence_service import stream_add_discovered_competitor as _stream
+
+    project = get_project_as_editor(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+
+    async def event_stream():
+        try:
+            async for event in _stream(project_id, body.competitor, brand_core):
                 yield f"data: {_json.dumps(event)}\n\n"
         except Exception as exc:
             yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"

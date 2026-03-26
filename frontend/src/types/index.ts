@@ -961,7 +961,10 @@ export interface DiscoveredCompetitor {
   industry?: string
   social_hints?: {
     instagram?: string
+    facebook?: string
+    tiktok?: string
     linkedin?: string
+    youtube?: string
     twitter?: string
   }
 }

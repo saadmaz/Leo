@@ -1715,13 +1715,12 @@ async def stream_discover_competitors(
         except Exception as exc:
             yield _evt("Exa company search skipped", "warn", str(exc)[:80])
 
-    # ── 6. Firecrawl: scrape candidate websites for deeper info ─────────────
+    # ── 6. Firecrawl: scrape up to 8 candidate websites for deeper info ───────
     if _settings.FIRECRAWL_API_KEY and candidates:
         from backend.services.ingestion.firecrawl_client import scrape_url
-        # Pick top 3 unique candidate URLs to scrape
         scraped_domains: set[str] = set()
         scrape_targets = []
-        for c in candidates[:8]:
+        for c in candidates[:15]:
             if c.get("url"):
                 try:
                     from urllib.parse import urlparse as _up
@@ -1729,55 +1728,68 @@ async def stream_discover_competitors(
                     if d and d not in scraped_domains:
                         scraped_domains.add(d)
                         scrape_targets.append(c)
-                        if len(scrape_targets) >= 3:
+                        if len(scrape_targets) >= 8:
                             break
                 except Exception:
                     pass
 
         for target in scrape_targets:
-            url = target["url"]
-            name = target["name"]
-            yield _evt(f"Reading {url}…", "read", f"Scraping {name}'s website")
+            tgt_url = target["url"]
+            tgt_name = target["name"]
+            yield _evt(f"Reading {tgt_name}'s website…", "read", tgt_url)
             try:
-                scraped = await scrape_url(url, _settings.FIRECRAWL_API_KEY)
+                scraped = await scrape_url(tgt_url, _settings.FIRECRAWL_API_KEY)
                 content = scraped.get("markdown") or scraped.get("content") or ""
                 if content:
-                    raw_web_results.append(f"WEBSITE CONTENT for {name} ({url}):\n{content[:800]}")
-                    yield _evt(f"Extracted content from {name}.com", "check", f"{len(content)} chars scraped")
+                    # Extract social links directly from the scraped page
+                    site_socials = extract_social_links(content)
+                    social_note = ""
+                    if site_socials:
+                        social_note = " | Socials: " + ", ".join(f"{p}: {u}" for p, u in site_socials.items())
+                        # Enrich the candidate with discovered socials for Claude context
+                        target["socials"] = site_socials
+                    raw_web_results.append(
+                        f"WEBSITE CONTENT for {tgt_name} ({tgt_url}):\n{content[:2000]}{social_note}"
+                    )
+                    yield _evt(f"Scraped {tgt_name}", "check", f"{len(content)} chars · {len(site_socials)} social links found")
             except Exception as exc:
-                yield _evt(f"Could not read {name}'s website", "warn", str(exc)[:60])
+                yield _evt(f"Could not read {tgt_name}'s website", "warn", str(exc)[:60])
 
-    # ── 7. Claude synthesises everything ─────────────────────────────────────
+    # ── 7. Claude synthesises everything into up to 12 competitors ───────────
     yield _evt("Synthesising all intelligence with Claude AI…", "brain")
 
     client = get_client()
     brand_context = build_brand_core_context(brand_core)
-    web_context = "\n\n".join(filter(None, raw_web_results[:10]))
+    web_context = "\n\n".join(filter(None, raw_web_results[:15]))
     candidate_list = "\n".join(
-        f"- {c['name']} ({c['url']}): {c['snippet'][:200]}"
-        for c in candidates[:10]
+        f"- {c['name']} ({c['url']}): {c.get('snippet','')[:200]}"
+        + (f" | Socials: {c['socials']}" if c.get('socials') else "")
+        for c in candidates[:15]
         if c.get("name") and c["name"] not in existing
     )
 
-    prompt = f"""You are a competitive intelligence analyst. Identify the top 6 genuine competitors for this brand from the research below.
+    prompt = f"""You are a competitive intelligence analyst. Identify the top 12 genuine competitors for this brand from the research below.
 
 OUR BRAND: {brand_name}
 BRAND CORE: {brand_context}
 
 WEB RESEARCH:
-{web_context[:4000] or "No web results"}
+{web_context[:6000] or "No web results"}
 
-ADDITIONAL CANDIDATES:
-{candidate_list[:2000] or "None"}
+ADDITIONAL CANDIDATES (with any social links found on their websites):
+{candidate_list[:3000] or "None"}
 
-Extract the 6 most relevant competitors. For each, extract REAL data from the research — don't fabricate data not in the sources.
+Extract the 12 most relevant competitors. For each:
+- Use ONLY real data from the research — do not fabricate URLs, handles, or stats
+- If a social link was found on their website, include it in social_hints
+- Include as many social platforms as you can find evidence for
 
 Return ONLY valid JSON:
 {{
   "competitors": [
     {{
       "name": "<company name>",
-      "url": "<website URL — use real URL from research>",
+      "url": "<website URL — from research>",
       "description": "<1-2 sentence description>",
       "what_they_do": "<their core product/service>",
       "key_advantage": "<their main competitive advantage>",
@@ -1790,36 +1802,156 @@ Return ONLY valid JSON:
       "why_competitor": "<1 sentence: why they directly compete>",
       "relevance_score": <0.0-1.0>,
       "social_hints": {{
-        "instagram": "<handle if found in research, else null>",
-        "linkedin": "<LinkedIn URL if found, else null>",
-        "twitter": "<handle if found, else null>"
+        "instagram": "<full URL or @handle if found, else null>",
+        "facebook": "<full URL if found, else null>",
+        "tiktok": "<full URL or @handle if found, else null>",
+        "linkedin": "<full LinkedIn company URL if found, else null>",
+        "youtube": "<full YouTube URL if found, else null>",
+        "twitter": "<@handle if found, else null>"
       }}
     }}
   ]
 }}
 
-Order by relevance_score. Only include genuine competitors."""
+Order by relevance_score descending. Only include genuine competitors — no investors, partners, or suppliers."""
 
     try:
         response = await client.messages.create(
             model=settings.LLM_CHAT_MODEL,
-            max_tokens=2500,
+            max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse_json_response(response.content[0].text)
         competitors = [c for c in result.get("competitors", []) if c.get("name") and c["name"] not in existing]
         yield _evt(f"Analysis complete — {len(competitors)} competitors identified", "done")
-        yield {"type": "result", "competitors": competitors[:6]}
+        yield {"type": "result", "competitors": competitors[:12]}
     except Exception as exc:
         yield _evt("Synthesis failed — returning raw candidates", "warn", str(exc)[:80])
         fallback = [
             {
                 "name": c["name"], "url": c["url"],
-                "description": c.get("snippet",""),
+                "description": c.get("snippet", ""),
                 "why_competitor": "Similar company in the same space",
                 "relevance_score": 0.6,
             }
-            for c in candidates[:6] if c.get("name") and c["name"] not in existing
+            for c in candidates[:12] if c.get("name") and c["name"] not in existing
         ]
         yield _evt(f"Returning {len(fallback)} candidates", "done")
         yield {"type": "result", "competitors": fallback}
+
+
+# ---------------------------------------------------------------------------
+# Social link extraction helpers
+# ---------------------------------------------------------------------------
+
+_SOCIAL_LINK_PATTERNS = {
+    "instagram": re.compile(r'(?:https?://)?(?:www\.)?instagram\.com/([A-Za-z0-9._]+)/?', re.IGNORECASE),
+    "facebook":  re.compile(r'(?:https?://)?(?:www\.)?facebook\.com/((?!share|sharer|login|signup|home|intent|p/|photo|video|hashtag|status|compose|settings)[A-Za-z0-9._/-]+)/?', re.IGNORECASE),
+    "tiktok":    re.compile(r'(?:https?://)?(?:www\.)?tiktok\.com/@([A-Za-z0-9._]+)/?', re.IGNORECASE),
+    "linkedin":  re.compile(r'(?:https?://)?(?:www\.)?linkedin\.com/company/([A-Za-z0-9._-]+)/?', re.IGNORECASE),
+    "youtube":   re.compile(r'(?:https?://)?(?:www\.)?youtube\.com/(@[A-Za-z0-9._-]+|channel/[A-Za-z0-9_-]+|c/[A-Za-z0-9._-]+)/?', re.IGNORECASE),
+    "twitter":   re.compile(r'(?:https?://)?(?:www\.)?(?:twitter|x)\.com/([A-Za-z0-9_]{1,15})(?:[/?]|$)', re.IGNORECASE),
+}
+
+_SOCIAL_FALSE_POSITIVES = {
+    "web", "search", "explore", "hashtag", "status", "intent", "share", "sharer",
+    "login", "signup", "home", "about", "help", "compose", "settings", "i",
+    "in", "jobs", "pulse", "feed", "me", "groups", "events", "pages",
+}
+
+
+def extract_social_links(content: str) -> dict:
+    """
+    Extract social media profile URLs from scraped website content.
+    Returns a dict with platform -> full URL for each found platform.
+    """
+    links: dict[str, str] = {}
+    for platform, pattern in _SOCIAL_LINK_PATTERNS.items():
+        match = pattern.search(content)
+        if not match:
+            continue
+        handle_or_path = match.group(1).lstrip("@").strip("/").split("/")[0].lower()
+        if handle_or_path in _SOCIAL_FALSE_POSITIVES or len(handle_or_path) < 2:
+            continue
+        full = match.group(0).strip()
+        if not full.startswith("http"):
+            full = "https://" + full
+        links[platform] = full
+    return links
+
+
+def _instagram_hint_to_url(hint: Optional[str]) -> Optional[str]:
+    """Convert an @handle or bare handle from discovery to a full URL."""
+    if not hint:
+        return None
+    hint = hint.strip()
+    if "instagram.com" in hint:
+        return hint
+    handle = hint.lstrip("@")
+    return f"https://instagram.com/{handle}" if handle else None
+
+
+# ---------------------------------------------------------------------------
+# Auto-add a discovered competitor (scrape social links + full refresh)
+# ---------------------------------------------------------------------------
+
+async def stream_add_discovered_competitor(
+    project_id: str,
+    competitor: dict,
+    brand_core: dict,
+):
+    """
+    Add a single discovered competitor automatically:
+    1. Scrape their website for social media links
+    2. Merge with any social_hints from discovery
+    3. Run the full intelligence refresh stream
+    """
+    from backend.config import settings as _settings
+
+    name = competitor.get("name") or "Unknown"
+    url  = competitor.get("url") or ""
+    hints = competitor.get("social_hints") or {}
+
+    def _evt(message: str, icon: str = "activity", detail: str = "") -> dict:
+        return {"type": "step", "message": message, "icon": icon, "detail": detail, "competitor": name}
+
+    # ── Step 1: scrape website for social links ──────────────────────────────
+    scraped_social: dict = {}
+    if url and _settings.FIRECRAWL_API_KEY:
+        yield _evt(f"Scraping {name}'s website for social media links…", "globe", url)
+        try:
+            from backend.services.ingestion.firecrawl_client import scrape_url
+            scraped = await scrape_url(url, _settings.FIRECRAWL_API_KEY)
+            content = scraped.get("markdown") or scraped.get("content") or ""
+            if content:
+                scraped_social = extract_social_links(content)
+                found_platforms = list(scraped_social.keys())
+                yield _evt(
+                    f"Found {len(found_platforms)} social profiles on website" if found_platforms else "No social links on website",
+                    "check",
+                    ", ".join(found_platforms) if found_platforms else "",
+                )
+        except Exception as exc:
+            yield _evt(f"Website scrape skipped", "warn", str(exc)[:80])
+
+    # ── Step 2: merge scraped + discovery hints ──────────────────────────────
+    merged_competitor = {
+        "name":      name,
+        "website":   url or None,
+        "instagram": scraped_social.get("instagram") or _instagram_hint_to_url(hints.get("instagram")),
+        "facebook":  scraped_social.get("facebook")  or hints.get("facebook") or None,
+        "tiktok":    scraped_social.get("tiktok")    or hints.get("tiktok") or None,
+        "linkedin":  scraped_social.get("linkedin")  or hints.get("linkedin") or None,
+        "youtube":   scraped_social.get("youtube")   or hints.get("youtube") or None,
+    }
+
+    platforms_found = [p for p in ["instagram", "facebook", "tiktok", "linkedin", "youtube"] if merged_competitor.get(p)]
+    yield _evt(
+        f"Starting full analysis — {len(platforms_found)} platforms to scrape" if platforms_found else "Starting analysis (website only)",
+        "zap",
+        ", ".join(platforms_found),
+    )
+
+    # ── Step 3: run full intelligence refresh ────────────────────────────────
+    async for event in stream_refresh_competitor_intelligence(project_id, [merged_competitor]):
+        yield event

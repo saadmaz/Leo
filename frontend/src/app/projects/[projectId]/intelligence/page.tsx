@@ -252,24 +252,39 @@ export default function IntelligencePage() {
     }
   }
 
-  function addDiscoveredCompetitor(c: DiscoveredCompetitor) {
+  async function addDiscoveredCompetitor(c: DiscoveredCompetitor) {
     const name = c.name || (() => { try { return new URL(c.url).hostname.replace('www.', '') } catch { return c.url } })()
-    const prefill: CompetitorForm = {
-      ...emptyForm(),
-      name,
-      website: c.url || '',
-      instagram: c.social_hints?.instagram || '',
-      linkedin: c.social_hints?.linkedin || '',
-    }
-    setCompetitors(prev => {
-      const emptyIdx = prev.findIndex(p => !p.name.trim())
-      if (emptyIdx >= 0) {
-        return prev.map((p, i) => i === emptyIdx ? prefill : p)
-      }
-      return [...prev, prefill]
+
+    // Remove from discovered banner immediately
+    setDiscovered(prev => prev.filter(d => d.name !== c.name))
+    setRefreshing(true)
+    setShowAddForm(false)
+    setLiveLog([])
+
+    await new Promise<void>((resolve) => {
+      api.intelligence.addDiscovered(
+        params.projectId,
+        c,
+        (event) => {
+          pushLog(event)
+          if (event.type === 'result' && event.refreshed) {
+            toast.success(`${name} analysed and saved.`)
+            setStrategy(null)
+            loadSnapshots()
+          }
+          if (event.type === 'error') {
+            toast.error(event.message || 'Analysis failed.')
+          }
+        },
+        () => resolve(),
+      ).catch(err => {
+        toast.error(`Could not analyse ${name}. Try again.`)
+        console.error(err)
+        resolve()
+      })
     })
-    setShowAddForm(true)
-    toast.success(`${name} added to the form — fill in any missing handles and run analysis.`)
+
+    setRefreshing(false)
   }
 
   // ---------------------------------------------------------------------------
