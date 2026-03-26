@@ -357,15 +357,19 @@ async def run_research(
     region = "US"  # TODO: derive from brand core or audience answer
 
     # ── Step 1: Google Trends ────────────────────────────────────────────────
+    trends_query = f"{industry_kw} trends {region}"
     yield _sse({"type": "research_step", "step": "google_trends", "label": "Pulling Google Trends data for your industry...", "status": "running"})
+    yield _sse({"type": "research_search", "query": trends_query, "source": "google_trends", "engine": "Google Trends", "results": [], "result_count": 0, "status": "searching"})
     trends_data = await _fetch_google_trends(industry_kw, region)
+    rising = trends_data.get("rising_queries", [])
+    yield _sse({"type": "research_search", "query": trends_query, "source": "google_trends", "engine": "Google Trends", "results": rising[:8], "result_count": len(rising), "status": "done"})
     firebase_service.save_strategy_research_cache(
         project_id, session["id"],
         source="google_trends",
         query_used=industry_kw,
         raw_response=trends_data,
         parsed_insights={
-            "rising_queries": trends_data.get("rising_queries", []),
+            "rising_queries": rising,
             "top_queries": trends_data.get("top_queries", []),
             "peak_month": trends_data.get("peak_month", ""),
         },
@@ -373,18 +377,22 @@ async def run_research(
     yield _sse({"type": "research_step", "step": "google_trends", "label": "Google Trends data pulled", "status": "done"})
 
     # ── Step 2: Industry benchmarks via SerpAPI ──────────────────────────────
+    benchmark_query = f"{industry_kw} marketing strategy 2025"
     yield _sse({"type": "research_step", "step": "serp_benchmarks", "label": "Searching for industry benchmarks...", "status": "running"})
+    yield _sse({"type": "research_search", "query": benchmark_query, "source": "serp_benchmarks", "engine": "Google Search", "results": [], "result_count": 0, "status": "searching"})
     benchmark_data = await _fetch_serp_benchmarks(industry_kw)
     benchmark_text = ""
+    top_urls: list[str] = []
     if benchmark_data:
         top_urls = benchmark_data.get("top_urls", [])
         benchmark_text = await _firecrawl_benchmark_urls(top_urls)
         if not benchmark_text:
             benchmark_text = " ".join(benchmark_data.get("snippets", []))
+    yield _sse({"type": "research_search", "query": benchmark_query, "source": "serp_benchmarks", "engine": "Google Search", "results": top_urls, "result_count": len(top_urls), "status": "done"})
     firebase_service.save_strategy_research_cache(
         project_id, session["id"],
         source="serp_benchmarks",
-        query_used=f"{industry_kw} marketing strategy 2025",
+        query_used=benchmark_query,
         raw_response=benchmark_data,
         parsed_insights={"benchmark_text": benchmark_text[:2000]},
     )
@@ -393,10 +401,14 @@ async def run_research(
     # ── Step 3: Competitor social scraping ───────────────────────────────────
     competitor_insights = []
     if competitor_names:
-        yield _sse({"type": "research_step", "step": "competitor_scrape", "label": f"Analysing competitor profiles via Apify...", "status": "running"})
+        yield _sse({"type": "research_step", "step": "competitor_scrape", "label": "Analysing competitor profiles via Apify...", "status": "running"})
         for name in competitor_names:
+            apify_query = f"instagram.com/{name.lower().replace(' ', '')}"
+            yield _sse({"type": "research_search", "query": apify_query, "source": "apify", "engine": "Apify / Instagram", "results": [], "result_count": 0, "status": "searching"})
             insight = await _scrape_competitor_social(name)
             competitor_insights.append(insight)
+            found_count = 1 if insight.get("found") else 0
+            yield _sse({"type": "research_search", "query": apify_query, "source": "apify", "engine": "Apify / Instagram", "results": [apify_query] if found_count else [], "result_count": found_count, "status": "done"})
         firebase_service.save_strategy_research_cache(
             project_id, session["id"],
             source="apify_competitors",

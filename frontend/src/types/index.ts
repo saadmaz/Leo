@@ -1080,6 +1080,15 @@ export interface ResearchStep {
   status: 'running' | 'done' | 'skipped'
 }
 
+export interface ResearchSearch {
+  query: string
+  source: string
+  engine: string
+  results: string[]
+  result_count: number
+  status: 'searching' | 'done'
+}
+
 export interface StrategySection {
   heading: string
   content: string
@@ -1108,6 +1117,7 @@ export interface StrategySession {
   questionNumber: number
   totalQuestions: number
   researchSteps: ResearchStep[]
+  researchSearches: ResearchSearch[]
   streamedMarkdown: string
   savedStrategy: MarketingStrategy | null
 }
@@ -1115,6 +1125,7 @@ export interface StrategySession {
 // SSE events emitted by the strategy research endpoint
 export type StrategyResearchEvent =
   | { type: 'research_step'; step: string; label: string; status: 'running' | 'done' | 'skipped' }
+  | { type: 'research_search'; query: string; source: string; engine: string; results: string[]; result_count: number; status: 'searching' | 'done' }
   | { type: 'research_complete' }
   | { type: 'error'; message: string }
 

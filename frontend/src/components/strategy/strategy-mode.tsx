@@ -13,7 +13,7 @@
  *   complete       → <StrategyDocument> + <StrategyActionButtons>
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { api } from '@/lib/api'
@@ -22,7 +22,7 @@ import { FunnelSelector } from './funnel-selector'
 import { ResearchProgress } from './research-progress'
 import { StrategyDocument, StrategyStreamPreview } from './strategy-document'
 import { StrategyActionButtons } from './strategy-action-buttons'
-import type { FunnelType, ResearchStep } from '@/types'
+import type { FunnelType, ResearchSearch, ResearchStep } from '@/types'
 
 interface StrategyModeProps {
   projectId: string
@@ -35,7 +35,6 @@ interface StrategyModeProps {
 export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyModeProps) {
   const { strategySession, updateStrategySession, resetStrategySession } = useAppStore()
   const abortRef = useRef<AbortController | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   // Cleanup on unmount
   useEffect(() => () => { abortRef.current?.abort() }, [])
@@ -65,7 +64,10 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyMo
   if (strategySession.status === 'researching') {
     return (
       <LeoMessageWrapper>
-        <ResearchProgress steps={strategySession.researchSteps} />
+        <ResearchProgress
+          steps={strategySession.researchSteps}
+          searches={strategySession.researchSearches}
+        />
       </LeoMessageWrapper>
     )
   }
@@ -103,7 +105,6 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyMo
 
   async function handleFunnelSelect(type: FunnelType) {
     if (!strategySession) return
-    setError(null)
 
     try {
       const res = await api.strategy.answer(projectId, strategySession.sessionId, {
@@ -123,8 +124,8 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyMo
       if (res.next_question) {
         onLeoMessage?.(`**Question 1 of ${res.total_questions ?? 6}**\n\n${res.next_question.text}`)
       }
-    } catch (err) {
-      setError(String(err))
+    } catch {
+      // non-critical — user can retry
     }
   }
 }
@@ -136,9 +137,10 @@ export async function runStrategyResearchAndGenerate(
   updateStrategySession: (patch: Partial<import('@/types').StrategySession>) => void,
 ) {
   // Phase: researching
-  updateStrategySession({ status: 'researching', researchSteps: [] })
+  updateStrategySession({ status: 'researching', researchSteps: [], researchSearches: [] })
 
   const steps: ResearchStep[] = []
+  const searches: ResearchSearch[] = []
 
   await api.strategy.streamResearch(
     projectId,
@@ -152,6 +154,15 @@ export async function runStrategyResearchAndGenerate(
           steps.push({ step: ev.step, label: ev.label, status: ev.status })
         }
         updateStrategySession({ researchSteps: [...steps] })
+      } else if (ev.type === 'research_search') {
+        const existing = searches.findIndex((s) => s.query === ev.query && s.source === ev.source)
+        const item: ResearchSearch = { query: ev.query, source: ev.source, engine: ev.engine, results: ev.results, result_count: ev.result_count, status: ev.status }
+        if (existing >= 0) {
+          searches[existing] = item
+        } else {
+          searches.push(item)
+        }
+        updateStrategySession({ researchSearches: [...searches] })
       }
     },
     () => {
@@ -173,7 +184,7 @@ export async function runStrategyResearchAndGenerate(
         md += text
         updateStrategySession({ streamedMarkdown: md })
       },
-      (strategyId, title, version) => {
+      (strategyId, _title, _version) => {
         // Strategy saved — fetch it and move to complete
         api.strategy.list(projectId).then((res) => {
           const saved = res.strategies.find((s) => s.id === strategyId)

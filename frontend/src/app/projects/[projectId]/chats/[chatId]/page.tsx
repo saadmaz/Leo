@@ -16,7 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
-import type { FunnelType, ImageAttachment, OptimisticMessage } from '@/types'
+import type { ImageAttachment, OptimisticMessage } from '@/types'
 import { StrategyMode, runStrategyResearchAndGenerate } from '@/components/strategy/strategy-mode'
 
 /** Generate a unique ephemeral id for optimistic messages. */
@@ -49,7 +49,7 @@ export default function ChatPage() {
     upsertChat, openUpgradeModal,
     activeChannel, setActiveChannel,
     setCampaignPanelOpen,
-    strategySession, setStrategySession, updateStrategySession, resetStrategySession,
+    strategySession, setStrategySession, updateStrategySession,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -174,7 +174,7 @@ export default function ChatPage() {
             })
           }
         }
-      } catch (err) {
+      } catch {
         addMessage({ id: newId(), role: 'assistant', content: 'Something went wrong — please try again.' })
       }
       return
@@ -194,6 +194,7 @@ export default function ChatPage() {
           questionNumber: 0,
           totalQuestions: 6,
           researchSteps: [],
+          researchSearches: [],
           streamedMarkdown: '',
           savedStrategy: null,
         })
@@ -201,7 +202,7 @@ export default function ChatPage() {
           id: newId(), role: 'assistant',
           content: res.message,
         })
-      } catch (err) {
+      } catch {
         addMessage({ id: newId(), role: 'assistant', content: 'Something went wrong starting the strategy session. Please try again.' })
       }
       return
