@@ -1072,6 +1072,7 @@ export interface StrategyQuestion {
   text: string
   placeholder?: string
   type?: 'funnel_selector' | 'text'
+  options?: string[]
 }
 
 export interface ResearchStep {

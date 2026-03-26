@@ -89,8 +89,15 @@ FUNNEL_TYPES = {
 QUESTIONS = [
     {
         "index": 0,
-        "text": "What is the main goal for this strategy? For example: get more followers, sell more products, generate leads, or launch a new product.",
+        "text": "What is the main goal for this strategy?",
         "placeholder": "e.g. Generate leads for my SaaS product",
+        "options": [
+            "Get more followers",
+            "Sell more products",
+            "Generate leads",
+            "Launch a new product",
+            "Build brand awareness",
+        ],
     },
     {
         "index": 1,
@@ -99,18 +106,40 @@ QUESTIONS = [
     },
     {
         "index": 2,
-        "text": "What's your budget for this? Give me a rough range — even 'very small' or 'flexible' helps.",
+        "text": "What's your budget for this campaign?",
         "placeholder": "e.g. $500/month, or no budget — organic only",
+        "options": [
+            "No budget — organic only",
+            "Under $500/month",
+            "$500–2,000/month",
+            "$2,000–5,000/month",
+            "$5,000+/month",
+        ],
     },
     {
         "index": 3,
         "text": "How long do you want this campaign to run?",
         "placeholder": "e.g. 2 weeks for a launch, 3 months ongoing",
+        "options": [
+            "1–2 weeks (launch sprint)",
+            "1 month",
+            "3 months",
+            "6 months",
+            "Ongoing",
+        ],
     },
     {
         "index": 4,
-        "text": "Which platforms do you want to focus on? Or should I recommend based on your audience?",
+        "text": "Which platforms do you want to focus on?",
         "placeholder": "e.g. Instagram + TikTok, or 'you decide'",
+        "options": [
+            "Instagram",
+            "TikTok",
+            "LinkedIn",
+            "Instagram + TikTok",
+            "All platforms",
+            "LEO recommends",
+        ],
     },
     {
         "index": 5,

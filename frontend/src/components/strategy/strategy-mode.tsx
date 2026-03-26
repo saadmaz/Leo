@@ -19,6 +19,7 @@ import Image from 'next/image'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { FunnelSelector } from './funnel-selector'
+import { QuestionCard } from './question-card'
 import { ResearchProgress } from './research-progress'
 import { StrategyDocument, StrategyStreamPreview } from './strategy-document'
 import { StrategyActionButtons } from './strategy-action-buttons'
@@ -30,9 +31,11 @@ interface StrategyModeProps {
   onFollowUp: (message: string) => void
   /** Called to inject a LEO message into the chat list (e.g. first question). */
   onLeoMessage?: (content: string) => void
+  /** Called to inject a user message into the chat list (selected answer). */
+  onUserMessage?: (content: string) => void
 }
 
-export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyModeProps) {
+export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessage }: StrategyModeProps) {
   const { strategySession, updateStrategySession, resetStrategySession } = useAppStore()
   const abortRef = useRef<AbortController | null>(null)
 
@@ -53,11 +56,18 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyMo
     )
   }
 
-  // ── Phase: intake with question (question shown in message list by chat page)
-  // StrategyMode renders nothing here — the chat page adds question text as a message
-  // and the user answers via the normal chat input.
-  if (strategySession.status === 'intake' && strategySession.funnelType) {
-    return null
+  // ── Phase: intake with question — show QuestionCard with dropdown options ─
+  if (strategySession.status === 'intake' && strategySession.funnelType && strategySession.currentQuestion) {
+    return (
+      <LeoMessageWrapper>
+        <QuestionCard
+          question={strategySession.currentQuestion}
+          questionNumber={strategySession.questionNumber}
+          totalQuestions={strategySession.totalQuestions}
+          onAnswer={(answer) => handleQuestionAnswer(answer)}
+        />
+      </LeoMessageWrapper>
+    )
   }
 
   // ── Phase: researching ───────────────────────────────────────────────────
@@ -102,6 +112,41 @@ export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyMo
   return null
 
   // ── Handlers ─────────────────────────────────────────────────────────────
+
+  async function handleQuestionAnswer(answer: string) {
+    if (!strategySession?.currentQuestion) return
+
+    // Echo the user's choice into the chat
+    onUserMessage?.(answer)
+
+    try {
+      const res = await api.strategy.answer(projectId, strategySession.sessionId, {
+        question_index: strategySession.currentQuestion.index,
+        answer,
+      })
+
+      if (res.status === 'research_ready') {
+        onLeoMessage?.(
+          res.message ??
+            "Got it. Give me a moment — I'm going to research your industry, check what's trending, and look at what's working for similar brands.",
+        )
+        updateStrategySession({ currentQuestion: null })
+        await runStrategyResearchAndGenerate(projectId, strategySession.sessionId, updateStrategySession)
+      } else {
+        updateStrategySession({
+          currentQuestion: res.next_question ?? null,
+          questionNumber: res.question_number ?? strategySession.questionNumber + 1,
+          totalQuestions: res.total_questions ?? strategySession.totalQuestions,
+          intakeAnswers: {
+            ...strategySession.intakeAnswers,
+            [`q${strategySession.currentQuestion.index}`]: answer,
+          },
+        })
+      }
+    } catch {
+      onLeoMessage?.('Something went wrong — please try again.')
+    }
+  }
 
   async function handleFunnelSelect(type: FunnelType) {
     if (!strategySession) return

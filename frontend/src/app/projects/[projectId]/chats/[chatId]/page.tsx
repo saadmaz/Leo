@@ -140,46 +140,6 @@ export default function ChatPage() {
     if ((!content.trim() && attachments.length === 0) || isStreaming) return
     setInput('')
 
-    // ── Strategy intake: answer a pending question ──────────────────────────
-    const sess = useAppStore.getState().strategySession
-    if (sess && sess.status === 'intake' && sess.funnelType && sess.currentQuestion) {
-      addMessage({ id: newId(), role: 'user', content })
-      try {
-        const res = await api.strategy.answer(params.projectId, sess.sessionId, {
-          question_index: sess.currentQuestion.index,
-          answer: content,
-        })
-        if (res.status === 'research_ready') {
-          // All questions answered — start research
-          addMessage({
-            id: newId(), role: 'assistant',
-            content: res.message ?? "Got it. Give me a moment — I'm going to research your industry, check what's trending, and look at what's working for similar brands.",
-          })
-          updateStrategySession({ currentQuestion: null })
-          await runStrategyResearchAndGenerate(params.projectId, sess.sessionId, updateStrategySession)
-        } else {
-          // Show next question
-          updateStrategySession({
-            currentQuestion: res.next_question ?? null,
-            questionNumber: res.question_number ?? sess.questionNumber + 1,
-            totalQuestions: res.total_questions ?? sess.totalQuestions,
-            intakeAnswers: { ...sess.intakeAnswers, [`q${sess.currentQuestion.index}`]: content },
-          })
-          if (res.next_question) {
-            const qNum = res.question_number ?? sess.questionNumber + 1
-            const total = res.total_questions ?? sess.totalQuestions
-            addMessage({
-              id: newId(), role: 'assistant',
-              content: `**Question ${qNum} of ${total}**\n\n${res.next_question.text}`,
-            })
-          }
-        }
-      } catch {
-        addMessage({ id: newId(), role: 'assistant', content: 'Something went wrong — please try again.' })
-      }
-      return
-    }
-
     // ── Strategy trigger: new strategy session ──────────────────────────────
     if (!sess && isStrategyIntent(content) && attachments.length === 0) {
       addMessage({ id: newId(), role: 'user', content })
@@ -521,6 +481,7 @@ export default function ChatPage() {
                 projectId={params.projectId}
                 onFollowUp={(msg) => handleSubmit(msg)}
                 onLeoMessage={(content) => addMessage({ id: newId(), role: 'assistant', content })}
+                onUserMessage={(content) => addMessage({ id: newId(), role: 'user', content })}
               />
             )}
 
