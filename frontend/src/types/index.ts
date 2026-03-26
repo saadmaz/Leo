@@ -1061,6 +1061,70 @@ export interface CreditTransaction {
 }
 
 // ---------------------------------------------------------------------------
+// Funnel Strategy Engine
+// ---------------------------------------------------------------------------
+
+export type FunnelType = 'tofu' | 'mofu' | 'bofu' | 'full' | 'retention'
+export type StrategyStatus = 'intake' | 'researching' | 'generating' | 'complete'
+
+export interface StrategyQuestion {
+  index: number
+  text: string
+  placeholder?: string
+  type?: 'funnel_selector' | 'text'
+}
+
+export interface ResearchStep {
+  step: string
+  label: string
+  status: 'running' | 'done' | 'skipped'
+}
+
+export interface StrategySection {
+  heading: string
+  content: string
+}
+
+export interface MarketingStrategy {
+  id: string
+  projectId: string
+  sessionId: string
+  version: number
+  title: string
+  funnelType: FunnelType
+  fullMarkdown: string
+  sections: StrategySection[]
+  isActive: boolean
+  intakeAnswers: Record<string, string>
+  createdAt: string
+}
+
+export interface StrategySession {
+  sessionId: string
+  status: StrategyStatus
+  funnelType: FunnelType | null
+  intakeAnswers: Record<string, string>
+  currentQuestion: StrategyQuestion | null
+  questionNumber: number
+  totalQuestions: number
+  researchSteps: ResearchStep[]
+  streamedMarkdown: string
+  savedStrategy: MarketingStrategy | null
+}
+
+// SSE events emitted by the strategy research endpoint
+export type StrategyResearchEvent =
+  | { type: 'research_step'; step: string; label: string; status: 'running' | 'done' | 'skipped' }
+  | { type: 'research_complete' }
+  | { type: 'error'; message: string }
+
+// SSE events emitted by the strategy generate endpoint
+export type StrategyGenerateEvent =
+  | { type: 'delta'; content: string }
+  | { type: 'strategy_saved'; strategy_id: string; title: string; version: number }
+  | { type: 'error'; message: string }
+
+// ---------------------------------------------------------------------------
 // Deep Search
 // ---------------------------------------------------------------------------
 

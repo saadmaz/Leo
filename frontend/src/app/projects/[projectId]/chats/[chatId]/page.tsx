@@ -16,7 +16,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
-import type { ImageAttachment, OptimisticMessage } from '@/types'
+import type { FunnelType, ImageAttachment, OptimisticMessage } from '@/types'
+import { StrategyMode, runStrategyResearchAndGenerate } from '@/components/strategy/strategy-mode'
 
 /** Generate a unique ephemeral id for optimistic messages. */
 function newId() {
@@ -48,6 +49,7 @@ export default function ChatPage() {
     upsertChat, openUpgradeModal,
     activeChannel, setActiveChannel,
     setCampaignPanelOpen,
+    strategySession, setStrategySession, updateStrategySession, resetStrategySession,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -119,10 +121,93 @@ export default function ChatPage() {
 
   useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
+  // ---------------------------------------------------------------------------
+  // Strategy intent detection (client-side keyword matching)
+  // ---------------------------------------------------------------------------
+  const STRATEGY_PATTERNS = [
+    /\b(build|create|make|give me|develop|design|write|craft|generate)\b.{0,30}\b(marketing\s+strategy|funnel|campaign\s+plan|growth\s+plan|content\s+strategy)\b/i,
+    /\bplan\s+(my|a|the)\s+funnel\b/i,
+    /\bmarketing\s+strategy\b/i,
+    /\b(help\s+me|i\s+want\s+to)\s+(run\s+a\s+campaign|get\s+more\s+customers|grow\s+my\s+(brand|audience|business))\b/i,
+    /\bgrowth\s+(strategy|plan|roadmap)\b/i,
+    /\b(tofu|mofu|bofu|full[\s-]funnel)\s+strategy\b/i,
+  ]
+  function isStrategyIntent(text: string) {
+    return STRATEGY_PATTERNS.some((p) => p.test(text))
+  }
+
   async function handleSubmit(content: string, attachments: ImageAttachment[] = []) {
     if ((!content.trim() && attachments.length === 0) || isStreaming) return
     setInput('')
 
+    // ── Strategy intake: answer a pending question ──────────────────────────
+    const sess = useAppStore.getState().strategySession
+    if (sess && sess.status === 'intake' && sess.funnelType && sess.currentQuestion) {
+      addMessage({ id: newId(), role: 'user', content })
+      try {
+        const res = await api.strategy.answer(params.projectId, sess.sessionId, {
+          question_index: sess.currentQuestion.index,
+          answer: content,
+        })
+        if (res.status === 'research_ready') {
+          // All questions answered — start research
+          addMessage({
+            id: newId(), role: 'assistant',
+            content: res.message ?? "Got it. Give me a moment — I'm going to research your industry, check what's trending, and look at what's working for similar brands.",
+          })
+          updateStrategySession({ currentQuestion: null })
+          await runStrategyResearchAndGenerate(params.projectId, sess.sessionId, updateStrategySession)
+        } else {
+          // Show next question
+          updateStrategySession({
+            currentQuestion: res.next_question ?? null,
+            questionNumber: res.question_number ?? sess.questionNumber + 1,
+            totalQuestions: res.total_questions ?? sess.totalQuestions,
+            intakeAnswers: { ...sess.intakeAnswers, [`q${sess.currentQuestion.index}`]: content },
+          })
+          if (res.next_question) {
+            const qNum = res.question_number ?? sess.questionNumber + 1
+            const total = res.total_questions ?? sess.totalQuestions
+            addMessage({
+              id: newId(), role: 'assistant',
+              content: `**Question ${qNum} of ${total}**\n\n${res.next_question.text}`,
+            })
+          }
+        }
+      } catch (err) {
+        addMessage({ id: newId(), role: 'assistant', content: 'Something went wrong — please try again.' })
+      }
+      return
+    }
+
+    // ── Strategy trigger: new strategy session ──────────────────────────────
+    if (!sess && isStrategyIntent(content) && attachments.length === 0) {
+      addMessage({ id: newId(), role: 'user', content })
+      try {
+        const res = await api.strategy.start(params.projectId, content)
+        setStrategySession({
+          sessionId: res.session_id,
+          status: 'intake',
+          funnelType: null,
+          intakeAnswers: {},
+          currentQuestion: res.next_question,
+          questionNumber: 0,
+          totalQuestions: 6,
+          researchSteps: [],
+          streamedMarkdown: '',
+          savedStrategy: null,
+        })
+        addMessage({
+          id: newId(), role: 'assistant',
+          content: res.message,
+        })
+      } catch (err) {
+        addMessage({ id: newId(), role: 'assistant', content: 'Something went wrong starting the strategy session. Please try again.' })
+      }
+      return
+    }
+
+    // ── Normal chat flow ────────────────────────────────────────────────────
     // Add optimistic user message immediately so the UI feels responsive.
     addMessage({ id: newId(), role: 'user', content })
 
@@ -326,17 +411,17 @@ export default function ChatPage() {
                 {/* Suggestion chips */}
                 <div className="flex flex-wrap justify-center gap-2 max-w-sm">
                   {(hasBrandCore ? [
+                    'Build me a marketing strategy',
                     'Write 5 Instagram captions',
                     'Create a campaign brief',
                     'Generate a content calendar for this week',
                     "What's my brand tone?",
                     'Write a promotional email',
-                    'Analyse our brand positioning',
                   ] : [
+                    'Build me a marketing strategy',
                     'What can LEO do for my brand?',
                     'Write 5 Instagram captions',
                     'Create a content calendar',
-                    'Write ad copy for Meta',
                   ]).map((prompt) => (
                     <button
                       key={prompt}
@@ -427,6 +512,15 @@ export default function ChatPage() {
                   </motion.div>
                 ))}
               </AnimatePresence>
+            )}
+
+            {/* Strategy Mode — funnel selector / research / document */}
+            {strategySession && (
+              <StrategyMode
+                projectId={params.projectId}
+                onFollowUp={(msg) => handleSubmit(msg)}
+                onLeoMessage={(content) => addMessage({ id: newId(), role: 'assistant', content })}
+              />
             )}
 
             {/* Thinking / tool-use indicator */}

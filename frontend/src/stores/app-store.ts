@@ -176,6 +176,14 @@ interface AppState {
   // ---------------------------------------------------------------------------
   hashtagPanelOpen: boolean
   setHashtagPanelOpen: (v: boolean) => void
+
+  // ---------------------------------------------------------------------------
+  // Funnel Strategy Engine
+  // ---------------------------------------------------------------------------
+  strategySession: import('@/types').StrategySession | null
+  setStrategySession: (session: import('@/types').StrategySession | null) => void
+  updateStrategySession: (patch: Partial<import('@/types').StrategySession>) => void
+  resetStrategySession: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -361,4 +369,15 @@ export const useAppStore = create<AppState>((set) => ({
   setBrandVoiceScorerOpen: (brandVoiceScorerOpen) => set({ brandVoiceScorerOpen }),
   hashtagPanelOpen: false,
   setHashtagPanelOpen: (hashtagPanelOpen) => set({ hashtagPanelOpen }),
+
+  // ---------------------------------------------------------------------------
+  // Funnel Strategy Engine
+  // ---------------------------------------------------------------------------
+  strategySession: null,
+  setStrategySession: (strategySession) => set({ strategySession }),
+  updateStrategySession: (patch) =>
+    set((s) => ({
+      strategySession: s.strategySession ? { ...s.strategySession, ...patch } : null,
+    })),
+  resetStrategySession: () => set({ strategySession: null }),
 }))

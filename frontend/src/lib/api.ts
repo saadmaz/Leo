@@ -1360,4 +1360,155 @@ export const api = {
     history: (projectId: string) =>
       get<{ results: DeepSearchHistory[] }>(`/projects/${projectId}/deep-search/history`),
   },
+
+  // -------------------------------------------------------------------------
+  // Funnel Strategy Engine
+  // -------------------------------------------------------------------------
+  strategy: {
+    /** Create a new strategy session; returns session_id + first question. */
+    start: (projectId: string, userGoal: string) =>
+      post<{ session_id: string; status: string; next_question: import('@/types').StrategyQuestion; message: string }>(
+        `/projects/${projectId}/strategy/start`,
+        { user_goal: userGoal },
+      ),
+
+    /** Submit an intake answer; returns next question or research_ready status. */
+    answer: (
+      projectId: string,
+      sessionId: string,
+      opts: { question_index: number; answer: string; funnel_type?: string },
+    ) =>
+      post<{
+        session_id: string
+        status: string
+        next_question: import('@/types').StrategyQuestion | null
+        question_number?: number
+        total_questions?: number
+        message?: string
+      }>(`/projects/${projectId}/strategy/${sessionId}/answer`, opts),
+
+    /** Stream research progress events (SSE). */
+    streamResearch: async (
+      projectId: string,
+      sessionId: string,
+      onEvent: (ev: import('@/types').StrategyResearchEvent) => void,
+      onDone: () => void,
+      onError: (msg: string) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/strategy/${sessionId}/research`, {
+        method: 'POST',
+        headers,
+        signal,
+      })
+      if (!res.ok) { onError(`Research failed: ${res.status}`); return }
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (payload === '[DONE]') { onDone(); return }
+          try { onEvent(JSON.parse(payload) as import('@/types').StrategyResearchEvent) } catch { /* skip */ }
+        }
+      }
+      onDone()
+    },
+
+    /** Stream strategy generation (SSE token deltas). */
+    streamGenerate: async (
+      projectId: string,
+      sessionId: string,
+      onDelta: (text: string) => void,
+      onSaved: (strategyId: string, title: string, version: number) => void,
+      onDone: () => void,
+      onError: (msg: string) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/strategy/${sessionId}/generate`, {
+        method: 'POST',
+        headers,
+        signal,
+      })
+      if (!res.ok) { onError(`Generation failed: ${res.status}`); return }
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (payload === '[DONE]') { onDone(); return }
+          try {
+            const ev = JSON.parse(payload) as import('@/types').StrategyGenerateEvent
+            if (ev.type === 'delta') onDelta(ev.content)
+            else if (ev.type === 'strategy_saved') onSaved(ev.strategy_id, ev.title, ev.version)
+            else if (ev.type === 'error') { onError(ev.message); return }
+          } catch { /* skip */ }
+        }
+      }
+      onDone()
+    },
+
+    /** List saved strategies for a project. */
+    list: (projectId: string) =>
+      get<{ strategies: import('@/types').MarketingStrategy[] }>(`/projects/${projectId}/strategy/list`),
+
+    /** Stream a follow-up / refinement response (SSE). */
+    streamRefine: async (
+      projectId: string,
+      strategyId: string,
+      followUpMessage: string,
+      onDelta: (text: string) => void,
+      onDone: () => void,
+      onError: (msg: string) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/strategy/${strategyId}/refine`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ follow_up_message: followUpMessage }),
+        signal,
+      })
+      if (!res.ok) { onError(`Refine failed: ${res.status}`); return }
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (payload === '[DONE]') { onDone(); return }
+          try {
+            const ev = JSON.parse(payload)
+            if (ev.type === 'delta') onDelta(ev.content)
+            else if (ev.type === 'error') { onError(ev.message); return }
+          } catch { /* skip */ }
+        }
+      }
+      onDone()
+    },
+  },
 }

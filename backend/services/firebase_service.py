@@ -2218,3 +2218,122 @@ def delete_post(project_id: str, post_id: str) -> None:
         .collection("posts").document(post_id)
         .delete()
     )
+
+
+# ---------------------------------------------------------------------------
+# Funnel Strategy Engine — sessions, research cache, saved strategies
+# ---------------------------------------------------------------------------
+
+def create_strategy_session(project_id: str, data: dict) -> dict:
+    """Create a new strategy session document and return it with its id."""
+    db = get_db()
+    now = _utcnow()
+    data = {**data, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("strategy_sessions").document()
+    )
+    ref.set(data)
+    return {"id": ref.id, **data}
+
+
+def get_strategy_session(project_id: str, session_id: str) -> Optional[dict]:
+    """Fetch a strategy session by ID, or None if not found."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("strategy_sessions").document(session_id)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def update_strategy_session(project_id: str, session_id: str, data: dict) -> None:
+    """Partially update a strategy session document."""
+    db = get_db()
+    data["updatedAt"] = _utcnow()
+    (
+        db.collection("projects").document(project_id)
+        .collection("strategy_sessions").document(session_id)
+        .update(data)
+    )
+
+
+def save_strategy_research_cache(
+    project_id: str,
+    session_id: str,
+    source: str,
+    query_used: str,
+    raw_response: Any,
+    parsed_insights: Any,
+) -> dict:
+    """Persist a research cache entry for a session."""
+    db = get_db()
+    now = _utcnow()
+    data = {
+        "source": source,
+        "query_used": query_used,
+        "raw_response": raw_response,
+        "parsed_insights": parsed_insights,
+        "fetched_at": now,
+    }
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("strategy_sessions").document(session_id)
+        .collection("research_cache").document()
+    )
+    ref.set(data)
+    return {"id": ref.id, **data}
+
+
+def list_strategy_research_cache(project_id: str, session_id: str) -> list[dict]:
+    """Return all research cache entries for a session."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("strategy_sessions").document(session_id)
+        .collection("research_cache")
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def save_marketing_strategy(project_id: str, data: dict) -> dict:
+    """Persist a completed marketing strategy document."""
+    db = get_db()
+    now = _utcnow()
+    data = {**data, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("marketing_strategies").document()
+    )
+    ref.set(data)
+    return {"id": ref.id, **data}
+
+
+def get_marketing_strategy(project_id: str, strategy_id: str) -> Optional[dict]:
+    """Fetch a saved strategy by ID, or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("marketing_strategies").document(strategy_id)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    return {"id": doc.id, **doc.to_dict()}
+
+
+def list_marketing_strategies(project_id: str) -> list[dict]:
+    """Return all saved strategies for a project, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("marketing_strategies")
+        .order_by("createdAt", direction="DESCENDING")
+        .limit(20)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
