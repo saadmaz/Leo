@@ -483,7 +483,6 @@ export default function ChatPage() {
                 projectId={params.projectId}
                 onFollowUp={(msg) => handleSubmit(msg)}
                 onLeoMessage={(content) => addMessage({ id: newId(), role: 'assistant', content })}
-                onUserMessage={(content) => addMessage({ id: newId(), role: 'user', content })}
               />
             )}
 

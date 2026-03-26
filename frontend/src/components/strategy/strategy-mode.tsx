@@ -32,11 +32,9 @@ interface StrategyModeProps {
   onFollowUp: (message: string) => void
   /** Called to inject a LEO message into the chat list (e.g. first question). */
   onLeoMessage?: (content: string) => void
-  /** Called to inject a user message into the chat list (selected answer). */
-  onUserMessage?: (content: string) => void
 }
 
-export function StrategyMode({ projectId, onFollowUp, onLeoMessage, onUserMessage }: StrategyModeProps) {
+export function StrategyMode({ projectId, onFollowUp, onLeoMessage }: StrategyModeProps) {
   const { strategySession, updateStrategySession, resetStrategySession, user } = useAppStore()
   const abortRef = useRef<AbortController | null>(null)
 
