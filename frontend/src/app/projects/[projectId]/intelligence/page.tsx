@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   BarChart2, RefreshCw, Plus, X, Loader2, ChevronDown, ChevronUp,
-  TrendingUp, AlertTriangle, Lightbulb, Zap, Bell, Search,
+  TrendingUp, AlertTriangle, Lightbulb, Zap, Search,
   Globe, Instagram, Youtube, Linkedin, Facebook, Target,
   ArrowRight, CheckCircle2, Flame, Shield, Swords,
   TrendingDown, Minus, Activity, Sparkles, MapPin, DollarSign, Building2,
@@ -95,7 +95,7 @@ function emptyForm(): CompetitorForm {
 export default function IntelligencePage() {
   const params = useParams<{ projectId: string }>()
   const router = useRouter()
-  const { activeProject } = useAppStore()
+  useAppStore()
 
   const [tab, setTab] = useState<Tab>('snapshots')
   const [snapshots, setSnapshots] = useState<CompetitorSnapshot[]>([])
