@@ -13,7 +13,6 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api, type IntelligenceStreamEvent } from '@/lib/api'
-import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
 import { CompetitorReportPanel } from './competitor-report'
@@ -95,7 +94,6 @@ function emptyForm(): CompetitorForm {
 export default function IntelligencePage() {
   const params = useParams<{ projectId: string }>()
   const router = useRouter()
-  useAppStore()
 
   const [tab, setTab] = useState<Tab>('snapshots')
   const [snapshots, setSnapshots] = useState<CompetitorSnapshot[]>([])
