@@ -7,8 +7,8 @@ import { signOut } from 'firebase/auth'
 import {
   PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
   CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
-  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Hash, Globe, Mail, BookOpen, Users, FileText,
-  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Bell, Search, ClipboardList, Crosshair,
+  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
+  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -38,10 +38,7 @@ export function Sidebar() {
     upsertProject, removeProject, upsertChat, removeChat,
     sidebarOpen, setSidebarOpen,
     setWizardOpen,
-    setCampaignPanelOpen,
     setProjectSettingsPanelOpen,
-    setBrandVoiceScorerOpen,
-    setHashtagPanelOpen,
   } = useAppStore()
 
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -283,39 +280,39 @@ export function Sidebar() {
           {/* Project-scoped tool groups */}
           {!projectsLoading && activeProject && (
             <div className="mt-1 border-t border-border/50 pt-1">
-              <NavGroup label="Content" storageKey="nav_content">
+              <NavGroup label="Workspace" storageKey="nav_workspace">
+                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"       onClick={() => router.push(`/projects/${activeProject.id}/campaigns`)} />
+                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"           onClick={() => router.push(`/projects/${activeProject.id}/posts`)} />
+                <NavItem icon={<Users className="w-3.5 h-3.5" />}         label="Team"            onClick={() => router.push(`/projects/${activeProject.id}/team`)} />
+              </NavGroup>
+
+              <NavGroup label="Create" storageKey="nav_content">
                 <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)} />
-                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />}   label="Posts"           onClick={() => router.push(`/projects/${activeProject.id}/posts`)} />
-                <NavItem icon={<Users className="w-3.5 h-3.5" />}           label="Team"            onClick={() => router.push(`/projects/${activeProject.id}/team`)} />
                 <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => router.push(`/projects/${activeProject.id}/library`)} />
                 <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => router.push(`/projects/${activeProject.id}/bulk`)} />
                 <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => router.push(`/projects/${activeProject.id}/planner`)} />
                 <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}       label="Image Studio"    onClick={() => router.push(`/projects/${activeProject.id}/images`)} />
-                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}       label="Campaigns"       onClick={() => setCampaignPanelOpen(true)} />
               </NavGroup>
 
-              <NavGroup label="Schedule" storageKey="nav_schedule">
-                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />} label="Calendar"      onClick={() => router.push(`/projects/${activeProject.id}/calendar`)} />
-                <NavItem icon={<Send className="w-3.5 h-3.5" />}         label="Publish Queue" onClick={() => router.push(`/projects/${activeProject.id}/publish`)} />
+              <NavGroup label="Publish" storageKey="nav_schedule">
+                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue" onClick={() => router.push(`/projects/${activeProject.id}/review`)} />
+                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"      onClick={() => router.push(`/projects/${activeProject.id}/calendar`)} />
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue" onClick={() => router.push(`/projects/${activeProject.id}/publish`)} />
               </NavGroup>
 
-              <NavGroup label="Intelligence" storageKey="nav_intelligence">
-                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />}   label="Analytics"        onClick={() => router.push(`/projects/${activeProject.id}/analytics`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="Reports"          onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="Deep Search"      onClick={() => router.push(`/projects/${activeProject.id}/deep-search`)} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Intelligence"     onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
-                <NavItem icon={<Crosshair className="w-3.5 h-3.5" />}   label="Competitor Profiles" onClick={() => router.push(`/projects/${activeProject.id}/intelligence/profiles`)} />
-                <NavItem icon={<Bell className="w-3.5 h-3.5" />}        label="Monitoring"       onClick={() => router.push(`/projects/${activeProject.id}/intelligence/monitoring`)} />
-                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Voice Scorer"     onClick={() => setBrandVoiceScorerOpen(true)} />
-                <NavItem icon={<Hash className="w-3.5 h-3.5" />}        label="Hashtag Research" onClick={() => setHashtagPanelOpen(true)} />
+              <NavGroup label="Insights" storageKey="nav_intelligence">
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"   onClick={() => router.push(`/projects/${activeProject.id}/analytics`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"     onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search" onClick={() => router.push(`/projects/${activeProject.id}/deep-search`)} />
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors" onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
               </NavGroup>
 
               <NavGroup label="Studio" storageKey="nav_studio">
-                <NavItem icon={<Globe className="w-3.5 h-3.5" />}         label="SEO Studio"    onClick={() => router.push(`/projects/${activeProject.id}/seo`)} />
-                <NavItem icon={<Mail className="w-3.5 h-3.5" />}          label="Email Studio"  onClick={() => router.push(`/projects/${activeProject.id}/emails`)} />
-                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}      label="Style Guide"   onClick={() => router.push(`/projects/${activeProject.id}/style-guide`)} />
-                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"    onClick={() => router.push(`/projects/${activeProject.id}/templates`)} />
-                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue" onClick={() => router.push(`/projects/${activeProject.id}/review`)} />
+                <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => router.push(`/projects/${activeProject.id}/seo`)} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => router.push(`/projects/${activeProject.id}/emails`)} />
+                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"     onClick={() => router.push(`/projects/${activeProject.id}/templates`)} />
+                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}       label="Style Guide"   onClick={() => router.push(`/projects/${activeProject.id}/style-guide`)} />
+                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />}    label="Brand Health"  onClick={() => router.push(`/projects/${activeProject.id}/brand-health`)} />
               </NavGroup>
             </div>
           )}

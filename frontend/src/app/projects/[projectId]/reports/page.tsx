@@ -404,7 +404,7 @@ export default function ReportsPage() {
         {/* Tabs */}
         <div className="flex items-center gap-1 ml-3">
           {([
-            { id: 'digest',   label: 'AI Digest',         icon: <Sparkles className="w-3.5 h-3.5" /> },
+            { id: 'digest',   label: 'Weekly Digest',      icon: <Sparkles className="w-3.5 h-3.5" /> },
             { id: 'research', label: 'Research Reports',  icon: <FlaskConical className="w-3.5 h-3.5" /> },
           ] as { id: Tab; label: string; icon: React.ReactNode }[]).map((t) => (
             <button

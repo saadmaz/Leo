@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   Bell, RefreshCw, Loader2, Globe, CheckCheck,
   TrendingUp, TrendingDown, Minus, ExternalLink, Filter,
@@ -48,6 +48,7 @@ function timeAgo(iso: string) {
 
 export default function MonitoringPage() {
   const params = useParams<{ projectId: string }>()
+  const router = useRouter()
   const [alerts, setAlerts] = useState<MonitorAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
@@ -120,7 +121,25 @@ export default function MonitoringPage() {
         <BackButton />
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold">Brand Monitoring</span>
+          <span className="text-sm font-semibold">Competitors</span>
+        </div>
+        {/* Section tabs */}
+        <div className="hidden sm:flex items-center gap-0.5 rounded-lg border border-border p-0.5 bg-muted/40">
+          <button
+            onClick={() => router.push(`/projects/${params.projectId}/intelligence`)}
+            className="px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Analysis
+          </button>
+          <button
+            onClick={() => router.push(`/projects/${params.projectId}/intelligence/profiles`)}
+            className="px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Profiles
+          </button>
+          <button className="px-3 py-1 rounded-md text-xs font-medium bg-background text-foreground shadow-sm">
+            Monitoring
+          </button>
         </div>
         {unreadCount > 0 && (
           <span className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">

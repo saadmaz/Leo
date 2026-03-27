@@ -299,19 +299,29 @@ export default function IntelligencePage() {
         <BackButton />
         <div className="flex items-center gap-2">
           <BarChart2 className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold">Competitive Intelligence</span>
+          <span className="text-sm font-semibold">Competitors</span>
         </div>
-        {activeProject && (
-          <span className="text-xs text-muted-foreground">— {activeProject.name}</span>
-        )}
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* Section tabs */}
+        <div className="hidden sm:flex items-center gap-0.5 rounded-lg border border-border p-0.5 bg-muted/40 ml-2">
+          <button className="px-3 py-1 rounded-md text-xs font-medium bg-background text-foreground shadow-sm">
+            Analysis
+          </button>
+          <button
+            onClick={() => router.push(`/projects/${params.projectId}/intelligence/profiles`)}
+            className="px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Profiles
+          </button>
           <button
             onClick={() => router.push(`/projects/${params.projectId}/intelligence/monitoring`)}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            className="px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Bell className="w-3.5 h-3.5" /> Monitoring
+            Monitoring
           </button>
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={handleDiscover}
             disabled={discovering}

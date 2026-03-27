@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp,
+  Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp, Hash,
   Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck, Zap, CalendarRange,
   ShieldAlert, ShieldCheck, AlertTriangle, X,
 } from 'lucide-react'
@@ -54,7 +54,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 
 export default function LibraryPage() {
   const params = useParams<{ projectId: string }>()
-  const { activeProject } = useAppStore()
+  const { activeProject, setHashtagPanelOpen } = useAppStore()
 
   const [items, setItems] = useState<ContentLibraryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -246,6 +246,13 @@ export default function LibraryPage() {
           >
             {scoring ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
             Score
+          </button>
+          <button
+            onClick={() => setHashtagPanelOpen(true)}
+            title="Hashtag Research"
+            className="flex items-center gap-1 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Hash className="w-3.5 h-3.5" />
           </button>
           <button onClick={loadItems} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <RefreshCw className="w-3.5 h-3.5" />

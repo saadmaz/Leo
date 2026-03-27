@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   Crosshair, Plus, Trash2, RefreshCw, ExternalLink, X, Globe, Users,
   Building2, DollarSign, Target, TrendingUp,
@@ -681,6 +681,7 @@ function AddCompetitorModal({
 
 export default function CompetitorProfilesPage() {
   const params = useParams<{ projectId: string }>()
+  const router = useRouter()
   const [profiles, setProfiles] = useState<CompetitorProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -851,9 +852,27 @@ export default function CompetitorProfilesPage() {
               <Crosshair className="w-4 h-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-semibold leading-tight">Competitor Profiles</h1>
+              <h1 className="text-sm font-semibold leading-tight">Competitors</h1>
               <p className="text-[11px] text-muted-foreground leading-tight">5-dimension classification engine</p>
             </div>
+          </div>
+          {/* Section tabs */}
+          <div className="hidden sm:flex items-center gap-0.5 rounded-lg border border-border p-0.5 bg-muted/40 ml-2">
+            <button
+              onClick={() => router.push(`/projects/${params.projectId}/intelligence`)}
+              className="px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Analysis
+            </button>
+            <button className="px-3 py-1 rounded-md text-xs font-medium bg-background text-foreground shadow-sm">
+              Profiles
+            </button>
+            <button
+              onClick={() => router.push(`/projects/${params.projectId}/intelligence/monitoring`)}
+              className="px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Monitoring
+            </button>
           </div>
           <div className="flex-1" />
           {/* Stats strip */}

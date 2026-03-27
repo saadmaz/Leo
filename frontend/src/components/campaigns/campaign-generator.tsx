@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Zap, CheckCircle2, XCircle, Loader2, Plus } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
@@ -63,9 +64,10 @@ function StepIcon({ status }: { status: IngestionStep['status'] }) {
 // ---------------------------------------------------------------------------
 
 export function CampaignGenerator() {
+  const router = useRouter()
   const {
     campaignGeneratorOpen, setCampaignGeneratorOpen,
-    activeProject, upsertCampaign, setCampaignPanelOpen, setActiveCampaign,
+    activeProject, upsertCampaign, setActiveCampaign,
     openUpgradeModal,
   } = useAppStore()
 
@@ -140,8 +142,9 @@ export function CampaignGenerator() {
 
   function handleViewCampaign() {
     const latest = useAppStore.getState().campaigns[0]
-    if (latest) { setActiveCampaign(latest); setCampaignPanelOpen(true) }
+    if (latest) setActiveCampaign(latest)
     handleClose()
+    if (activeProject) router.push(`/projects/${activeProject.id}/campaigns`)
   }
 
   return (

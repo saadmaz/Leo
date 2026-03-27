@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { Zap, Check, X, Loader2, BookmarkPlus, ChevronRight, ChevronLeft, Pencil, RefreshCw } from 'lucide-react'
+import { Zap, Check, X, Loader2, BookmarkPlus, ChevronRight, ChevronLeft, Pencil, RefreshCw, Hash } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -14,7 +14,7 @@ const PLATFORM_OPTIONS = ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'X', 'E
 
 export default function BulkGeneratePage() {
   const params = useParams<{ projectId: string }>()
-  const { activeProject } = useAppStore()
+  const { activeProject, setHashtagPanelOpen } = useAppStore()
 
   const [goal, setGoal] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['Instagram', 'Facebook', 'TikTok'])
@@ -159,6 +159,16 @@ export default function BulkGeneratePage() {
         <Zap className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Bulk Content Generator</span>
         {activeProject && <span className="text-xs text-muted-foreground">— {activeProject.name}</span>}
+        <div className="ml-auto">
+          <button
+            onClick={() => setHashtagPanelOpen(true)}
+            title="Hashtag Research"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Hash className="w-3.5 h-3.5" />
+            Hashtags
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">

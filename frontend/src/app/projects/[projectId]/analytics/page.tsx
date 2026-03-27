@@ -9,14 +9,19 @@ import {
 import {
   BarChart2, TrendingUp, FileText, Upload, Sparkles,
   RefreshCw, Clock, CheckCircle2, AlertCircle, Info,
+  Zap, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
 import { api } from '@/lib/api'
 import type {
-  AnalyticsOverview, AnalyticsTrends, ContentPerformanceRow, ActivityEvent,
+  AnalyticsOverview, AnalyticsTrends, ContentPerformanceRow, ActivityEvent, ContentPrediction,
 } from '@/types'
+import { CHANNELS } from '@/components/chat/channel-selector'
+
+type MainTab = 'overview' | 'predict'
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -94,6 +99,7 @@ export default function AnalyticsPage() {
   const params = useParams<{ projectId: string }>()
   const projectId = params.projectId
 
+  const [mainTab, setMainTab] = useState<MainTab>('overview')
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [trends, setTrends] = useState<AnalyticsTrends | null>(null)
   const [content, setContent] = useState<ContentPerformanceRow[]>([])
@@ -175,18 +181,52 @@ export default function AnalyticsPage() {
         <BackButton />
         <BarChart2 className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-semibold">Analytics</span>
-        <div className="ml-auto">
+
+        {/* Tabs */}
+        <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5 bg-muted/40 ml-2">
           <button
-            onClick={load}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border border-border hover:bg-muted transition-colors"
+            onClick={() => setMainTab('overview')}
+            className={cn(
+              'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+              mainTab === 'overview' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            <RefreshCw className="w-3 h-3" />
-            Refresh
+            Overview
           </button>
+          <button
+            onClick={() => setMainTab('predict')}
+            className={cn(
+              'flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors',
+              mainTab === 'predict' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Zap className="w-3 h-3" />
+            Predict
+          </button>
+        </div>
+
+        <div className="ml-auto">
+          {mainTab === 'overview' && (
+            <button
+              onClick={load}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border border-border hover:bg-muted transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Refresh
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Scrollable body */}
+      {/* Predict tab */}
+      {mainTab === 'predict' && (
+        <div className="flex-1 overflow-y-auto">
+          <PredictTab projectId={projectId} />
+        </div>
+      )}
+
+      {/* Overview tab body */}
+      {mainTab === 'overview' && (
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
         {/* Overview cards */}
@@ -432,6 +472,184 @@ export default function AnalyticsPage() {
           </div>
 
         </div>
+      </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Predict tab
+// ---------------------------------------------------------------------------
+
+const PLATFORM_OPTIONS = ['instagram', 'linkedin', 'twitter', 'tiktok', 'facebook', 'email', 'youtube']
+
+const PREDICTION_CONFIG: Record<ContentPrediction['prediction'], { color: string; bg: string }> = {
+  'excellent':     { color: 'text-emerald-600', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+  'above average': { color: 'text-blue-600',    bg: 'bg-blue-500/10 border-blue-500/20' },
+  'average':       { color: 'text-amber-600',   bg: 'bg-amber-500/10 border-amber-500/20' },
+  'below average': { color: 'text-orange-600',  bg: 'bg-orange-500/10 border-orange-500/20' },
+  'poor':          { color: 'text-red-600',     bg: 'bg-red-500/10 border-red-500/20' },
+}
+
+function PredictTab({ projectId }: { projectId: string }) {
+  const [content, setContent] = useState('')
+  const [platform, setPlatform] = useState('instagram')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<ContentPrediction | null>(null)
+
+  async function handlePredict() {
+    if (!content.trim()) { toast.error('Enter some content to predict.'); return }
+    setLoading(true)
+    setResult(null)
+    try {
+      const data = await api.contentPredict.predict(projectId, content.trim(), platform)
+      setResult(data)
+    } catch (err) {
+      const msg = String(err)
+      if (msg.includes('400')) {
+        toast.error('Brand Core not set up yet. Run brand ingestion first.', { duration: 5000 })
+      } else {
+        toast.error('Prediction failed. Try again.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const predCfg = result ? PREDICTION_CONFIG[result.prediction] : null
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div>
+        <h2 className="text-base font-semibold mb-1">Performance Predictor</h2>
+        <p className="text-sm text-muted-foreground">
+          Paste draft content and get a predicted engagement score before you publish.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {/* Platform selector */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-2">Platform</label>
+          <div className="flex flex-wrap gap-1.5">
+            {PLATFORM_OPTIONS.map((p) => {
+              const ch = CHANNELS.find((c) => c.key === p)
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPlatform(p)}
+                  className={cn(
+                    'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                    platform === p
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {ch && <span>{ch.icon}</span>}
+                  <span className="capitalize">{p.replace('_', ' ')}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Paste your draft content here to get a performance prediction..."
+          rows={7}
+          className="w-full text-sm bg-muted/50 border border-border rounded-lg px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors placeholder:text-muted-foreground/50"
+        />
+        <div className="flex justify-end">
+          <button
+            onClick={handlePredict}
+            disabled={loading || !content.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Predicting…</>
+            ) : (
+              <><Zap className="w-3.5 h-3.5" /> Predict performance</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {result && predCfg && (
+        <div className="space-y-4">
+          {/* Main score */}
+          <div className={cn('rounded-xl border p-5', predCfg.bg)}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className={cn('text-4xl font-bold tabular-nums', predCfg.color)}>
+                  {result.score}
+                  <span className="text-lg font-normal text-muted-foreground">/100</span>
+                </div>
+                <div className={cn('text-sm font-medium mt-0.5 capitalize', predCfg.color)}>
+                  {result.prediction} · {result.estimated_engagement} engagement
+                </div>
+              </div>
+              {result.best_posting_time && (
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Best time to post</p>
+                  <p className="text-sm font-medium">{result.best_posting_time}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Dimension bars */}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <ScoreBar label="Hook Strength" value={result.hook_strength} />
+              <ScoreBar label="Clarity" value={result.clarity} />
+              <ScoreBar label="CTA Strength" value={result.cta_strength} />
+              <ScoreBar label="Brand Alignment" value={result.brand_alignment} />
+            </div>
+          </div>
+
+          {result.reasons.length > 0 && (
+            <div className="rounded-xl border border-border p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide">Why this score</p>
+              <ul className="space-y-1">
+                {result.reasons.map((r, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-foreground/80">
+                    <span className="text-muted-foreground mt-0.5 shrink-0">·</span>{r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {result.improvements.length > 0 && (
+            <div className="rounded-xl border border-border p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide">How to improve</p>
+              <ul className="space-y-1">
+                {result.improvements.map((imp, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-foreground/80">
+                    <span className="text-primary mt-0.5 shrink-0">→</span>{imp}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium tabular-nums">{value}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-border overflow-hidden">
+        <div
+          className="h-full rounded-full bg-primary transition-all"
+          style={{ width: `${Math.min(value, 100)}%` }}
+        />
       </div>
     </div>
   )
