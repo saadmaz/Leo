@@ -231,6 +231,13 @@ async def run(
             if fmts:
                 brand_profile["logo_url"] = fmts[0].get("src", "")
 
+    # ── Logo.dev fallback — if Brandfetch returned nothing ──────────────────
+    if not brand_profile.get("logo_url") and settings.LOGO_DEV_API_KEY:
+        brand_profile["logo_url"] = (
+            f"https://img.logo.dev/{domain}"
+            f"?token={settings.LOGO_DEV_API_KEY}&retina=true"
+        )
+
     yield _step("Reading your website...", done=True)
 
     # ── Step 2: Brand.dev typography ────────────────────────────────────────

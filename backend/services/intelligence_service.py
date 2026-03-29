@@ -13,9 +13,21 @@ import json
 import logging
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
 from backend.config import settings
 from backend.services.llm_service import get_client, build_brand_core_context
+
+
+def _logo_url(website: str) -> Optional[str]:
+    """Return a Logo.dev image URL for a given website, or None if key missing."""
+    if not settings.LOGO_DEV_API_KEY or not website:
+        return None
+    parsed = urlparse(website if "://" in website else f"https://{website}")
+    domain = parsed.netloc.lstrip("www.") or parsed.path.lstrip("www.").split("/")[0]
+    if not domain:
+        return None
+    return f"https://img.logo.dev/{domain}?token={settings.LOGO_DEV_API_KEY}&retina=true"
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +172,13 @@ async def refresh_competitor_intelligence(
 
     for competitor in competitors[:5]:  # cap at 5 to control cost
         name = competitor.get("name", "Unknown")
-        scraped: dict = {"name": name, "platforms": {}, "website": competitor.get("website", "")}
+        website = competitor.get("website", "")
+        scraped: dict = {
+            "name": name,
+            "platforms": {},
+            "website": website,
+            "logo_url": _logo_url(website),
+        }
 
         if competitor.get("instagram"):
             try:
@@ -233,6 +251,7 @@ async def refresh_competitor_intelligence(
 
         results.append({
             "name": name,
+            "logo_url": scraped.get("logo_url"),
             "platforms_scraped": list(scraped["platforms"].keys()),
         })
 
@@ -996,7 +1015,13 @@ async def stream_refresh_competitor_intelligence(
 
     for idx, competitor in enumerate(competitors[:5]):
         name = competitor.get("name", "Unknown")
-        scraped: dict = {"name": name, "platforms": {}, "website": competitor.get("website", "")}
+        website = competitor.get("website", "")
+        scraped: dict = {
+            "name": name,
+            "platforms": {},
+            "website": website,
+            "logo_url": _logo_url(website),
+        }
 
         yield _evt(f"[{idx+1}/{total}] Starting analysis of {name}", "zap", competitor=name)
 
