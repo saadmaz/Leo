@@ -1,5 +1,6 @@
 'use client'
 
+import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { BrandProfile } from '@/types'
 
@@ -7,9 +8,10 @@ interface BrandProfileCardProps {
   brandProfile: BrandProfile
   onContinue: () => void
   onEdit: (field: string, value: string) => void
+  loading?: boolean
 }
 
-export function BrandProfileCard({ brandProfile, onContinue }: BrandProfileCardProps) {
+export function BrandProfileCard({ brandProfile, onContinue, loading }: BrandProfileCardProps) {
   const typeLabels: Record<string, string> = {
     educational: '📚 Educational',
     stats: '📊 Stats / Data',
@@ -92,9 +94,14 @@ export function BrandProfileCard({ brandProfile, onContinue }: BrandProfileCardP
 
       <button
         onClick={onContinue}
-        className="w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Looks right, continue →
+        {loading ? (
+          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading questions…</>
+        ) : (
+          'Looks right, continue →'
+        )}
       </button>
     </motion.div>
   )

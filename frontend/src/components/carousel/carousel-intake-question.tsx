@@ -44,6 +44,8 @@ export function CarouselIntakeQuestion({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.2 }}
       className="rounded-xl border border-border bg-card p-4 space-y-3 w-full max-w-md"
     >
       <div className="space-y-0.5">

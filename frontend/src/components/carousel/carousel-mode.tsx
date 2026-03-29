@@ -30,6 +30,8 @@ export function CarouselMode({ projectId, onLeoMessage }: CarouselModeProps) {
   }>({ running: false, current: 0, total: 0, zipUrl: null, done: false })
   const [editInput, setEditInput] = useState('')
   const [editMode, setEditMode] = useState(false)
+  const [continuingToQ1, setContinuingToQ1] = useState(false)
+  const [submittingAnswer, setSubmittingAnswer] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const session = carouselSession
@@ -50,9 +52,10 @@ export function CarouselMode({ projectId, onLeoMessage }: CarouselModeProps) {
 
   // ── Handle intake answer ────────────────────────────────────────────────
   async function handleAnswer(answer: string) {
-    if (!sessionId || !currentQuestion) return
-    const questionNum = currentQuestion.index as number
+    if (!sessionId || !currentQuestion || submittingAnswer) return
+    const questionNum = currentQuestion.index
 
+    setSubmittingAnswer(true)
     updateCarouselSession({
       intakeAnswers: { ...intakeAnswers, [`q${questionNum}`]: answer },
     })
@@ -74,6 +77,8 @@ export function CarouselMode({ projectId, onLeoMessage }: CarouselModeProps) {
     } catch (err) {
       onLeoMessage('Something went wrong. Please try again.')
       console.error(err)
+    } finally {
+      setSubmittingAnswer(false)
     }
   }
 
@@ -177,6 +182,7 @@ export function CarouselMode({ projectId, onLeoMessage }: CarouselModeProps) {
           <BrandProfileCard
             brandProfile={brandProfile}
             onContinue={async () => {
+              setContinuingToQ1(true)
               try {
                 const q1res = await api.carousel.submitIntake(projectId, sessionId, 0, '__init__')
                 updateCarouselSession({
@@ -187,26 +193,30 @@ export function CarouselMode({ projectId, onLeoMessage }: CarouselModeProps) {
                   questionNumber: 1,
                 })
               } catch {
-                // Fallback — show Q1 directly from local definition
                 updateCarouselSession({
                   currentQuestion: { index: 1, text: 'What type of carousel do you want?' },
                   questionNumber: 1,
                 })
+              } finally {
+                setContinuingToQ1(false)
               }
             }}
+            loading={continuingToQ1}
             onEdit={() => {}}
           />
         )}
       </AnimatePresence>
 
       {/* Intake question */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {status === 'intake' && currentQuestion && (
           <IntakeQuestion
+            key={String(currentQuestion.index)}
             question={currentQuestion as CarouselIntakeQuestion}
             questionNumber={questionNumber}
             totalQuestions={totalQuestions}
             brandProfile={brandProfile}
+            disabled={submittingAnswer}
             onAnswer={handleAnswer}
           />
         )}
