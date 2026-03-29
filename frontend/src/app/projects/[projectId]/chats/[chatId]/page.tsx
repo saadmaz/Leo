@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone } from 'lucide-react'
 import { ThinkingIndicator } from '@/components/chat/thinking-indicator'
@@ -29,6 +29,7 @@ function newId() {
 export default function ChatPage() {
   const params = useParams<{ projectId: string; chatId: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
   const [messagesLoading, setMessagesLoading] = useState(false)
@@ -107,6 +108,19 @@ export default function ChatPage() {
       setLoadingEarlier(false)
     }
   }
+
+  // Auto-trigger from ?trigger= query param (e.g. Carousel Studio sidebar button)
+  useEffect(() => {
+    const trigger = searchParams.get('trigger')
+    if (!trigger || messagesLoading) return
+    // Clear the param from the URL without a re-navigation
+    router.replace(`/projects/${params.projectId}/chats/${params.chatId}`, { scroll: false })
+    if (trigger === 'carousel') {
+      // Small delay so the chat page is fully mounted
+      setTimeout(() => handleSubmit('Create an Instagram carousel for my brand'), 400)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, messagesLoading])
 
   // Abort any in-flight stream when navigating away from this chat.
   useEffect(() => {

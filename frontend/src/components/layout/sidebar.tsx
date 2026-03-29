@@ -101,6 +101,20 @@ export function Sidebar() {
     }
   }
 
+  async function newCarouselChat(project: Project) {
+    try {
+      const chat = await api.chats.create(project.id, 'Carousel Studio')
+      setChats([chat, ...chats])
+      setActiveProject(project)
+      setActiveChat(chat)
+      router.push(`/projects/${project.id}/chats/${chat.id}?trigger=carousel`)
+      setSidebarOpen(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to create chat')
+    }
+  }
+
   async function handleRenameProject(project: Project, name: string) {
     try {
       await api.projects.update(project.id, { name })
@@ -292,6 +306,7 @@ export function Sidebar() {
                 <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => router.push(`/projects/${activeProject.id}/bulk`)} />
                 <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => router.push(`/projects/${activeProject.id}/planner`)} />
                 <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}       label="Image Studio"    onClick={() => router.push(`/projects/${activeProject.id}/images`)} />
+                <NavItem icon={<Layers className="w-3.5 h-3.5" />}          label="Carousel Studio" onClick={() => newCarouselChat(activeProject)} />
               </NavGroup>
 
               <NavGroup label="Publish" storageKey="nav_schedule">
