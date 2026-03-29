@@ -282,12 +282,6 @@ async def submit_intake(
         {"intake_answers": intake},
     )
 
-    await asyncio.to_thread(
-        firebase_service.update_carousel_session,
-        project_id, body.session_id,
-        {"intake_answers": intake},
-    )
-
     answered = len([v for v in intake.values() if v])
 
     if answered >= 5:
