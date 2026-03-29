@@ -2337,3 +2337,125 @@ def list_marketing_strategies(project_id: str) -> list[dict]:
         .stream()
     )
     return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Carousel Studio — scrape cache, sessions, carousels
+# ---------------------------------------------------------------------------
+
+def get_brand_scrape_cache(project_id: str) -> Optional[dict]:
+    """Return a fresh (non-expired) scrape cache for this project, or None."""
+    db = get_db()
+    docs = list(
+        db.collection("projects").document(project_id)
+        .collection("brand_scrape_cache")
+        .order_by("fetchedAt", direction="DESCENDING")
+        .limit(1)
+        .stream()
+    )
+    if not docs:
+        return None
+    data = {"id": docs[0].id, **docs[0].to_dict()}
+    expires_at = data.get("expiresAt", "")
+    if expires_at > _utcnow():
+        return data
+    return None
+
+
+def save_brand_scrape_cache(project_id: str, data: dict) -> dict:
+    """Persist a brand scrape cache entry. TTL = 24 hours."""
+    from datetime import datetime, timezone, timedelta
+    now = _utcnow()
+    expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    payload = {**data, "fetchedAt": now, "expiresAt": expires}
+    db = get_db()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("brand_scrape_cache").document()
+    )
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def create_carousel_session(project_id: str, data: dict) -> dict:
+    """Create a new carousel session. Returns the doc with its id."""
+    db = get_db()
+    now = _utcnow()
+    payload = {**data, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("carousel_sessions").document()
+    )
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def get_carousel_session(project_id: str, session_id: str) -> Optional[dict]:
+    """Fetch a carousel session by ID, or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("carousel_sessions").document(session_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def update_carousel_session(project_id: str, session_id: str, data: dict) -> None:
+    """Partially update a carousel session."""
+    db = get_db()
+    data["updatedAt"] = _utcnow()
+    (
+        db.collection("projects").document(project_id)
+        .collection("carousel_sessions").document(session_id)
+        .update(data)
+    )
+
+
+def create_carousel(project_id: str, data: dict) -> dict:
+    """Persist a new carousel document and return it with its id."""
+    db = get_db()
+    now = _utcnow()
+    payload = {**data, "version": 1, "createdAt": now, "updatedAt": now}
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("carousels").document()
+    )
+    ref.set(payload)
+    return {"id": ref.id, **payload}
+
+
+def get_carousel(project_id: str, carousel_id: str) -> Optional[dict]:
+    """Fetch a carousel by ID, or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("carousels").document(carousel_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def update_carousel(project_id: str, carousel_id: str, data: dict) -> None:
+    """Partially update a carousel (increments version automatically)."""
+    db = get_db()
+    data["updatedAt"] = _utcnow()
+    data["version"] = firestore.Increment(1)
+    (
+        db.collection("projects").document(project_id)
+        .collection("carousels").document(carousel_id)
+        .update(data)
+    )
+
+
+def list_carousels(project_id: str) -> list[dict]:
+    """Return all carousels for a project, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("carousels")
+        .order_by("createdAt", direction="DESCENDING")
+        .limit(50)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]

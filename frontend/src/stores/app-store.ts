@@ -184,6 +184,14 @@ interface AppState {
   setStrategySession: (session: import('@/types').StrategySession | null) => void
   updateStrategySession: (patch: Partial<import('@/types').StrategySession>) => void
   resetStrategySession: () => void
+
+  // ---------------------------------------------------------------------------
+  // Carousel Studio
+  // ---------------------------------------------------------------------------
+  carouselSession: import('@/types').CarouselSession | null
+  setCarouselSession: (session: import('@/types').CarouselSession | null) => void
+  updateCarouselSession: (patch: Partial<import('@/types').CarouselSession>) => void
+  resetCarouselSession: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -380,4 +388,15 @@ export const useAppStore = create<AppState>((set) => ({
       strategySession: s.strategySession ? { ...s.strategySession, ...patch } : null,
     })),
   resetStrategySession: () => set({ strategySession: null }),
+
+  // ---------------------------------------------------------------------------
+  // Carousel Studio
+  // ---------------------------------------------------------------------------
+  carouselSession: null,
+  setCarouselSession: (carouselSession) => set({ carouselSession }),
+  updateCarouselSession: (patch) =>
+    set((s) => ({
+      carouselSession: s.carouselSession ? { ...s.carouselSession, ...patch } : null,
+    })),
+  resetCarouselSession: () => set({ carouselSession: null }),
 }))

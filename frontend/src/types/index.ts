@@ -1171,3 +1171,109 @@ export interface DeepSearchHistory {
   createdAt: string
   events: Array<{ type: string; data: unknown }>
 }
+
+// ---------------------------------------------------------------------------
+// Carousel Studio
+// ---------------------------------------------------------------------------
+
+export interface BrandProfile {
+  domain?: string
+  logo_url?: string
+  primary_color: string
+  secondary_color: string
+  background_color: string
+  heading_font: string
+  body_font: string
+  tone: string
+  formality: string
+  personality: string[]
+  avoid_words: string[]
+  dominant_content_type: string
+  instagram_aesthetic: string
+  audience_signal: string
+  suggested_carousel_type: string
+  tagline?: string
+}
+
+export interface CarouselIntakeOption {
+  value: string
+  label: string
+  description: string
+  recommended?: boolean
+}
+
+export interface CarouselIntakeQuestion {
+  index: number | string
+  text: string
+  options?: CarouselIntakeOption[]
+  type?: 'free_text'
+  placeholder?: string
+}
+
+export interface CarouselSlide {
+  index: number
+  type: string
+  background: 'LIGHT_BG' | 'DARK_BG' | 'GRADIENT'
+  tag: string
+  headline: string
+  body: string
+  component: 'stat_block' | 'feature_list' | 'numbered_steps' | 'quote_box' | 'cta_centred' | 'none'
+  component_data: Record<string, unknown>
+}
+
+export interface Carousel {
+  id: string
+  project_id: string
+  session_id?: string
+  title: string
+  carousel_type: string
+  format: 'portrait' | 'square' | 'landscape' | 'stories'
+  design_style: string
+  slide_count: number
+  html_content?: string
+  slide_data?: CarouselSlide[]
+  colour_system?: Record<string, string>
+  heading_font?: string
+  body_font?: string
+  cover_png_url?: string
+  zip_url?: string
+  slide_urls?: string[]
+  version: number
+  status: 'draft' | 'approved' | 'exported'
+  created_at: string
+  updated_at?: string
+}
+
+export interface CarouselSession {
+  sessionId: string
+  status: 'intake' | 'generating' | 'complete'
+  intakeAnswers: Record<string, string>
+  currentQuestion: CarouselIntakeQuestion | null
+  questionNumber: number
+  totalQuestions: number
+  brandProfile: BrandProfile | null
+  scrapingSteps: { message: string; done: boolean }[]
+  scraping: boolean
+  carouselId?: string
+  htmlContent?: string
+  slideCount?: number
+}
+
+// SSE events from carousel scrape endpoint
+export type CarouselScrapeEvent =
+  | { type: 'step'; message: string; done: boolean }
+  | { type: 'done'; brand_profile: BrandProfile; cached?: boolean }
+  | { type: 'error'; message: string }
+
+// SSE events from carousel generate endpoint
+export type CarouselGenerateEvent =
+  | { type: 'status'; message: string }
+  | { type: 'done'; carousel_id: string; html_content: string; slide_count: number; title: string }
+  | { type: 'error'; message: string }
+
+// SSE events from carousel export endpoint
+export type CarouselExportEvent =
+  | { type: 'progress'; slide: number; total: number }
+  | { type: 'status'; message: string }
+  | { type: 'done'; zip_url: string | null; slide_urls: string[]; slide_count: number }
+  | { type: 'error'; message: string }

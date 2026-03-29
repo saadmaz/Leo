@@ -18,6 +18,7 @@ import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import type { ImageAttachment, OptimisticMessage } from '@/types'
 import { StrategyMode } from '@/components/strategy/strategy-mode'
+import { CarouselMode } from '@/components/carousel/carousel-mode'
 
 /** Generate a unique ephemeral id for optimistic messages. */
 function newId() {
@@ -50,6 +51,7 @@ export default function ChatPage() {
     activeChannel, setActiveChannel,
     setCampaignPanelOpen,
     strategySession, setStrategySession,
+    carouselSession, setCarouselSession,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -122,6 +124,20 @@ export default function ChatPage() {
   useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
   // ---------------------------------------------------------------------------
+  // Carousel intent detection
+  // ---------------------------------------------------------------------------
+  const CAROUSEL_PATTERNS = [
+    /\b(create|make|build|generate|design)\b.{0,30}\b(carousel|ig\s+post|instagram\s+post|instagram\s+slide|slide\s+deck)\b/i,
+    /\bcarousel\s+(for|about|on)\b/i,
+    /\binstagram\s+carousel\b/i,
+    /\bcarousel\s+studio\b/i,
+    /\b(make|create)\b.{0,20}\b(slides|swipe)\b.{0,20}\binstagram\b/i,
+  ]
+  function isCarouselIntent(text: string) {
+    return CAROUSEL_PATTERNS.some((p) => p.test(text))
+  }
+
+  // ---------------------------------------------------------------------------
   // Strategy intent detection (client-side keyword matching)
   // ---------------------------------------------------------------------------
   const STRATEGY_PATTERNS = [
@@ -139,6 +155,81 @@ export default function ChatPage() {
   async function handleSubmit(content: string, attachments: ImageAttachment[] = []) {
     if ((!content.trim() && attachments.length === 0) || isStreaming) return
     setInput('')
+
+    // ── Carousel trigger: new carousel studio session ────────────────────────
+    const carouselSess = useAppStore.getState().carouselSession
+    if (!carouselSess && isCarouselIntent(content) && attachments.length === 0) {
+      addMessage({ id: newId(), role: 'user', content })
+      const websiteUrl = activeProject?.websiteUrl ?? ''
+      const instagramUrl = activeProject?.instagramUrl ?? null
+
+      if (!websiteUrl) {
+        addMessage({
+          id: newId(), role: 'assistant',
+          content: "To build your carousel I need your website URL. Add it in your project settings (Brand Core) and try again.",
+        })
+        return
+      }
+
+      try {
+        const sessionRes = await api.carousel.createSession(params.projectId)
+        const sessionId = sessionRes.session_id
+
+        setCarouselSession({
+          sessionId,
+          status: 'intake',
+          intakeAnswers: {},
+          currentQuestion: null,
+          questionNumber: 1,
+          totalQuestions: 5,
+          brandProfile: null,
+          scrapingSteps: [],
+          scraping: true,
+        })
+
+        addMessage({ id: newId(), role: 'assistant', content: "Let me study your brand before we start building. Reading your website and social profiles now…" })
+
+        // Stream brand scraping
+        await api.carousel.scrapeBrand(
+          params.projectId,
+          websiteUrl,
+          instagramUrl,
+          (message, done) => {
+            const store = useAppStore.getState()
+            const current = store.carouselSession?.scrapingSteps ?? []
+            const existing = current.find((s) => s.message === message)
+            if (existing) {
+              useAppStore.getState().updateCarouselSession({
+                scrapingSteps: current.map((s) => s.message === message ? { ...s, done } : s),
+              })
+            } else {
+              useAppStore.getState().updateCarouselSession({
+                scrapingSteps: [...current, { message, done }],
+              })
+            }
+          },
+          (brandProfile) => {
+            useAppStore.getState().updateCarouselSession({
+              brandProfile,
+              scraping: false,
+              // Don't set currentQuestion yet — BrandProfileCard shows first
+            })
+            addMessage({
+              id: newId(), role: 'assistant',
+              content: `Brand profile ready. I found your colours, fonts, and content style. Take a look below — then we'll pick your carousel type.`,
+            })
+          },
+          (err) => {
+            useAppStore.getState().updateCarouselSession({ scraping: false })
+            addMessage({ id: newId(), role: 'assistant', content: `Brand scan had an issue (${err}), but let's continue — I'll use sensible defaults.` })
+          },
+        )
+      } catch (err) {
+        addMessage({ id: newId(), role: 'assistant', content: 'Something went wrong starting Carousel Studio. Please try again.' })
+        console.error(err)
+      }
+      return
+    }
 
     // ── Strategy trigger: new strategy session ──────────────────────────────
     const sess = useAppStore.getState().strategySession
@@ -482,6 +573,14 @@ export default function ChatPage() {
               <StrategyMode
                 projectId={params.projectId}
                 onFollowUp={(msg) => handleSubmit(msg)}
+                onLeoMessage={(content) => addMessage({ id: newId(), role: 'assistant', content })}
+              />
+            )}
+
+            {/* Carousel Studio */}
+            {carouselSession && (
+              <CarouselMode
+                projectId={params.projectId}
                 onLeoMessage={(content) => addMessage({ id: newId(), role: 'assistant', content })}
               />
             )}

@@ -1519,4 +1519,177 @@ export const api = {
       onDone()
     },
   },
+
+  // -------------------------------------------------------------------------
+  // Carousel Studio
+  // -------------------------------------------------------------------------
+  carousel: {
+    /** Stream brand scraping progress. Calls onStep, onDone, onError. */
+    scrapeBrand: async (
+      projectId: string,
+      websiteUrl: string,
+      instagramUrl: string | null,
+      onStep: (message: string, done: boolean) => void,
+      onDone: (brandProfile: import('@/types').BrandProfile) => void,
+      onError: (msg: string) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/carousel/scrape-brand`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ project_id: projectId, website_url: websiteUrl, instagram_url: instagramUrl }),
+        signal,
+      })
+      if (!res.ok) { onError(`Scrape failed: ${res.status}`); return }
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          try {
+            const ev = JSON.parse(payload) as import('@/types').CarouselScrapeEvent
+            if (ev.type === 'step') onStep(ev.message, ev.done)
+            else if (ev.type === 'done') { onDone(ev.brand_profile); return }
+            else if (ev.type === 'error') { onError(ev.message); return }
+          } catch { /* skip */ }
+        }
+      }
+    },
+
+    /** Create a new carousel session. */
+    createSession: (projectId: string) =>
+      post<{ session_id: string; status: string }>(
+        `/projects/${projectId}/carousel/session`,
+        { project_id: projectId },
+      ),
+
+    /** Submit one intake answer, get back next question or ready signal. */
+    submitIntake: (
+      projectId: string,
+      sessionId: string,
+      question: number | string,
+      answer: string,
+    ) =>
+      post<{
+        session_id: string
+        status: string
+        next_question: import('@/types').CarouselIntakeQuestion | null
+        question_number?: number
+        total_questions?: number
+      }>(`/projects/${projectId}/carousel/intake`, {
+        session_id: sessionId,
+        question,
+        answer,
+      }),
+
+    /** Stream carousel generation. */
+    generate: async (
+      projectId: string,
+      sessionId: string,
+      onStatus: (message: string) => void,
+      onDone: (carouselId: string, htmlContent: string, slideCount: number, title: string) => void,
+      onError: (msg: string) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/carousel/generate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ session_id: sessionId }),
+        signal,
+      })
+      if (!res.ok) { onError(`Generation failed: ${res.status}`); return }
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          try {
+            const ev = JSON.parse(payload) as import('@/types').CarouselGenerateEvent
+            if (ev.type === 'status') onStatus(ev.message)
+            else if (ev.type === 'done') { onDone(ev.carousel_id, ev.html_content, ev.slide_count, ev.title); return }
+            else if (ev.type === 'error') { onError(ev.message); return }
+          } catch { /* skip */ }
+        }
+      }
+    },
+
+    /** Apply a natural-language edit to a single slide. */
+    editSlide: (
+      projectId: string,
+      carouselId: string,
+      slideIndex: number,
+      instruction: string,
+    ) =>
+      post<{ updated_html: string; updated_slide: import('@/types').CarouselSlide }>(
+        `/projects/${projectId}/carousel/edit-slide`,
+        { carousel_id: carouselId, slide_index: slideIndex, instruction },
+      ),
+
+    /** Stream PNG export progress. */
+    export: async (
+      projectId: string,
+      carouselId: string,
+      format: string,
+      onProgress: (slide: number, total: number) => void,
+      onDone: (zipUrl: string | null, slideUrls: string[], slideCount: number) => void,
+      onError: (msg: string) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/carousel/export`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ carousel_id: carouselId, format }),
+        signal,
+      })
+      if (!res.ok) { onError(`Export failed: ${res.status}`); return }
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No stream'); return }
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          try {
+            const ev = JSON.parse(payload) as import('@/types').CarouselExportEvent
+            if (ev.type === 'progress') onProgress(ev.slide, ev.total)
+            else if (ev.type === 'done') { onDone(ev.zip_url, ev.slide_urls, ev.slide_count); return }
+            else if (ev.type === 'error') { onError(ev.message); return }
+          } catch { /* skip */ }
+        }
+      }
+    },
+
+    /** List all carousels for a project. */
+    list: (projectId: string) =>
+      get<{ carousels: import('@/types').Carousel[] }>(`/projects/${projectId}/carousel/list`),
+
+    /** Fetch a single carousel with html_content. */
+    get: (projectId: string, carouselId: string) =>
+      get<import('@/types').Carousel>(`/projects/${projectId}/carousel/${carouselId}`),
+  },
 }

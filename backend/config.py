@@ -50,6 +50,8 @@ class Settings(BaseSettings):
 
     # --- Brand Intelligence ---
     LOGO_DEV_API_KEY: Optional[str] = None
+    BRANDFETCH_API_KEY: Optional[str] = None
+    BRAND_DEV_API_KEY: Optional[str] = None
 
     # --- Storage (Cloudflare R2) ---
     CLOUDFLARE_R2_TOKEN: Optional[str] = None
