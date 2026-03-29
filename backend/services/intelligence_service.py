@@ -246,62 +246,82 @@ async def refresh_competitor_intelligence(
                 logger.warning("YouTube scrape failed for %s: %s", name, exc)
 
         if scraped["platforms"]:
-            scraped["analysis"] = await _analyse_competitor(name, scraped["platforms"])
-            firebase_service.save_competitor_snapshot(project_id, scraped)
+            results.append({
+                "name": name,
+                "logo_url": scraped.get("logo_url"),
+                "platforms_scraped": list(scraped["platforms"].keys()),
+                "_scraped": scraped,  # carry for batch analysis below
+            })
+        else:
+            results.append({
+                "name": name,
+                "logo_url": scraped.get("logo_url"),
+                "platforms_scraped": [],
+            })
 
-        results.append({
-            "name": name,
-            "logo_url": scraped.get("logo_url"),
-            "platforms_scraped": list(scraped["platforms"].keys()),
-        })
+    # Batch-analyse all scraped competitors in a SINGLE Claude call instead of N calls.
+    scraped_list = [r.pop("_scraped") for r in results if "_scraped" in r]
+    if scraped_list:
+        analyses = await _analyse_competitors_batch(scraped_list)
+        for scraped in scraped_list:
+            scraped["analysis"] = analyses.get(scraped["name"], {"tone": "Unknown", "key_themes": [], "content_gaps": []})
+            firebase_service.save_competitor_snapshot(project_id, scraped)
 
     return {"refreshed": results}
 
 
-async def _analyse_competitor(name: str, platforms: dict) -> dict:
-    """Use Claude to extract strategic insights from scraped competitor content."""
+async def _analyse_competitors_batch(scraped_list: list[dict]) -> dict:
+    """
+    Analyse up to 5 competitors in a SINGLE Claude call.
+    Returns dict keyed by competitor name → analysis dict.
+    Previously this was N separate calls; batching saves 4 API round-trips.
+    """
     client = get_client()
 
-    content_sections = []
-    for platform, data in platforms.items():
-        raw = data.get("raw_captions") or data.get("raw_text", "")
-        if raw:
-            content_sections.append(f"{platform.upper()} CONTENT:\n{raw[:1500]}")
+    blocks = []
+    for scraped in scraped_list:
+        name = scraped["name"]
+        content_sections = []
+        for platform, data in scraped.get("platforms", {}).items():
+            raw = data.get("raw_captions") or data.get("raw_text", "")
+            if raw:
+                content_sections.append(f"  {platform.upper()}:\n{raw[:800]}")
+        if content_sections:
+            blocks.append(f"COMPETITOR: {name}\n" + "\n".join(content_sections))
 
-    if not content_sections:
-        return {"tone": "Unknown", "key_themes": [], "content_gaps": []}
+    if not blocks:
+        return {}
 
-    combined = "\n\n---\n\n".join(content_sections)
+    competitors_text = "\n\n===\n\n".join(blocks)
 
-    prompt = f"""Analyse this competitor's social media content and extract strategic intelligence.
+    prompt = f"""Analyse each competitor's social media content below. Return ONLY a valid JSON object where each key is the competitor name and the value is their analysis.
 
-COMPETITOR: {name}
+{competitors_text}
 
-THEIR CONTENT:
-{combined}
-
-Return ONLY valid JSON:
+Return format:
 {{
-  "tone": <their voice/tone in 1 sentence>,
-  "key_themes": [<up to 5 recurring topics they post about>],
-  "posting_style": <brief description of their format and style>,
-  "strengths": [<up to 3 things they do well in their content>],
-  "weaknesses": [<up to 3 content gaps or weaknesses>],
-  "content_gaps": [<up to 3 topics or angles they're NOT covering — opportunities for you>],
-  "top_hashtags": [<hashtags they use most>],
-  "engagement_patterns": <what type of content gets most engagement>
+  "<competitor name>": {{
+    "tone": "<voice/tone in 1 sentence>",
+    "key_themes": ["<up to 5 recurring topics>"],
+    "posting_style": "<brief description>",
+    "strengths": ["<up to 3>"],
+    "weaknesses": ["<up to 3>"],
+    "content_gaps": ["<up to 3 opportunities>"],
+    "top_hashtags": ["<most used>"],
+    "engagement_patterns": "<what gets most engagement>"
+  }}
 }}"""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=800,
+        max_tokens=1200,
         messages=[{"role": "user", "content": prompt}],
     )
 
     try:
         return _parse_json_response(response.content[0].text)
     except Exception:
-        return {"tone": "Unknown", "key_themes": [], "content_gaps": []}
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -1011,6 +1031,7 @@ async def stream_refresh_competitor_intelligence(
         yield _evt("Apify API key not configured — skipping social scraping", "warn")
 
     results = []
+    all_scraped_for_batch: list[dict] = []
     total = min(len(competitors), 5)
 
     for idx, competitor in enumerate(competitors[:5]):
@@ -1170,11 +1191,23 @@ async def stream_refresh_competitor_intelligence(
             except Exception as exc:
                 yield _evt(f"Web enrichment skipped for {name}", "warn", str(exc)[:60], name)
 
-        # Claude analysis
+        # Collect for batch analysis — don't call Claude yet
         if scraped["platforms"]:
-            yield _evt(f"Analysing {name}'s content strategy with Claude AI…", "brain", f"{len(scraped['platforms'])} platforms", name)
-            try:
-                scraped["analysis"] = await _analyse_competitor(name, scraped["platforms"])
+            all_scraped_for_batch.append(scraped)
+
+        results.append({
+            "name": name,
+            "platforms_scraped": list(scraped["platforms"].keys()),
+        })
+
+    # Batch Claude analysis — ONE call for all competitors instead of N calls
+    if all_scraped_for_batch:
+        yield _evt(f"Analysing {len(all_scraped_for_batch)} competitor(s) with Claude AI…", "brain", "Single batch call")
+        try:
+            analyses = await _analyse_competitors_batch(all_scraped_for_batch)
+            for scraped in all_scraped_for_batch:
+                name = scraped["name"]
+                scraped["analysis"] = analyses.get(name, {"tone": "Unknown", "key_themes": [], "content_gaps": []})
                 themes_found = scraped["analysis"].get("key_themes", [])
                 yield _evt(
                     f"Analysis complete for {name}",
@@ -1182,21 +1215,12 @@ async def stream_refresh_competitor_intelligence(
                     f"Themes: {', '.join(themes_found[:3])}" if themes_found else "Strategy extracted",
                     name,
                 )
-            except Exception as exc:
-                yield _evt(f"Analysis failed for {name}", "warn", str(exc)[:60], name)
-
-        # Save
-        yield _evt(f"Saving {name} intelligence to database…", "save", "", name)
-        try:
-            firebase_service.save_competitor_snapshot(project_id, scraped)
-            yield _evt(f"{name} saved ✓", "check", "", name)
+                try:
+                    firebase_service.save_competitor_snapshot(project_id, scraped)
+                except Exception as exc:
+                    yield _evt(f"Save failed for {name}", "warn", str(exc)[:60], name)
         except Exception as exc:
-            yield _evt(f"Save failed for {name}", "warn", str(exc)[:60], name)
-
-        results.append({
-            "name": name,
-            "platforms_scraped": list(scraped["platforms"].keys()),
-        })
+            yield _evt("Batch analysis failed", "warn", str(exc)[:80])
 
     # Web analysis in background for all competitors
     if (_settings.EXA_API_KEY or _settings.TAVILY_API_KEY) and results:
@@ -1844,7 +1868,7 @@ Order by relevance_score descending. Only include genuine competitors — no inv
     try:
         response = await client.messages.create(
             model=settings.LLM_CHAT_MODEL,
-            max_tokens=4000,
+            max_tokens=1800,  # competitor discovery JSON (up to 10 competitors), rarely > 1500 tokens
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse_json_response(response.content[0].text)

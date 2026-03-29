@@ -305,7 +305,7 @@ Send days: email 1 = day 0, space subsequent emails 1-4 days apart based on the 
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=4000,
+        max_tokens=2200,  # email sequence JSON (up to 7 emails × ~300 words) rarely exceeds 2000 tokens
         messages=[{"role": "user", "content": prompt}],
     )
     try:
@@ -423,7 +423,7 @@ Return ONLY valid JSON:
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=4000,
+        max_tokens=2200,  # brand playbook JSON with 5 sections, rarely exceeds 2000 tokens
         messages=[{"role": "user", "content": prompt}],
     )
     try:
@@ -496,7 +496,7 @@ Return ONLY the JSON array, no other text."""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=6000,
+        max_tokens=3500,  # content plan JSON for 30 days; 6000 was 2x overprovisioned
         messages=[{"role": "user", "content": prompt}],
     )
     try:

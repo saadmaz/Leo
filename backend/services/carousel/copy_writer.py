@@ -197,7 +197,7 @@ Return EXACTLY {slide_count} slides. Return ONLY this JSON structure:
     client = llm_service.get_client()
     msg = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=4096,
+        max_tokens=2000,  # carousel JSON rarely exceeds 1500 tokens
         system=system_prompt,
         messages=[{"role": "user", "content": user_prompt}],
     )

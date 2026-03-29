@@ -403,7 +403,8 @@ async def stream_chat(
 
     memory_section = f"\n\n{memory_context}" if memory_context else ""
 
-    system_prompt = (
+    # Dynamic portion (changes per project/channel/memory — not cached)
+    dynamic_text = (
         f"You are LEO, a brand-aware marketing co-pilot for the brand '{project_name}'. "
         "You help marketers create on-brand campaigns, content, copy, and strategy "
         "through natural conversation. Always stay on-brand. Be concise, strategic, "
@@ -412,8 +413,19 @@ async def stream_chat(
         + build_brand_core_context(brand_core)
         + memory_section
         + channel_section
-        + ARTIFACT_INSTRUCTIONS
     )
+
+    # System prompt as multi-block list so Anthropic can cache ARTIFACT_INSTRUCTIONS.
+    # The static block (artifact format) is marked with cache_control — Claude caches
+    # it for 5 minutes, costing only 10% of normal input tokens on cache hits.
+    system_prompt = [
+        {"type": "text", "text": dynamic_text},
+        {
+            "type": "text",
+            "text": ARTIFACT_INSTRUCTIONS,
+            "cache_control": {"type": "ephemeral"},
+        },
+    ]
 
     # Trim history to the configured context window to control token cost.
     # LLM_CONTEXT_MESSAGES is the number of *prior* turns to include.
@@ -471,6 +483,11 @@ _CONTENT_INTENT_KEYWORDS = frozenset([
     "email", "ad", "script", "blog", "article", "campaign",
 ])
 
+# In-process trend cache: key = "topic||platform", value = (result_str, expiry_epoch)
+import time as _time
+_trend_cache: dict[str, tuple[str, float]] = {}
+_TREND_CACHE_TTL = 1800  # 30 minutes — trends don't change faster than this
+
 
 async def build_trend_context(
     topic: str,
@@ -479,10 +496,16 @@ async def build_trend_context(
 ) -> str:
     """
     Fetch current trending content signals for a topic + platform combo.
-    Called before stream_chat_with_tools when content-generation intent is detected.
-    Returns a brief trend-context string injected into the system prompt.
-    Uses ~2 Tavily credits. Fast (<1s typical).
+    Results are cached in-process for 30 minutes to avoid burning Tavily
+    credits on repeated messages about the same topic in the same session.
+    Uses ~2 Tavily credits on a cache miss; 0 on a cache hit.
     """
+    cache_key = f"{topic[:60]}||{platform}"
+    now = _time.monotonic()
+    cached = _trend_cache.get(cache_key)
+    if cached and now < cached[1]:
+        return cached[0]
+
     try:
         from backend.services.integrations import tavily_client
         query = f"trending {topic} content {platform} 2025 strategy"
@@ -499,7 +522,9 @@ async def build_trend_context(
             if content:
                 snippets.append(f"- {content}")
         if snippets:
-            return "CURRENT TRENDS (live data):\n" + "\n".join(snippets)
+            result = "CURRENT TRENDS (live data):\n" + "\n".join(snippets)
+            _trend_cache[cache_key] = (result, now + _TREND_CACHE_TTL)
+            return result
     except Exception as exc:
         logger.debug("build_trend_context failed (non-fatal): %s", exc)
     return ""
@@ -565,7 +590,7 @@ async def stream_chat_with_tools(
     memory_section = f"\n\n{memory_context}" if memory_context else ""
     trend_section = f"\n\n{trend_context}" if trend_context else ""
 
-    system_prompt = (
+    dynamic_text = (
         f"You are LEO, a brand-aware marketing co-pilot for the brand '{project_name}'. "
         "You help marketers create on-brand campaigns, content, copy, and strategy "
         "through natural conversation. Always stay on-brand. Be concise, strategic, "
@@ -578,8 +603,16 @@ async def stream_chat_with_tools(
         + memory_section
         + trend_section
         + channel_section
-        + ARTIFACT_INSTRUCTIONS
     )
+
+    system_prompt = [
+        {"type": "text", "text": dynamic_text},
+        {
+            "type": "text",
+            "text": ARTIFACT_INSTRUCTIONS,
+            "cache_control": {"type": "ephemeral"},
+        },
+    ]
 
     context_window = history[-settings.LLM_CONTEXT_MESSAGES:]
     messages = [

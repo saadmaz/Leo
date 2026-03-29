@@ -102,7 +102,7 @@ Make each piece distinct in angle and approach. Be specific, on-brand, and platf
         try:
             response = await client.messages.create(
                 model=settings.LLM_CHAT_MODEL,
-                max_tokens=3000,
+                max_tokens=1800,  # bulk content JSON per-platform chunk, rarely > 1200 tokens
                 messages=[{"role": "user", "content": prompt}],
             )
 
@@ -235,7 +235,7 @@ Use the exact platform names as keys (e.g. "instagram", "linkedin", etc.)."""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=3000,
+        max_tokens=1800,  # platform transform JSON for 6 platforms, rarely > 1500 tokens
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -303,7 +303,7 @@ Generate entries for the full {period} period. Today is 2026-03-22."""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=4000,
+        max_tokens=2500,  # content calendar JSON, rarely > 2000 tokens
         messages=[{"role": "user", "content": prompt}],
     )
 
