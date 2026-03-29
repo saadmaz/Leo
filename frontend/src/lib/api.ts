@@ -1692,4 +1692,28 @@ export const api = {
     get: (projectId: string, carouselId: string) =>
       get<import('@/types').Carousel>(`/projects/${projectId}/carousel/${carouselId}`),
   },
+
+  threads: {
+    /** Check whether the current user has connected their Threads account. */
+    status: () =>
+      get<{ connected: boolean; threads_user_id?: string; expires_at?: string }>('/auth/threads/status'),
+
+    /** Get the OAuth URL to redirect the user to Threads for authorisation. */
+    connect: () =>
+      get<{ auth_url: string }>('/auth/threads/connect'),
+
+    /** Remove the stored Threads token (disconnect). */
+    disconnect: () =>
+      post<{ ok: boolean }>('/auth/threads/disconnect', {}),
+
+    /** Fetch the connected user's Threads profile for a project. */
+    profile: (projectId: string) =>
+      get<{ id: string; username: string; name: string; followers_count: number }>(`/projects/${projectId}/threads/profile`),
+
+    /** Publish a post to Threads. */
+    publish: (
+      projectId: string,
+      payload: { text: string; image_url?: string; carousel_items?: { media_type: string; image_url: string }[] },
+    ) => post<{ ok: boolean; thread_id: string }>(`/projects/${projectId}/publish/threads`, payload),
+  },
 }

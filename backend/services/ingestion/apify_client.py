@@ -29,6 +29,7 @@ TIKTOK_ACTOR    = "clockworks/tiktok-scraper"
 LINKEDIN_ACTOR  = "voyager/linkedin-company-scraper"
 X_ACTOR         = "quacker/twitter-scraper"
 YOUTUBE_ACTOR   = "streamers/youtube-scraper"
+THREADS_ACTOR   = "apidojo/threads-scraper"
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +372,66 @@ async def scrape_youtube(channel_url: str, api_key: str, max_videos: int = 20) -
         "description": channel.get("channelDescription", ""),
         "subscribers": channel.get("numberOfSubscribers", 0),
         "videos": videos,
+        "raw_text": raw_text,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Threads
+# ---------------------------------------------------------------------------
+
+async def scrape_threads(profile_url: str, api_key: str, max_posts: int = 20) -> dict:
+    """
+    Scrape a public Threads profile using the apidojo/threads-scraper actor.
+    Returns profile info, recent posts, and joined captions for brand analysis.
+    Used for competitor intelligence (no OAuth needed for public profiles).
+    """
+    logger.info("Apify: scraping Threads %s", profile_url)
+
+    # Normalise: accept @handle or full URL
+    if not profile_url.startswith("http"):
+        handle = profile_url.lstrip("@")
+        profile_url = f"https://www.threads.net/@{handle}"
+
+    run_input = {
+        "startUrls": [{"url": profile_url}],
+        "maxPosts": max_posts,
+        "proxyConfiguration": {"useApifyProxy": True},
+    }
+
+    try:
+        items = await _run_actor(THREADS_ACTOR, run_input, api_key, timeout=60)
+    except Exception as exc:
+        logger.warning("Threads scrape failed for %s: %s", profile_url, exc)
+        return _empty("threads", url=profile_url)
+
+    if not items:
+        return _empty("threads", url=profile_url)
+
+    posts = [
+        {
+            "text": item.get("text", "") or "",
+            "likes": item.get("likeCount", 0),
+            "replies": item.get("replyCount", 0),
+            "reposts": item.get("repostCount", 0),
+            "timestamp": item.get("timestamp", ""),
+        }
+        for item in items
+    ]
+
+    raw_text = "\n\n---\n\n".join(p["text"] for p in posts if p["text"])
+
+    first = items[0] if items else {}
+    author = first.get("author") or {}
+
+    return {
+        "source_type": "threads",
+        "url": profile_url,
+        "username": author.get("username", ""),
+        "display_name": author.get("fullName", ""),
+        "bio": author.get("bio", ""),
+        "followers": author.get("followerCount", 0),
+        "posts": posts,
         "raw_text": raw_text,
     }
 

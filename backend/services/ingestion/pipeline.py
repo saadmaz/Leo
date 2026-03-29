@@ -69,12 +69,13 @@ async def run(
     linkedin_url: Optional[str] = None,
     x_url: Optional[str] = None,
     youtube_url: Optional[str] = None,
+    threads_url: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """
     Async generator that drives the multi-platform brand ingestion pipeline:
       1. Website scraping via Firecrawl
       2. Instagram scraping via Apify
-      3. Facebook, TikTok, LinkedIn, X, YouTube scraping via Apify (optional)
+      3. Facebook, TikTok, LinkedIn, X, YouTube, Threads scraping via Apify (optional)
       4. Brand Core extraction via Claude
       5. Persist to Firestore
 
@@ -82,7 +83,7 @@ async def run(
     """
     has_any = any([
         website_url, instagram_handle, facebook_url,
-        tiktok_url, linkedin_url, x_url, youtube_url,
+        tiktok_url, linkedin_url, x_url, youtube_url, threads_url,
     ])
     if not has_any:
         yield _error("Provide at least a website URL or one social media link.")
@@ -109,7 +110,7 @@ async def run(
 
     # Count total sources to weight progress bar
     sources = [
-        s for s in [website_url, instagram_handle, facebook_url, tiktok_url, linkedin_url, x_url, youtube_url]
+        s for s in [website_url, instagram_handle, facebook_url, tiktok_url, linkedin_url, x_url, youtube_url, threads_url]
         if s
     ]
     n = max(len(sources), 1)
@@ -266,7 +267,28 @@ async def run(
         yield _progress(current_progress)
 
     # -----------------------------------------------------------------------
-    # Step 8 — Web enrichment via Exa (competitor discovery + similar brands)
+    # Step 8 — Threads
+    # -----------------------------------------------------------------------
+    if threads_url:
+        yield _step("Scraping Threads profile…", "running")
+
+        if not settings.APIFY_API_KEY:
+            yield _step("Threads skipped", "skipped", "APIFY_API_KEY not configured")
+        else:
+            try:
+                result = await apify_client.scrape_threads(threads_url, settings.APIFY_API_KEY)
+                if result.get("raw_text") or result.get("bio"):
+                    scraped_data.append(result)
+                yield _step("Threads content extracted", "done")
+            except Exception as exc:
+                logger.warning("Threads scrape failed: %s", exc)
+                yield _step("Threads scraping failed", "error", str(exc)[:120])
+
+        current_progress += progress_per_source
+        yield _progress(current_progress)
+
+    # -----------------------------------------------------------------------
+    # Step 9 — Web enrichment via Exa (competitor discovery + similar brands)
     # Runs only when website_url is available and EXA_API_KEY is configured.
     # Non-blocking: failures are logged and skipped, never fatal.
     # -----------------------------------------------------------------------

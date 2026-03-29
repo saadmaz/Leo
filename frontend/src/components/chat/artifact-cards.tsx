@@ -203,12 +203,18 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
 function CaptionsCard({ artifact }: { artifact: CaptionsArtifact }) {
   const allText = artifact.captions.map((c) => c.text).join('\n\n---\n\n')
   const allHashtags = artifact.captions.flatMap((c) => c.hashtags).filter((h, i, arr) => arr.indexOf(h) === i)
+  // Build first caption + hashtags as the Threads publish text
+  const firstCaption = artifact.captions[0]
+  const threadsText = firstCaption
+    ? firstCaption.text + (firstCaption.hashtags.length ? '\n\n' + firstCaption.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ') : '')
+    : allText
   return (
     <Card
       icon={<Instagram className="w-3.5 h-3.5" />}
       title={`${artifact.platform} Captions`}
       count={artifact.captions.length}
       saveProps={{ platform: artifact.platform, type: 'caption', content: allText, hashtags: allHashtags }}
+      publishThreadsText={threadsText}
     >
       <div className="space-y-3">
         {artifact.captions.map((cap, i) => (
@@ -938,17 +944,73 @@ function SaveToLibraryButton({
 }
 
 // ---------------------------------------------------------------------------
+// Publish to Threads button
+// ---------------------------------------------------------------------------
+
+function PublishToThreadsButton({ text }: { text: string }) {
+  const { activeProject } = useAppStore()
+  const [publishing, setPublishing] = useState(false)
+  const [published, setPublished] = useState(false)
+
+  async function handlePublish(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!activeProject || published) return
+    setPublishing(true)
+    try {
+      await api.threads.publish(activeProject.id, { text })
+      setPublished(true)
+      toast.success('Published to Threads!')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('401')) {
+        toast.error('Connect your Threads account in Project Settings first')
+      } else {
+        toast.error('Failed to publish to Threads')
+      }
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  if (!activeProject) return null
+
+  return (
+    <button
+      onClick={handlePublish}
+      disabled={publishing || published}
+      title={published ? 'Published to Threads' : 'Publish to Threads'}
+      className={cn(
+        'flex items-center gap-1 text-xs transition-colors',
+        published
+          ? 'text-green-600'
+          : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {publishing ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : published ? (
+        <Check className="w-3 h-3" />
+      ) : (
+        <span className="w-3 h-3 inline-flex items-center justify-center rounded-sm bg-black text-white text-[8px] font-bold leading-none">T</span>
+      )}
+      <span>{published ? 'Published' : 'Threads'}</span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Shared card shell
 // ---------------------------------------------------------------------------
 
 function Card({
-  icon, title, count, copyText, saveProps, children,
+  icon, title, count, copyText, saveProps, publishThreadsText, children,
 }: {
   icon: React.ReactNode
   title: string
   count?: number
   copyText?: string
   saveProps?: Parameters<typeof SaveToLibraryButton>[0]
+  publishThreadsText?: string
   children: React.ReactNode
 }) {
   return (
@@ -964,6 +1026,7 @@ function Card({
         </div>
         <div className="flex items-center gap-3">
           {saveProps && <SaveToLibraryButton {...saveProps} />}
+          {publishThreadsText && <PublishToThreadsButton text={publishThreadsText} />}
           {copyText && <CopyButton text={copyText} inline />}
         </div>
       </div>

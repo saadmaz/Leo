@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Trash2, AlertTriangle, UserPlus, UserMinus, Crown, Users } from 'lucide-react'
+import { X, Loader2, Trash2, AlertTriangle, UserPlus, UserMinus, Crown, Users, Link2, Link2Off } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/stores/app-store'
@@ -81,6 +81,12 @@ export function ProjectSettingsPanel() {
   const [inviting, setInviting]       = useState(false)
   const [removingUid, setRemovingUid] = useState<string | null>(null)
 
+  // Threads connect state
+  const [threadsConnected, setThreadsConnected] = useState(false)
+  const [threadsUsername, setThreadsUsername] = useState<string | null>(null)
+  const [threadsLoading, setThreadsLoading] = useState(false)
+  const [threadsDisconnecting, setThreadsDisconnecting] = useState(false)
+
   // Sync form from activeProject whenever panel opens
   useEffect(() => {
     if (!projectSettingsPanelOpen || !activeProject) return
@@ -112,7 +118,40 @@ export function ProjectSettingsPanel() {
       .then(setMembers)
       .catch(() => toast.error('Failed to load team members'))
       .finally(() => setMembersLoading(false))
+
+    // Check Threads connection status
+    api.threads.status()
+      .then((s) => {
+        setThreadsConnected(s.connected)
+        setThreadsUsername(s.connected ? (s.threads_user_id ?? null) : null)
+      })
+      .catch(() => { /* non-fatal */ })
   }, [projectSettingsPanelOpen, activeProject])
+
+  async function handleThreadsConnect() {
+    setThreadsLoading(true)
+    try {
+      const { auth_url } = await api.threads.connect()
+      window.location.href = auth_url
+    } catch {
+      toast.error('Could not start Threads connection')
+      setThreadsLoading(false)
+    }
+  }
+
+  async function handleThreadsDisconnect() {
+    setThreadsDisconnecting(true)
+    try {
+      await api.threads.disconnect()
+      setThreadsConnected(false)
+      setThreadsUsername(null)
+      toast.success('Threads account disconnected')
+    } catch {
+      toast.error('Failed to disconnect Threads')
+    } finally {
+      setThreadsDisconnecting(false)
+    }
+  }
 
   function handleClose() {
     if (saving || deleting) return
@@ -275,6 +314,47 @@ export function ProjectSettingsPanel() {
                       </select>
                     </div>
                   ))}
+                </div>
+              </section>
+
+              {/* Connected Accounts */}
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Connected Accounts</h3>
+                <div className="rounded-xl border border-border p-4 flex items-center gap-3">
+                  {/* Threads logo — simple T icon */}
+                  <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center shrink-0">
+                    <span className="text-white text-xs font-bold">T</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium">Threads</p>
+                    {threadsConnected && threadsUsername
+                      ? <p className="text-[11px] text-muted-foreground">Connected — user {threadsUsername}</p>
+                      : <p className="text-[11px] text-muted-foreground">Publish posts directly to Threads</p>
+                    }
+                  </div>
+                  {threadsConnected ? (
+                    <button
+                      onClick={handleThreadsDisconnect}
+                      disabled={threadsDisconnecting}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-destructive hover:border-destructive/50 disabled:opacity-40 transition-colors"
+                    >
+                      {threadsDisconnecting
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Link2Off className="w-3 h-3" />}
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleThreadsConnect}
+                      disabled={threadsLoading}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted disabled:opacity-40 transition-colors"
+                    >
+                      {threadsLoading
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Link2 className="w-3 h-3" />}
+                      Connect
+                    </button>
+                  )}
                 </div>
               </section>
 

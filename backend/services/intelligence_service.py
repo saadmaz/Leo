@@ -163,6 +163,7 @@ async def refresh_competitor_intelligence(
         scrape_tiktok,
         scrape_linkedin,
         scrape_youtube,
+        scrape_threads,
     )
 
     if not settings.APIFY_API_KEY:
@@ -244,6 +245,17 @@ async def refresh_competitor_intelligence(
                 }
             except Exception as exc:
                 logger.warning("YouTube scrape failed for %s: %s", name, exc)
+
+        if competitor.get("threads"):
+            try:
+                data = await scrape_threads(competitor["threads"], settings.APIFY_API_KEY)
+                scraped["platforms"]["threads"] = {
+                    "posts": data.get("posts", [])[:10],
+                    "followers": data.get("followers", 0),
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+            except Exception as exc:
+                logger.warning("Threads scrape failed for %s: %s", name, exc)
 
         if scraped["platforms"]:
             results.append({
@@ -1020,7 +1032,7 @@ async def stream_refresh_competitor_intelligence(
     from backend.services import firebase_service
     from backend.services.ingestion.apify_client import (
         scrape_instagram, scrape_facebook, scrape_tiktok,
-        scrape_linkedin, scrape_youtube,
+        scrape_linkedin, scrape_youtube, scrape_threads,
     )
     from backend.config import settings as _settings
 
@@ -1137,6 +1149,21 @@ async def stream_refresh_competitor_intelligence(
                 yield _evt(f"YouTube: {subs:,} subscribers · {len(data.get('videos',[]))} videos", "check", data.get("channel_name",""), name)
             except Exception as exc:
                 yield _evt(f"YouTube scrape failed for {name}", "warn", str(exc)[:80], name)
+
+        # Threads
+        if competitor.get("threads") and _settings.APIFY_API_KEY:
+            yield _evt(f"Scanning {name}'s Threads…", "activity", competitor["threads"][:60], name)
+            try:
+                data = await scrape_threads(competitor["threads"], _settings.APIFY_API_KEY)
+                followers = data.get("followers", 0)
+                scraped["platforms"]["threads"] = {
+                    "posts": data.get("posts", [])[:10],
+                    "followers": followers,
+                    "raw_text": (data.get("raw_text") or "")[:3000],
+                }
+                yield _evt(f"Threads: {followers:,} followers · {len(data.get('posts',[]))} posts", "check", "", name)
+            except Exception as exc:
+                yield _evt(f"Threads scrape failed for {name}", "warn", str(exc)[:80], name)
 
         # Website — Firecrawl
         if competitor.get("website") and _settings.FIRECRAWL_API_KEY:

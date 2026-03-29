@@ -2459,3 +2459,55 @@ def list_carousels(project_id: str) -> list[dict]:
         .stream()
     )
     return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Threads OAuth token storage  (user_integrations/{uid}/threads)
+# ---------------------------------------------------------------------------
+
+def save_threads_token(uid: str, token_data: dict) -> None:
+    """
+    Persist a Threads long-lived token for a user.
+    token_data must contain: access_token, user_id, expires_in (seconds).
+    expires_at is computed and stored as a UTC timestamp string.
+    """
+    import datetime as _dt
+    db = get_db()
+    expires_in = int(token_data.get("expires_in", 5183944))  # ~60 days
+    expires_at = _dt.datetime.utcnow() + _dt.timedelta(seconds=expires_in)
+    payload = {
+        "access_token": token_data.get("access_token", ""),
+        "threads_user_id": token_data.get("user_id", ""),
+        "expires_at": expires_at.isoformat() + "Z",
+        "token_type": token_data.get("token_type", "bearer"),
+        "connected_at": _utcnow(),
+    }
+    (
+        db.collection("user_integrations").document(uid)
+        .collection("threads").document("token")
+        .set(payload)
+    )
+
+
+def get_threads_token(uid: str) -> dict | None:
+    """
+    Retrieve the stored Threads token for a user.
+    Returns None if no token exists.
+    """
+    db = get_db()
+    doc = (
+        db.collection("user_integrations").document(uid)
+        .collection("threads").document("token")
+        .get()
+    )
+    return doc.to_dict() if doc.exists else None
+
+
+def delete_threads_token(uid: str) -> None:
+    """Remove stored Threads token (disconnect)."""
+    db = get_db()
+    (
+        db.collection("user_integrations").document(uid)
+        .collection("threads").document("token")
+        .delete()
+    )

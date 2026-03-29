@@ -54,8 +54,9 @@ class IngestRequest(BaseModel):
     linkedinUrl: Optional[str] = None
     xUrl: Optional[str] = None
     youtubeUrl: Optional[str] = None
+    threadsUrl: Optional[str] = None
 
-    @field_validator("websiteUrl", "facebookUrl", "tiktokUrl", "linkedinUrl", "xUrl", "youtubeUrl", mode="before")
+    @field_validator("websiteUrl", "facebookUrl", "tiktokUrl", "linkedinUrl", "xUrl", "youtubeUrl", "threadsUrl", mode="before")
     @classmethod
     def normalise_url(cls, v: Optional[str]) -> Optional[str]:
         return _normalise_url(v)
@@ -119,8 +120,9 @@ async def ingest_brand(
     linkedin_url     = _pick(body.linkedinUrl,    "linkedinUrl")
     x_url            = _pick(body.xUrl,           "xUrl")
     youtube_url      = _pick(body.youtubeUrl,     "youtubeUrl")
+    threads_url      = _pick(body.threadsUrl,     "threadsUrl")
 
-    has_any = any([website_url, instagram_handle, facebook_url, tiktok_url, linkedin_url, x_url, youtube_url])
+    has_any = any([website_url, instagram_handle, facebook_url, tiktok_url, linkedin_url, x_url, youtube_url, threads_url])
     if not has_any:
         raise HTTPException(
             status_code=422,
@@ -138,6 +140,7 @@ async def ingest_brand(
                 linkedin_url=linkedin_url,
                 x_url=x_url,
                 youtube_url=youtube_url,
+                threads_url=threads_url,
             ):
                 yield _sse(event)
         except Exception as exc:
