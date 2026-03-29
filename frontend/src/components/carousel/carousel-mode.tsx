@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Layers } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
-import type { BrandProfile, CarouselIntakeQuestion } from '@/types'
+import type { CarouselIntakeQuestion } from '@/types'
 import { CarouselScrapingProgress } from './carousel-scraping-progress'
 import { BrandProfileCard } from './brand-profile-card'
 import { CarouselIntakeQuestion as IntakeQuestion } from './carousel-intake-question'
