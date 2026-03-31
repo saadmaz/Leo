@@ -361,6 +361,30 @@ Rules:
 
 
 # ---------------------------------------------------------------------------
+# Simple non-streaming call (used by competitor research, batch analysis)
+# ---------------------------------------------------------------------------
+
+async def call_claude_raw(
+    prompt: str,
+    system: str = "",
+    max_tokens: int = 2048,
+    model: Optional[str] = None,
+) -> str:
+    """
+    Single-turn, non-streaming Claude call. Returns the full text response.
+    Used for batch analysis tasks (competitor research, SWOT synthesis, etc.).
+    """
+    client = get_client()
+    chosen_model = model or settings.LLM_CHAT_MODEL
+    messages = [{"role": "user", "content": prompt}]
+    kwargs: dict = {"model": chosen_model, "max_tokens": max_tokens, "messages": messages}
+    if system:
+        kwargs["system"] = system
+    response = await client.messages.create(**kwargs)
+    return response.content[0].text if response.content else ""
+
+
+# ---------------------------------------------------------------------------
 # Streaming chat
 # ---------------------------------------------------------------------------
 

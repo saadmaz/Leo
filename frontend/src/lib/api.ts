@@ -72,6 +72,13 @@ import type {
   DeepSearchHistory,
   CompetitorProfile,
   ClassifyStreamEvent,
+  DeepResearchEvent,
+  DeepResearchReport,
+  DeepResearchReportSummary,
+  CompetitorMonitor,
+  MonitorChangeAlert,
+  DiscoveredCompetitorSuggestion,
+  CompetitorInput,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -1715,5 +1722,67 @@ export const api = {
       projectId: string,
       payload: { text: string; image_url?: string; carousel_items?: { media_type: string; image_url: string }[] },
     ) => post<{ ok: boolean; thread_id: string }>(`/projects/${projectId}/publish/threads`, payload),
+  },
+
+  deepResearch: {
+    /** Auto-discover competitors from brand core using SerpAPI + Claude. */
+    discover: (projectId: string) =>
+      get<{ competitors: DiscoveredCompetitorSuggestion[] }>(`/projects/${projectId}/competitors/discover`),
+
+    /**
+     * Stream 7-layer deep research for up to 5 competitors.
+     * Yields DeepResearchEvent objects via SSE.
+     */
+    async stream(
+      projectId: string,
+      competitors: CompetitorInput[],
+      onEvent: (event: DeepResearchEvent) => void,
+      onDone: () => void,
+      signal?: AbortSignal,
+    ): Promise<void> {
+      const headers = await authHeaders()
+      const res = await fetch(`${API}/projects/${projectId}/competitors/research`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ competitors }),
+        signal,
+      })
+      if (!res.ok) throw new Error(await extractErrorMessage(res))
+      const reader = res.body!.getReader()
+      return readSSEStream<DeepResearchEvent>(reader, onEvent, onDone)
+    },
+
+    /** List all deep research reports for a project (lightweight). */
+    listReports: (projectId: string) =>
+      get<{ reports: DeepResearchReportSummary[] }>(`/projects/${projectId}/competitors/reports`),
+
+    /** Fetch a single full research report. */
+    getReport: (projectId: string, reportId: string) =>
+      get<DeepResearchReport>(`/projects/${projectId}/competitors/reports/${reportId}`),
+
+    /** Set up weekly competitor monitoring. */
+    createMonitor: (
+      projectId: string,
+      payload: { competitor: CompetitorInput; frequency?: 'weekly' | 'monthly' },
+    ) => post<CompetitorMonitor>(`/projects/${projectId}/competitors/monitor`, payload),
+
+    /** List all active competitor monitors. */
+    listMonitors: (projectId: string) =>
+      get<{ monitors: CompetitorMonitor[] }>(`/projects/${projectId}/competitors/monitors`),
+
+    /** Deactivate a monitor. */
+    deleteMonitor: (projectId: string, monitorId: string) =>
+      del(`/projects/${projectId}/competitors/monitors/${monitorId}`),
+
+    /** Manually trigger a monitor diff run. */
+    runMonitor: (projectId: string, monitorId: string) =>
+      post<{ changes: MonitorChangeAlert[]; has_significant_changes: boolean }>(
+        `/projects/${projectId}/competitors/monitors/${monitorId}/run`,
+        {},
+      ),
+
+    /** Get alerts for a monitor. */
+    listAlerts: (projectId: string, monitorId: string) =>
+      get<{ alerts: MonitorChangeAlert[] }>(`/projects/${projectId}/competitors/monitors/${monitorId}/alerts`),
   },
 }

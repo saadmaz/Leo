@@ -1277,3 +1277,169 @@ export type CarouselExportEvent =
   | { type: 'status'; message: string }
   | { type: 'done'; zip_url: string | null; slide_urls: string[]; slide_count: number }
   | { type: 'error'; message: string }
+
+// ---------------------------------------------------------------------------
+// Competitor Deep Research — 7-Layer Intelligence Engine
+// ---------------------------------------------------------------------------
+
+export interface CompetitorInput {
+  name: string
+  website?: string
+  domain?: string
+  instagram?: string
+  tiktok?: string
+  facebook?: string
+  linkedin?: string
+  youtube?: string
+}
+
+export interface CompetitorOverview {
+  headline: string
+  value_prop: string
+  target_customer: string
+  tone: string
+  pricing_model: string
+  price_anchor: string
+  top_claims: string[]
+  trust_signals: string[]
+  threat_level: 'high' | 'medium' | 'low'
+  strengths_vs_us: string[]
+  weaknesses_vs_us: string[]
+}
+
+export interface CompetitorPaidAds {
+  ads_found: number
+  most_used_hook: string
+  dominant_cta: string
+  primary_offer: string
+  ad_formats: { image: number; video: number; carousel: number }
+  messaging_themes: string[]
+  longest_running_ad: { copy: string; days_active: number }
+  target_audience_signals: string
+  estimated_ad_budget_signal: 'low' | 'medium' | 'high'
+  winning_angle: string
+}
+
+export interface CompetitorSocialContent {
+  platforms_scraped: string[]
+  posting_frequency: Record<string, string>
+  best_performing_format: string
+  top_content_themes: string[]
+  best_posting_times: string[]
+  avg_engagement_rate: string
+  caption_style: string
+  top_hashtags: string[]
+  content_they_avoid: string[]
+  viral_content_pattern: string
+  weaknesses: string[]
+  platform_raw: Record<string, { followers: number; post_count: number; top_hashtags: string[] }>
+}
+
+export interface CompetitorSEO {
+  seo_strength: 'low' | 'medium' | 'high'
+  indexed_pages: number
+  ranking_keywords: string[]
+  google_ads_running: boolean
+  google_ad_message: string
+  autocomplete_signals: string[]
+  trending_vs_us: 'growing' | 'declining' | 'stable'
+  seo_gap_for_us: string
+}
+
+export interface CompetitorSentiment {
+  overall_sentiment: 'positive' | 'mixed' | 'negative' | 'unknown'
+  top_praise: string[]
+  top_complaints: string[]
+  feature_requests: string[]
+  churn_signals: string[]
+  brand_loyalty_signals: string[]
+  unmet_needs: string[]
+}
+
+export interface CompetitorContentMap {
+  owned_topics: string[]
+  publishing_frequency: string
+  content_format_preference: string
+  topics_they_avoid: string[]
+  seo_content_pillars: string[]
+  our_opportunity_topics: string[]
+}
+
+export interface CompetitorSWOT {
+  strengths: string[]
+  weaknesses: string[]
+  opportunities_for_us: string[]
+  threats_to_us: string[]
+  positioning_summary: string
+  how_they_win_customers: string
+  how_we_beat_them: string
+  threat_level: 'high' | 'medium' | 'low'
+  steal_this: {
+    tactic: string
+    why_it_works: string
+    our_version: string
+  }
+}
+
+export interface DeepResearchReport {
+  id: string
+  run_id: string
+  project_id: string
+  competitor: CompetitorInput & { logo_url?: string }
+  overview: CompetitorOverview
+  paid_ads: CompetitorPaidAds
+  social_content: CompetitorSocialContent
+  seo: CompetitorSEO
+  sentiment: CompetitorSentiment
+  content_map: CompetitorContentMap
+  strategic_swot: CompetitorSWOT
+  created_at: string
+}
+
+export interface DeepResearchReportSummary {
+  id: string
+  run_id: string
+  competitor: CompetitorInput & { logo_url?: string }
+  threat_level: 'high' | 'medium' | 'low'
+  created_at: string
+}
+
+export interface CompetitorMonitor {
+  id: string
+  project_id: string
+  competitor: CompetitorInput
+  frequency: 'weekly' | 'monthly'
+  is_active: boolean
+  last_run_at: string | null
+  last_snapshot: Record<string, unknown>
+  has_significant_changes: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MonitorChangeAlert {
+  id: string
+  monitor_id: string
+  type: 'new_ads_launched' | 'ads_pulled' | 'frequency_change' | 'new_content_theme' | 'content_spike'
+  description: string
+  is_significant: boolean
+  created_at: string
+}
+
+export interface DiscoveredCompetitorSuggestion {
+  name: string
+  domain: string
+  website: string
+  reason: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+// SSE events from deep research endpoint
+export type DeepResearchEvent =
+  | { type: 'run_started'; run_id: string; competitor_count: number }
+  | { type: 'competitor_started'; name: string }
+  | { type: 'layer_started'; layer: number; name: string; message: string }
+  | { type: 'layer_done'; layer: number; name: string }
+  | { type: 'competitor_done'; name: string; report_id: string }
+  | { type: 'research_complete'; run_id: string; reports: { id: string; name: string }[] }
+  | { type: 'error'; message: string }

@@ -120,6 +120,15 @@ function buildCommands(
       action: (pid) => router.push(`/projects/${pid}/intelligence`),
     },
     {
+      id: 'deep-research',
+      label: 'Deep Competitor Research',
+      description: '7-layer competitor intelligence engine',
+      icon: <BarChart2 className="w-4 h-4" />,
+      section: 'navigation',
+      projectRequired: true,
+      action: (pid) => router.push(`/projects/${pid}/intelligence/deep-research`),
+    },
+    {
       id: 'deep-search',
       label: 'Deep Search',
       description: 'AI-powered web research',

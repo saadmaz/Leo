@@ -2511,3 +2511,146 @@ def delete_threads_token(uid: str) -> None:
         .collection("threads").document("token")
         .delete()
     )
+
+
+# ---------------------------------------------------------------------------
+# Competitor Deep Research — Reports
+# ---------------------------------------------------------------------------
+
+def save_competitor_report(project_id: str, report: dict) -> dict:
+    """
+    Persist a completed 7-layer competitor research report.
+    Stored under projects/{id}/competitor_reports/{report_id}.
+    """
+    db = get_db()
+    report_id = report.get("id") or db.collection("projects").document(project_id).collection("competitor_reports").document().id
+    payload = {**report, "id": report_id, "project_id": project_id}
+    (
+        db.collection("projects").document(project_id)
+        .collection("competitor_reports").document(report_id)
+        .set(payload)
+    )
+    return payload
+
+
+def get_competitor_report(project_id: str, report_id: str) -> Optional[dict]:
+    """Return a single competitor report or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_reports").document(report_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def list_competitor_reports(project_id: str) -> list[dict]:
+    """Return all competitor reports for a project, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_reports")
+        .order_by("created_at", direction="DESCENDING")
+        .limit(50)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Competitor Deep Research — Monitors
+# ---------------------------------------------------------------------------
+
+def save_competitor_monitor(project_id: str, monitor: dict) -> dict:
+    """Create a new competitor monitor record."""
+    db = get_db()
+    now = _utcnow()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors").document()
+    )
+    payload = {
+        **monitor,
+        "id": ref.id,
+        "project_id": project_id,
+        "is_active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    ref.set(payload)
+    return payload
+
+
+def get_competitor_monitor(project_id: str, monitor_id: str) -> Optional[dict]:
+    """Return a single competitor monitor or None."""
+    db = get_db()
+    doc = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors").document(monitor_id)
+        .get()
+    )
+    return {"id": doc.id, **doc.to_dict()} if doc.exists else None
+
+
+def list_competitor_monitors(project_id: str) -> list[dict]:
+    """Return all active competitor monitors for a project."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors")
+        .where("is_active", "==", True)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def update_competitor_monitor(project_id: str, monitor_id: str, updates: dict) -> None:
+    """Update fields on an existing monitor."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors").document(monitor_id)
+        .update({**updates, "updated_at": _utcnow()})
+    )
+
+
+def delete_competitor_monitor(project_id: str, monitor_id: str) -> None:
+    """Soft-delete (deactivate) a monitor."""
+    db = get_db()
+    (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors").document(monitor_id)
+        .update({"is_active": False, "updated_at": _utcnow()})
+    )
+
+
+# ---------------------------------------------------------------------------
+# Competitor Deep Research — Monitor Alerts
+# ---------------------------------------------------------------------------
+
+def save_monitor_alert(project_id: str, monitor_id: str, alert: dict) -> dict:
+    """Save a monitor change alert."""
+    db = get_db()
+    now = _utcnow()
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors").document(monitor_id)
+        .collection("alerts").document()
+    )
+    payload = {**alert, "id": ref.id, "monitor_id": monitor_id, "created_at": now}
+    ref.set(payload)
+    return payload
+
+
+def list_monitor_alerts(project_id: str, monitor_id: str) -> list[dict]:
+    """Return all alerts for a monitor, newest first."""
+    db = get_db()
+    docs = (
+        db.collection("projects").document(project_id)
+        .collection("competitor_monitors").document(monitor_id)
+        .collection("alerts")
+        .order_by("created_at", direction="DESCENDING")
+        .limit(30)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]
