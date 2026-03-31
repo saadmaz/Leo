@@ -4,11 +4,11 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Search, Plus, X, Loader2, CheckCircle2, AlertTriangle, Zap,
-  Globe, Instagram, Youtube, Linkedin, Facebook, Activity,
-  ChevronDown, ChevronUp, ExternalLink, Copy, Check,
+  Globe, Activity,
+  ChevronDown, ChevronUp, ExternalLink,
   TrendingUp, TrendingDown, Minus, Shield, Flame,
-  BarChart2, Megaphone, Hash, Users, Star, Target,
-  ArrowRight, Eye, Lock, BookOpen, RefreshCw, Bell,
+  BarChart2, Megaphone, Users, Star, Target,
+  ArrowRight, Eye, BookOpen, RefreshCw, Bell,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -71,33 +71,6 @@ const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode }[] = [
 // Small helpers
 // ---------------------------------------------------------------------------
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-    >
-      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-    </button>
-  )
-}
-
-function Pill({ label, color = 'default' }: { label: string; color?: 'red' | 'green' | 'amber' | 'blue' | 'default' }) {
-  const colors = {
-    red:    'bg-red-500/10 text-red-500 border-red-500/20',
-    green:  'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-    amber:  'bg-amber-500/10 text-amber-600 border-amber-500/20',
-    blue:   'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    default:'bg-muted text-muted-foreground border-border',
-  }
-  return (
-    <span className={cn('px-2 py-0.5 rounded text-[11px] border font-medium', colors[color])}>
-      {label}
-    </span>
-  )
-}
-
 function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -114,7 +87,7 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   )
 }
 
-function StringList({ items, color }: { items: string[]; color?: 'red' | 'green' | 'amber' | 'blue' | 'default' }) {
+function StringList({ items }: { items: string[]; color?: 'red' | 'green' | 'amber' | 'blue' | 'default' }) {
   if (!items?.length) return <p className="text-xs text-muted-foreground italic">No data</p>
   return (
     <ul className="space-y-1">
@@ -229,7 +202,7 @@ function OverviewTab({ report }: { report: DeepResearchReport }) {
               {competitor.website}<ExternalLink className="w-2.5 h-2.5" />
             </a>
           )}
-          {overview.headline && <p className="text-xs mt-2 italic text-muted-foreground">"{overview.headline}"</p>}
+          {overview.headline && <p className="text-xs mt-2 italic text-muted-foreground">&ldquo;{overview.headline}&rdquo;</p>}
         </div>
       </div>
 
