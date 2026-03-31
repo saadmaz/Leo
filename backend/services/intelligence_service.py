@@ -1575,7 +1575,28 @@ async def discover_competitors(
     )
 
     raw_web_results = [tavily_answer] + tavily_snippets if tavily_answer else tavily_snippets
-    candidates = exa_similar_results + exa_company_results
+    raw_candidates = exa_similar_results + exa_company_results
+
+    # Deduplicate candidates by domain and name
+    _seen_domains: set[str] = set()
+    _seen_names: set[str] = set()
+    candidates: list[dict] = []
+    for _c in raw_candidates:
+        _cname = (_c.get("name") or "").strip().lower()
+        _curl = _c.get("url") or ""
+        try:
+            from urllib.parse import urlparse as _urlparse
+            _cdomain = _urlparse(_curl).netloc.lstrip("www.").lower()
+        except Exception:
+            _cdomain = ""
+        if not _cname:
+            continue
+        if (_cdomain and _cdomain in _seen_domains) or _cname in _seen_names:
+            continue
+        if _cdomain:
+            _seen_domains.add(_cdomain)
+        _seen_names.add(_cname)
+        candidates.append(_c)
 
     # ── 4. Claude: synthesise everything into rich profiles ──────────────────
     client = get_client()
@@ -1835,13 +1856,34 @@ async def stream_discover_competitors(
     # ── 7. Claude synthesises everything into up to 12 competitors ───────────
     yield _evt("Synthesising all intelligence with Claude AI…", "brain")
 
+    # Deduplicate candidates by domain before synthesis and fallback
+    _seen_domains: set[str] = set()
+    _seen_names: set[str] = set()
+    deduped_candidates: list[dict] = []
+    for _c in candidates:
+        _cname = (_c.get("name") or "").strip().lower()
+        _curl = _c.get("url") or ""
+        try:
+            from urllib.parse import urlparse as _urlparse
+            _cdomain = _urlparse(_curl).netloc.lstrip("www.").lower()
+        except Exception:
+            _cdomain = ""
+        if not _cname:
+            continue
+        if (_cdomain and _cdomain in _seen_domains) or _cname in _seen_names:
+            continue
+        if _cdomain:
+            _seen_domains.add(_cdomain)
+        _seen_names.add(_cname)
+        deduped_candidates.append(_c)
+
     client = get_client()
     brand_context = build_brand_core_context(brand_core)
     web_context = "\n\n".join(filter(None, raw_web_results[:15]))
     candidate_list = "\n".join(
         f"- {c['name']} ({c['url']}): {c.get('snippet','')[:200]}"
         + (f" | Socials: {c['socials']}" if c.get('socials') else "")
-        for c in candidates[:15]
+        for c in deduped_candidates[:15]
         if c.get("name") and c["name"] not in existing
     )
 
@@ -1911,7 +1953,7 @@ Order by relevance_score descending. Only include genuine competitors — no inv
                 "why_competitor": "Similar company in the same space",
                 "relevance_score": 0.6,
             }
-            for c in candidates[:12] if c.get("name") and c["name"] not in existing
+            for c in deduped_candidates[:12] if c.get("name") and c["name"] not in existing
         ]
         yield _evt(f"Returning {len(fallback)} candidates", "done")
         yield {"type": "result", "competitors": fallback}
