@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ArrowRight, SkipForward } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion } from '@/types'
@@ -30,9 +30,6 @@ export function InterviewQuestionCard({
   const hasChips = question.chips && question.chips.length > 0
   // Writing samples question gets special treatment
   const isWritingSamples = question.key === 'C_writing_samples'
-  // Chips-only questions (no textarea) — ones with chips AND no free text expected
-  const chipsOnly = hasChips && !['A_what_do_you_stand_for', 'C_avoided_language'].includes(question.key)
-
   function toggleChip(chip: string) {
     setSelected((prev) =>
       prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip],

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Loader2, RefreshCw, TrendingUp, Users, BarChart2, Star, Calendar, Sparkles,
+  Loader2, RefreshCw, TrendingUp, Users, BarChart2, Star, Sparkles,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -144,7 +144,7 @@ function WeeklyBriefCard({ brief }: { brief: WeeklyBrief }) {
     <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
       <div className="flex items-center gap-2">
         <Sparkles className="w-4 h-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">This Week's Brief</h3>
+        <h3 className="text-sm font-semibold text-foreground">This Week&apos;s Brief</h3>
         <span className="text-[10px] text-muted-foreground ml-auto">
           {brief.generatedAt ? new Date(brief.generatedAt).toLocaleDateString() : ''}
         </span>
@@ -187,23 +187,24 @@ export default function PersonalBrandAnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  async function load() {
-    try {
-      const [snaps, weeklyBrief] = await Promise.allSettled([
-        api.persona.getAnalytics(params.projectId) as Promise<AnalyticsSnapshot[]>,
-        api.persona.getWeeklyBrief(params.projectId) as Promise<WeeklyBrief>,
-      ])
-      if (snaps.status === 'fulfilled') setSnapshots(snaps.value ?? [])
-      if (weeklyBrief.status === 'fulfilled' && weeklyBrief.value) setBrief(weeklyBrief.value)
-    } catch {
-      // Non-critical — page shows empty state
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+  useEffect(() => {
+    async function load() {
+      try {
+        const [snaps, weeklyBrief] = await Promise.allSettled([
+          api.persona.getAnalytics(params.projectId) as Promise<AnalyticsSnapshot[]>,
+          api.persona.getWeeklyBrief(params.projectId) as Promise<WeeklyBrief>,
+        ])
+        if (snaps.status === 'fulfilled') setSnapshots(snaps.value ?? [])
+        if (weeklyBrief.status === 'fulfilled' && weeklyBrief.value) setBrief(weeklyBrief.value)
+      } catch {
+        // Non-critical — page shows empty state
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
-  }
-
-  useEffect(() => { load() }, [params.projectId])
+    load()
+  }, [params.projectId])
 
   // Load Personal Core for the name display
   useEffect(() => {
@@ -213,7 +214,18 @@ export default function PersonalBrandAnalyticsPage() {
 
   async function handleRefresh() {
     setRefreshing(true)
-    await load()
+    try {
+      const [snaps, weeklyBrief] = await Promise.allSettled([
+        api.persona.getAnalytics(params.projectId) as Promise<AnalyticsSnapshot[]>,
+        api.persona.getWeeklyBrief(params.projectId) as Promise<WeeklyBrief>,
+      ])
+      if (snaps.status === 'fulfilled') setSnapshots(snaps.value ?? [])
+      if (weeklyBrief.status === 'fulfilled' && weeklyBrief.value) setBrief(weeklyBrief.value)
+    } catch {
+      // Non-critical
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   // Compute overall consistency score (average of all platforms)

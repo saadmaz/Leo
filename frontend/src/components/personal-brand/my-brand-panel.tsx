@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, User, Target, Mic2, BookOpen, BarChart2, ChevronDown, ChevronUp,
-  Edit2, Check, RefreshCw, Loader2,
+  Check, RefreshCw, Loader2,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
@@ -213,7 +213,7 @@ export function MyBrandPanel() {
               <Section icon={<Target className="w-3.5 h-3.5" />} title="Identity">
                 {core.positioningStatement && (
                   <blockquote className="text-xs text-foreground italic border-l-2 border-primary pl-3 py-0.5 leading-relaxed">
-                    "{core.positioningStatement}"
+                    &quot;{core.positioningStatement}&quot;
                   </blockquote>
                 )}
                 {core.uniqueAngle && (
@@ -256,7 +256,7 @@ export function MyBrandPanel() {
                         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Signature Phrases</p>
                         <div className="space-y-1">
                           {voice.signaturePhrases.slice(0, 5).map((p) => (
-                            <p key={p} className="text-xs text-foreground italic">"{p}"</p>
+                            <p key={p} className="text-xs text-foreground italic">&quot;{p}&quot;</p>
                           ))}
                         </div>
                       </div>
@@ -304,7 +304,7 @@ export function MyBrandPanel() {
               <Section icon={<BarChart2 className="w-3.5 h-3.5" />} title="Platforms" defaultOpen={false}>
                 {core.platformStrategy && Object.keys(core.platformStrategy).length > 0 ? (
                   <div className="space-y-2">
-                    {Object.entries(core.platformStrategy).map(([platform, cfg]: [string, any]) => (
+                    {Object.entries(core.platformStrategy as Record<string, { focusLevel?: string; postsPerWeek?: number }>).map(([platform, cfg]) => (
                       <div key={platform} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
                         <div>
                           <p className="text-xs font-medium text-foreground capitalize">{platform}</p>

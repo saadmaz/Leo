@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronRight, ChevronLeft, Loader2, Check, Building2, User } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -237,11 +237,6 @@ export function ProjectWizard() {
     setPromptModel('claude-opus-4-6')
   }
 
-  function selectType(type: 'business' | 'personal') {
-    setProjectType(type)
-    setStep(0)
-  }
-
   // Business: Step 0 → Step 1
   function goToLinks() {
     if (!name.trim()) return
@@ -256,12 +251,6 @@ export function ProjectWizard() {
     setSocialErrors(errors)
     if (Object.keys(errors).length > 0) return
     setStep(2)
-  }
-
-  // Personal: Step 0 → Step 1
-  function personalGoToModels() {
-    if (!name.trim()) return
-    setStep(1)
   }
 
   async function handleSubmit() {

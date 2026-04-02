@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Loader2, MessageSquare, Map, Mic2, Search, ChevronRight,
@@ -90,7 +90,7 @@ function ChecklistItem({ done, label, href }: { done: boolean; label: string; hr
 // Platform row
 // ---------------------------------------------------------------------------
 
-function PlatformRow({ platform, cfg }: { platform: string; cfg: any }) {
+function PlatformRow({ platform, cfg }: { platform: string; cfg: { focusLevel?: string; postsPerWeek?: number } }) {
   const focusColor: Record<string, string> = {
     primary: 'text-primary bg-primary/10',
     secondary: 'text-amber-600 bg-amber-500/10',
@@ -120,7 +120,6 @@ function PlatformRow({ platform, cfg }: { platform: string; cfg: any }) {
 
 export default function PersonalBrandDashboardPage() {
   const params = useParams<{ projectId: string }>()
-  const router = useRouter()
   const { personalCore, setPersonalCore, setMyBrandPanelOpen } = useAppStore()
   const [core, setCore] = useState<PersonalCore | null>(personalCore)
   const [loading, setLoading] = useState(!personalCore)
@@ -301,7 +300,7 @@ export default function PersonalBrandDashboardPage() {
               </Link>
             </div>
             <div className="divide-y divide-border/50">
-              {Object.entries(core.platformStrategy).map(([platform, cfg]: [string, any]) => (
+              {Object.entries(core.platformStrategy as Record<string, { focusLevel?: string; postsPerWeek?: number }>).map(([platform, cfg]) => (
                 <PlatformRow key={platform} platform={platform} cfg={cfg} />
               ))}
             </div>

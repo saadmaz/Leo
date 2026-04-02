@@ -178,6 +178,7 @@ export default function ChatPage() {
   // ---------------------------------------------------------------------------
   // Personal brand content intent detection (only active for personal projects)
   // ---------------------------------------------------------------------------
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function getPersonalContentMode(text: string): string | null {
     if (activeProject?.projectType !== 'personal') return null
     if (/thought leadership|long.?form|linkedin article|write.*opinion|my take on/i.test(text)) return 'thought_leadership'

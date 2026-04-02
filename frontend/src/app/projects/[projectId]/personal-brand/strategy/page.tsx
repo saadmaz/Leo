@@ -60,9 +60,17 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
 // Platform Plan Tab
 // ---------------------------------------------------------------------------
 
-function PlatformPlanTab({ projectId, core }: { projectId: string; core: any }) {
+interface StrategyData {
+  platformAllocation?: Record<string, { percentage?: number; focusLevel?: string; postsPerWeek?: number; contentMix?: string[] }>
+  contentStrategy?: Array<{ pillar: string; angle: string; formats: string[]; frequency: string; sampleTopics: string[] }>
+  roadmap?: Record<string, { focus: string; metrics: string[]; experiments: string[]; milestones: string[] }>
+  quickWins?: string[]
+  differentiationStatement?: string
+}
+
+function PlatformPlanTab({ projectId }: { projectId: string }) {
   const [generating, setGenerating] = useState(false)
-  const [strategy, setStrategy] = useState<any>(null)
+  const [strategy, setStrategy] = useState<StrategyData | null>(null)
   const [steps, setSteps] = useState<string[]>([])
   const ctrlRef = useRef<AbortController | null>(null)
 
@@ -216,7 +224,7 @@ function PlatformPlanTab({ projectId, core }: { projectId: string; core: any }) 
 
 function NicheResearchTab({ projectId }: { projectId: string }) {
   const [researching, setResearching] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<Record<string, unknown> | null>(null)
   const [steps, setSteps] = useState<string[]>([])
   const ctrlRef = useRef<AbortController | null>(null)
 
@@ -244,7 +252,7 @@ function NicheResearchTab({ projectId }: { projectId: string }) {
         <div className="text-center max-w-xs">
           <h3 className="text-base font-semibold text-foreground">Research your niche</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            LEO finds the top voices in your space and identifies the gaps they're leaving open.
+            LEO finds the top voices in your space and identifies the gaps they&apos;re leaving open.
           </p>
         </div>
         <button
@@ -321,15 +329,13 @@ function NicheResearchTab({ projectId }: { projectId: string }) {
 // Profile Audit Tab
 // ---------------------------------------------------------------------------
 
-function ProfileAuditTab({ projectId }: { projectId: string }) {
+function ProfileAuditTab() {
   const [auditing, setAuditing] = useState(false)
-  const [auditResult, setAuditResult] = useState<any>(null)
 
   async function handleAudit() {
     setAuditing(true)
     try {
-      // Profile audit endpoint will be added in backend phase
-      setAuditResult({ placeholder: true })
+      // Profile audit endpoint will be added in a future phase
     } finally {
       setAuditing(false)
     }
@@ -370,7 +376,7 @@ function ReputationTab({ projectId }: { projectId: string }) {
   async function handleCheck() {
     setChecking(true)
     try {
-      const res = await api.persona.checkReputation(projectId) as any
+      const res = await api.persona.checkReputation(projectId) as ReputationResult
       setResult(res)
     } finally {
       setChecking(false)
@@ -378,7 +384,7 @@ function ReputationTab({ projectId }: { projectId: string }) {
   }
 
   useEffect(() => {
-    api.persona.getReputation(projectId).then((r: any) => setResult(r)).catch(() => {})
+    api.persona.getReputation(projectId).then((r) => setResult(r as ReputationResult)).catch(() => {})
   }, [projectId])
 
   if (!result && !checking) {
@@ -477,7 +483,7 @@ export default function PersonalBrandStrategyPage() {
   const params = useParams<{ projectId: string }>()
   const searchParams = useSearchParams()
   const { personalCore, setPersonalCore } = useAppStore()
-  const [core, setCore] = useState<any>(personalCore)
+  const [core, setCore] = useState<{ fullName?: string } | null>(personalCore)
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const tab = searchParams.get('tab') as TabKey | null
     return TABS.some((t) => t.key === tab) ? tab! : 'platform'
@@ -506,10 +512,10 @@ export default function PersonalBrandStrategyPage() {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto">
-          {activeTab === 'platform' && <PlatformPlanTab projectId={params.projectId} core={core} />}
+          {activeTab === 'platform' && <PlatformPlanTab projectId={params.projectId} />}
           {activeTab === 'niche' && <NicheResearchTab projectId={params.projectId} />}
-          {activeTab === 'audit' && <ProfileAuditTab projectId={params.projectId} />}
-          {activeTab === 'roadmap' && <PlatformPlanTab projectId={params.projectId} core={core} />}
+          {activeTab === 'audit' && <ProfileAuditTab />}
+          {activeTab === 'roadmap' && <PlatformPlanTab projectId={params.projectId} />}
           {activeTab === 'reputation' && <ReputationTab projectId={params.projectId} />}
         </div>
       </div>

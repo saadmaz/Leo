@@ -9,7 +9,7 @@ import {
   CreditCard, X, Moon, Sun, Settings, Menu, Megaphone, Sparkles,
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
-  ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map, Mic2,
+  ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'

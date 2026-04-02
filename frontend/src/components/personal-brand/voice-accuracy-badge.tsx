@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Mic2, X, ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
-import { useAppStore } from '@/stores/app-store'
 
 interface VoiceAccuracyBadgeProps {
   projectId: string
@@ -12,11 +11,9 @@ interface VoiceAccuracyBadgeProps {
   score?: number | null
   /** The generated content text, used for saving to approved_outputs. */
   generatedContent?: string
-  platform?: string
 }
 
-export function VoiceAccuracyBadge({ projectId, score, generatedContent, platform }: VoiceAccuracyBadgeProps) {
-  const { personalCore, setPersonalCore } = useAppStore()
+export function VoiceAccuracyBadge({ projectId, score, generatedContent }: VoiceAccuracyBadgeProps) {
   const [calibrating, setCalibrating] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -27,16 +24,12 @@ export function VoiceAccuracyBadge({ projectId, score, generatedContent, platfor
     : score >= 60 ? 'text-amber-600 bg-amber-500/10 border-amber-500/20'
     : 'text-red-500 bg-red-500/10 border-red-500/20'
 
-  async function handleVote(vote: 'yes' | 'somewhat' | 'no') {
+  async function handleVote(_vote: 'yes' | 'somewhat' | 'no') {
     setSaved(true)
     setCalibrating(false)
     if (!generatedContent) return
     try {
-      // Save as approved output for voice training
-      await api.persona.updateCore(projectId, {
-        // The backend appends this to approved_outputs in personal_voice_profiles
-        // We pass it as a lightweight update signal; actual persistence handled server-side
-      } as any)
+      await api.persona.updateCore(projectId, {})
     } catch {
       // Non-critical — silently ignore
     }
