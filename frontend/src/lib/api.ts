@@ -968,6 +968,7 @@ export const api = {
         time?: string
         hashtags?: string[]
         type?: string
+        content_format?: string
         status?: string
       },
       signal?: AbortSignal,
