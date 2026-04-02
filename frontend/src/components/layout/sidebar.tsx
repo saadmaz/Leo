@@ -203,7 +203,7 @@ export function Sidebar() {
     setWizardOpen,
   } = useAppStore()
 
-  const [projectsLoading, setProjectsLoading] = useState(true)
+  const [_projectsLoading, setProjectsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
