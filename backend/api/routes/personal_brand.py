@@ -249,3 +249,175 @@ async def get_voice_profile(project_id: str, user: CurrentUser):
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Voice profile not found. Complete the interview first.")
     return {"projectId": project_id, **doc.to_dict()}
+
+
+# ---------------------------------------------------------------------------
+# Personal Strategy Engine
+# ---------------------------------------------------------------------------
+
+@router.get("/{project_id}/persona/strategy")
+async def get_personal_strategy(project_id: str, user: CurrentUser):
+    """Return the saved personal brand strategy (if generated)."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    db = firebase_service.get_db()
+    doc = db.collection("personal_strategies").document(project_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Strategy not yet generated.")
+    return doc.to_dict()
+
+
+@router.post("/{project_id}/persona/strategy/generate")
+async def generate_personal_strategy(project_id: str, user: CurrentUser):
+    """Stream a full personal brand strategy (platform plan + roadmap) via SSE."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found. Complete the interview first.")
+
+    from backend.services.personal_brand import strategy_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in strategy_engine.generate_strategy(project_id, personal_core):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Strategy generation error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/strategy/niche")
+async def research_niche(project_id: str, user: CurrentUser):
+    """Stream niche competitor research via SSE."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    from backend.services.personal_brand import strategy_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in strategy_engine.research_niche(project_id, personal_core):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Niche research error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Personal Brand Analytics
+# ---------------------------------------------------------------------------
+
+@router.get("/{project_id}/persona/analytics")
+async def get_analytics(project_id: str, user: CurrentUser):
+    """Return analytics snapshots for the personal brand project."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    db = firebase_service.get_db()
+    snaps = (
+        db.collection("personal_brand_analytics")
+        .where("projectId", "==", project_id)
+        .order_by("snapshotDate", direction="DESCENDING")
+        .limit(40)
+        .stream()
+    )
+    return [{"id": s.id, **s.to_dict()} for s in snaps]
+
+
+@router.post("/{project_id}/persona/analytics/snapshot")
+async def trigger_snapshot(project_id: str, user: CurrentUser):
+    """Manually trigger an analytics snapshot for all connected platforms."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    from backend.services.personal_brand import analytics_service
+    result = await asyncio.to_thread(analytics_service.take_snapshot, project_id, personal_core)
+    return {"status": "ok", "snapshotId": result.get("id")}
+
+
+@router.get("/{project_id}/persona/analytics/brief")
+async def get_weekly_brief(project_id: str, user: CurrentUser):
+    """Return the latest weekly brief, generating one if needed."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    db = firebase_service.get_db()
+    doc = db.collection("personal_weekly_briefs").document(project_id).get()
+    if doc.exists:
+        return doc.to_dict()
+
+    # Generate on first call
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    from backend.services.personal_brand import analytics_service
+    brief = await asyncio.to_thread(analytics_service.generate_weekly_brief, project_id, personal_core)
+    return brief
+
+
+# ---------------------------------------------------------------------------
+# Reputation Monitoring
+# ---------------------------------------------------------------------------
+
+@router.get("/{project_id}/persona/reputation")
+async def get_reputation(project_id: str, user: CurrentUser):
+    """Return the latest reputation snapshot."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    db = firebase_service.get_db()
+    doc = db.collection("personal_reputation").document(project_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="No reputation data yet. Run a check first.")
+    return doc.to_dict()
+
+
+@router.post("/{project_id}/persona/reputation/check")
+async def check_reputation(project_id: str, user: CurrentUser):
+    """Run a reputation check: Google name search + social mention scan."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    full_name = personal_core.get("fullName", "")
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Full name not set in Personal Core.")
+
+    from backend.services.personal_brand import reputation_service
+    result = await asyncio.to_thread(reputation_service.check_reputation, project_id, full_name)
+    return result
