@@ -203,7 +203,7 @@ export function Sidebar() {
     setWizardOpen,
   } = useAppStore()
 
-  const [_projectsLoading, setProjectsLoading] = useState(true)
+
   const [mounted, setMounted] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -226,11 +226,9 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!user) return
-    setProjectsLoading(true)
     api.projects.list()
       .then(setProjects)
       .catch(console.error)
-      .finally(() => setProjectsLoading(false))
     api.credits.getBalance().then(setCredits).catch(console.error)
   }, [user, setProjects, setCredits])
 

@@ -182,6 +182,7 @@ function OverviewTab({ report }: { report: DeepResearchReport }) {
       {/* Header card */}
       <div className="flex items-start gap-4 p-4 border border-border rounded-lg bg-muted/20">
         {competitor.logo_url && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={competitor.logo_url}
             alt={competitor.name}
@@ -652,6 +653,7 @@ function ReportCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {report.competitor.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={report.competitor.logo_url}
                 alt={report.competitor.name}
@@ -1087,6 +1089,7 @@ export default function DeepResearchPage() {
                       className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
                     >
                       {r.competitor.logo_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={r.competitor.logo_url}
                           alt=""
