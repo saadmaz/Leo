@@ -216,8 +216,8 @@ export default function PersonalBrandAnalyticsPage() {
     setRefreshing(true)
     try {
       const [snaps, weeklyBrief] = await Promise.allSettled([
-        api.persona.getAnalytics(params.projectId) as Promise<AnalyticsSnapshot[]>,
-        api.persona.getWeeklyBrief(params.projectId) as Promise<WeeklyBrief>,
+        api.persona.getAnalytics(params.projectId) as unknown as Promise<AnalyticsSnapshot[]>,
+        api.persona.getWeeklyBrief(params.projectId) as unknown as Promise<WeeklyBrief>,
       ])
       if (snaps.status === 'fulfilled') setSnapshots(snaps.value ?? [])
       if (weeklyBrief.status === 'fulfilled' && weeklyBrief.value) setBrief(weeklyBrief.value)
