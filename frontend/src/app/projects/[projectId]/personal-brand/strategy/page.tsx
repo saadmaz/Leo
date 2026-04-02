@@ -61,6 +61,8 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
 // ---------------------------------------------------------------------------
 
 interface StrategyData {
+  platforms?: PlatformPlan[]
+  allocation?: Record<string, number>
   platformAllocation?: Record<string, { percentage?: number; focusLevel?: string; postsPerWeek?: number; contentMix?: string[] }>
   contentStrategy?: Array<{ pillar: string; angle: string; formats: string[]; frequency: string; sampleTopics: string[] }>
   roadmap?: Record<string, { focus: string; metrics: string[]; experiments: string[]; milestones: string[] }>
@@ -76,7 +78,7 @@ function PlatformPlanTab({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     // Try to load saved strategy
-    api.persona.getStrategy(projectId).then(setStrategy).catch(() => {})
+    api.persona.getStrategy(projectId).then((s) => setStrategy(s as unknown as StrategyData)).catch(() => {})
   }, [projectId])
 
   function handleGenerate() {
@@ -87,7 +89,7 @@ function PlatformPlanTab({ projectId }: { projectId: string }) {
       projectId,
       {
         onStep: (label) => setSteps((p) => [...p, label]),
-        onDone: (s) => { setStrategy(s); setGenerating(false) },
+        onDone: (s) => { setStrategy(s as unknown as StrategyData); setGenerating(false) },
         onError: () => setGenerating(false),
       },
       ctrlRef.current.signal,
@@ -376,7 +378,7 @@ function ReputationTab({ projectId }: { projectId: string }) {
   async function handleCheck() {
     setChecking(true)
     try {
-      const res = await api.persona.checkReputation(projectId) as ReputationResult
+      const res = await api.persona.checkReputation(projectId) as unknown as ReputationResult
       setResult(res)
     } finally {
       setChecking(false)
@@ -384,7 +386,7 @@ function ReputationTab({ projectId }: { projectId: string }) {
   }
 
   useEffect(() => {
-    api.persona.getReputation(projectId).then((r) => setResult(r as ReputationResult)).catch(() => {})
+    api.persona.getReputation(projectId).then((r) => setResult(r as unknown as ReputationResult)).catch(() => {})
   }, [projectId])
 
   if (!result && !checking) {
