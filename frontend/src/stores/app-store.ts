@@ -209,6 +209,16 @@ interface AppState {
   checklistCache: Record<string, { items: unknown[]; fetchedAt: number }>
   setChecklistCache: (projectId: string, items: unknown[]) => void
   invalidateChecklistCache: (projectId: string) => void
+
+  // ---------------------------------------------------------------------------
+  // Personal Brand
+  // ---------------------------------------------------------------------------
+  personalCore: import('@/types').PersonalCore | null
+  setPersonalCore: (core: import('@/types').PersonalCore | null) => void
+  personalVoiceProfile: import('@/types').PersonalVoiceProfile | null
+  setPersonalVoiceProfile: (profile: import('@/types').PersonalVoiceProfile | null) => void
+  myBrandPanelOpen: boolean
+  setMyBrandPanelOpen: (v: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -449,4 +459,14 @@ export const useAppStore = create<AppState>((set) => ({
       delete next[projectId]
       return { checklistCache: next }
     }),
+
+  // ---------------------------------------------------------------------------
+  // Personal Brand
+  // ---------------------------------------------------------------------------
+  personalCore: null,
+  setPersonalCore: (personalCore) => set({ personalCore }),
+  personalVoiceProfile: null,
+  setPersonalVoiceProfile: (personalVoiceProfile) => set({ personalVoiceProfile }),
+  myBrandPanelOpen: false,
+  setMyBrandPanelOpen: (myBrandPanelOpen) => set({ myBrandPanelOpen }),
 }))

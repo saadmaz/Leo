@@ -9,13 +9,14 @@ import {
   CreditCard, X, Moon, Sun, Settings, Menu, Megaphone, Sparkles,
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
-  ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check,
+  ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map, Mic2,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
+import { MyBrandPanel } from '@/components/personal-brand/my-brand-panel'
 import { cn } from '@/lib/utils'
 import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
 import { NotificationBell } from '@/components/layout/notification-bell'
@@ -201,6 +202,7 @@ export function Sidebar() {
     sidebarOpen, setSidebarOpen,
     sidebarCollapsed, setSidebarCollapsed,
     setWizardOpen,
+    setMyBrandPanelOpen,
   } = useAppStore()
 
 
@@ -360,6 +362,18 @@ export function Sidebar() {
           {/* Project-scoped nav groups — only visible when a project is active */}
           {activeProject && (
             <div className="mt-1 border-t border-border/50 pt-1">
+
+              {/* Personal Brand section — only for personal brand projects */}
+              {activeProject.projectType === 'personal' && (
+                <NavGroup label="Personal Brand" storageKey="nav_personal_brand">
+                  <NavItem icon={<User className="w-3.5 h-3.5" />}        label="My Brand"   onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
+                  <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard" onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/dashboard`); setSidebarOpen(false) }} />
+                  <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}    label="Interview"  onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/onboarding`); setSidebarOpen(false) }} />
+                  <NavItem icon={<Map className="w-3.5 h-3.5" />}         label="Strategy"   onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/strategy`); setSidebarOpen(false) }} />
+                  <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Analytics"  onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/analytics`); setSidebarOpen(false) }} />
+                </NavGroup>
+              )}
+
               <NavGroup label="Workspace" storageKey="nav_workspace">
                 <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"       onClick={() => { router.push(`/projects/${activeProject.id}/campaigns`); setSidebarOpen(false) }} />
                 <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"           onClick={() => { router.push(`/projects/${activeProject.id}/posts`); setSidebarOpen(false) }} />
@@ -499,6 +513,9 @@ export function Sidebar() {
       {accountOpen && <AccountModal onClose={() => setAccountOpen(false)} />}
       <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+
+      {/* Personal Brand panel */}
+      <MyBrandPanel />
     </>
   )
 }

@@ -53,6 +53,7 @@ export default function ChatPage() {
     setCampaignPanelOpen,
     strategySession, setStrategySession,
     carouselSession, setCarouselSession,
+    personalCore, setPersonalCore, setPersonalVoiceProfile,
   } = useAppStore()
 
   // Whether this is the first message in the chat (used to refresh the chat name).
@@ -62,6 +63,14 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user) router.replace('/login')
   }, [user, router])
+
+  // Load Personal Core for personal brand projects (provides voice context in chat)
+  useEffect(() => {
+    if (activeProject?.projectType !== 'personal') return
+    if (personalCore && personalCore.projectId === activeProject.id) return
+    api.persona.getCore(activeProject.id).then(setPersonalCore).catch(() => {})
+    api.persona.getVoice(activeProject.id).then(setPersonalVoiceProfile).catch(() => {})
+  }, [activeProject, personalCore, setPersonalCore, setPersonalVoiceProfile])
 
   // Load message history whenever the chat changes.
   useEffect(() => {
@@ -164,6 +173,19 @@ export default function ChatPage() {
   ]
   function isStrategyIntent(text: string) {
     return STRATEGY_PATTERNS.some((p) => p.test(text))
+  }
+
+  // ---------------------------------------------------------------------------
+  // Personal brand content intent detection (only active for personal projects)
+  // ---------------------------------------------------------------------------
+  function getPersonalContentMode(text: string): string | null {
+    if (activeProject?.projectType !== 'personal') return null
+    if (/thought leadership|long.?form|linkedin article|write.*opinion|my take on/i.test(text)) return 'thought_leadership'
+    if (/story.*post|post.*story|what happened|lesson.*learned|mistake.*made|client call/i.test(text)) return 'story_post'
+    if (/rewrite.*bio|bio.*rewrite|update.*headline|linkedin.*bio|twitter.*bio|instagram.*bio/i.test(text)) return 'bio_rewrite'
+    if (/\bcontroversial\b|hot take|unpopular opinion|counterintuitive|i believe.*but/i.test(text)) return 'opinion_post'
+    if (/reformat|cross.?post|all platforms|twitter thread|tiktok script|instagram from/i.test(text)) return 'platform_reformat'
+    return null
   }
 
   async function handleSubmit(content: string, attachments: ImageAttachment[] = []) {

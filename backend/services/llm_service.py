@@ -153,9 +153,16 @@ def build_brand_core_context(brand_core: Optional[dict]) -> str:
     """
     Serialize a Brand Core dict into a concise system-prompt section.
 
+    If brand_core contains the sentinel key '__personal_core__', delegates to
+    build_personal_core_context() for personal brand projects.
+
     If brand_core is None or empty, returns a guidance string that nudges
     the user towards setting one up rather than silently ignoring it.
     """
+    # Personal brand sentinel — delegate to personal core builder
+    if brand_core and "__personal_core__" in brand_core:
+        return build_personal_core_context(brand_core["__personal_core__"])
+
     if not brand_core:
         return (
             "No Brand Core has been set up for this project yet. "
@@ -203,6 +210,86 @@ def build_brand_core_context(brand_core: Optional[dict]) -> str:
         sections.append(f"COMPETITORS: {', '.join(brand_core['competitors'])}.")
 
     return "\n".join(sections) if sections else "Brand Core is incomplete — treat as a general brand."
+
+
+def build_personal_core_context(personal_core: Optional[dict]) -> str:
+    """
+    Serialize a Personal Core dict into a system-prompt section for personal
+    brand projects. Replaces build_brand_core_context() for personal projects.
+    """
+    if not personal_core:
+        return (
+            "No Personal Core has been set up yet. "
+            "Guide the user to complete their discovery interview so LEO can learn their voice, "
+            "positioning, and content strategy."
+        )
+
+    sections: list[str] = []
+
+    full_name = personal_core.get("fullName", "")
+    if full_name:
+        sections.append(f"PERSON: {full_name}.")
+
+    positioning = personal_core.get("positioningStatement", "")
+    if positioning:
+        sections.append(f"POSITIONING: {positioning}")
+
+    unique_angle = personal_core.get("uniqueAngle", "")
+    if unique_angle:
+        sections.append(f"UNIQUE ANGLE: {unique_angle}")
+
+    values = personal_core.get("values", [])
+    if values:
+        sections.append(f"CORE VALUES: {', '.join(values)}.")
+
+    avoided_topics = personal_core.get("avoidedTopics", [])
+    if avoided_topics:
+        sections.append(f"AVOID THESE TOPICS: {', '.join(avoided_topics)}.")
+
+    target_audience = personal_core.get("targetAudience", {})
+    if target_audience:
+        role = target_audience.get("role", "")
+        industry = target_audience.get("industry", "")
+        if role or industry:
+            sections.append(f"TARGET AUDIENCE: {role} in {industry}.")
+
+    content_pillars = personal_core.get("contentPillars", [])
+    if content_pillars:
+        pillar_names = [p.get("name", p) if isinstance(p, dict) else str(p) for p in content_pillars]
+        sections.append(f"CONTENT PILLARS: {', '.join(pillar_names)}.")
+
+    goal_90 = personal_core.get("goal90Day", "")
+    if goal_90:
+        sections.append(f"90-DAY GOAL: {goal_90}")
+
+    # Voice profile context (if nested in the personal_core or passed separately)
+    voice = personal_core.get("voiceProfile", {})
+    if voice:
+        formality_labels = {1: "very casual", 2: "casual", 3: "balanced", 4: "formal", 5: "very formal"}
+        formality = voice.get("formalityLevel")
+        register = voice.get("emotionalRegister", "")
+        sig_phrases = voice.get("signaturePhrases", [])
+        avoided_phrases = voice.get("avoidedPhrases", [])
+
+        voice_parts = []
+        if formality:
+            voice_parts.append(f"tone={formality_labels.get(formality, 'balanced')}")
+        if register:
+            voice_parts.append(f"register={register}")
+        if sig_phrases:
+            voice_parts.append(f"signature phrases: {', '.join(sig_phrases[:4])}")
+        if avoided_phrases:
+            voice_parts.append(f"never use: {', '.join(avoided_phrases[:5])}")
+        if voice_parts:
+            sections.append(f"VOICE: {'; '.join(voice_parts)}.")
+
+    instruction = (
+        f"\n\nYou are writing content FOR {full_name or 'this person'}, not about them. "
+        "Match their voice precisely. Do not sound like generic AI content. "
+        "Every output must feel like they wrote it themselves."
+    )
+
+    return ("\n".join(sections) if sections else "Personal Core is incomplete.") + instruction
 
 
 # ---------------------------------------------------------------------------

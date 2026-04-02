@@ -117,9 +117,30 @@ async def send_message(
             from backend.config import settings as _settings
             _use_tools = bool(_settings.EXA_API_KEY or _settings.TAVILY_API_KEY)
             _stream_fn = llm_service.stream_chat_with_tools if _use_tools else llm_service.stream_chat
+
+            # For personal brand projects, fetch and inject Personal Core context
+            # instead of the business Brand Core.
+            is_personal = project.get("projectType") == "personal"
+            effective_brand_core = project.get("brandCore")
+            if is_personal:
+                try:
+                    personal_core_doc = firebase_service.get_personal_core(project_id)
+                    if personal_core_doc:
+                        # Fetch voice profile and nest it for context building
+                        from backend.services.firebase_service import db as _db
+                        _voice_snap = _db.collection("personal_voice_profiles").document(project_id).get()
+                        voice_doc = _voice_snap.to_dict() if _voice_snap.exists else None
+                        if voice_doc:
+                            personal_core_doc["voiceProfile"] = voice_doc
+                        # Use a sentinel value so stream_chat knows to call the
+                        # personal context builder instead of brand_core builder.
+                        effective_brand_core = {"__personal_core__": personal_core_doc}
+                except Exception:
+                    pass  # Fall back to no brand context rather than crashing
+
             _kwargs = dict(
                 project_name=project.get("name", ""),
-                brand_core=project.get("brandCore"),
+                brand_core=effective_brand_core,
                 history=history,
                 user_message=body.content,
                 channel=body.channel,

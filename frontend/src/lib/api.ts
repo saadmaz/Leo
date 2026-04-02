@@ -1878,5 +1878,69 @@ export const api = {
     /** Get the voice profile for a personal brand project. */
     getVoice: (projectId: string) =>
       get<PersonalVoiceProfile>(`/projects/${projectId}/persona/voice`),
+
+    /** Generate the full personal platform strategy (SSE). */
+    streamStrategy: (
+      projectId: string,
+      callbacks: {
+        onStep?: (label: string) => void
+        onDone?: (strategy: Record<string, unknown>) => void
+        onError?: (msg: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<{ type: string; label?: string; strategy?: Record<string, unknown>; message?: string }>(
+        `/projects/${projectId}/persona/strategy/generate`,
+        {},
+        (event) => {
+          if (event.type === 'step' && event.label) callbacks.onStep?.(event.label)
+          else if (event.type === 'done' && event.strategy) callbacks.onDone?.(event.strategy)
+          else if (event.type === 'error' && event.message) callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Get saved personal strategy. */
+    getStrategy: (projectId: string) =>
+      get<Record<string, unknown>>(`/projects/${projectId}/persona/strategy`),
+
+    /** Run niche competitor research (SSE). */
+    streamNicheResearch: (
+      projectId: string,
+      callbacks: {
+        onStep?: (label: string) => void
+        onDone?: (result: Record<string, unknown>) => void
+        onError?: (msg: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<{ type: string; label?: string; result?: Record<string, unknown>; message?: string }>(
+        `/projects/${projectId}/persona/strategy/niche`,
+        {},
+        (event) => {
+          if (event.type === 'step' && event.label) callbacks.onStep?.(event.label)
+          else if (event.type === 'done' && event.result) callbacks.onDone?.(event.result)
+          else if (event.type === 'error' && event.message) callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Get personal brand analytics snapshots. */
+    getAnalytics: (projectId: string) =>
+      get<Record<string, unknown>[]>(`/projects/${projectId}/persona/analytics`),
+
+    /** Get or generate the weekly brief. */
+    getWeeklyBrief: (projectId: string) =>
+      get<Record<string, unknown>>(`/projects/${projectId}/persona/analytics/brief`),
+
+    /** Check reputation (Google + social mentions). */
+    checkReputation: (projectId: string) =>
+      post<Record<string, unknown>>(`/projects/${projectId}/persona/reputation/check`, {}),
+
+    /** Get last reputation snapshot. */
+    getReputation: (projectId: string) =>
+      get<Record<string, unknown>>(`/projects/${projectId}/persona/reputation`),
   },
 }
