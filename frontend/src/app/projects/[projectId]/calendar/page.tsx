@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import {
   CalendarDays, ChevronLeft, ChevronRight, Loader2, Sparkles, X, Check,
-  Plus, Clock, Pencil, Trash2, Image, Video, FileText, Upload, ExternalLink, Eye, Code2,
+  Plus, Clock, Pencil, Trash2, Image as ImageIcon, Video, FileText, Upload, ExternalLink, Eye, Code2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -122,7 +122,7 @@ export default function CalendarPage() {
   const days=daysInMonth(year,month), startDay=firstDayOfMonth(year,month)
   const byDate: Record<string,CalendarEntry[]> = {}
   for(const e of entries){ if(!byDate[e.date]) byDate[e.date]=[]; byDate[e.date].push(e) }
-  const presentPlatforms = [...new Set(entries.map(e=>e.platform))].filter(p=>PLATFORM_DOT[p])
+  const presentPlatforms = Array.from(new Set(entries.map(e=>e.platform))).filter(p=>PLATFORM_DOT[p])
 
   function sync(next: CalendarEntry[]){
     const s=[...next].sort((a,b)=>a.date.localeCompare(b.date))
@@ -180,7 +180,7 @@ export default function CalendarPage() {
 
       {/* Legend */}
       {presentPlatforms.length>0 && (
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-background shrink-0 flex-wrap">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-background shrink-0 overflow-x-auto scrollbar-none">
           {presentPlatforms.map(p=>(
             <div key={p} className="flex items-center gap-1.5">
               <div className={cn('w-2 h-2 rounded-full',PLATFORM_DOT[p])}/>
@@ -192,14 +192,17 @@ export default function CalendarPage() {
 
       {/* Day headers */}
       <div className="grid grid-cols-7 border-b border-border shrink-0">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
-          <div key={d} className="py-2 text-center text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{d}</div>
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=>(
+          <div key={d} className="py-2 text-center text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="sm:hidden">{['S','M','T','W','T','F','S'][i]}</span>
+            <span className="hidden sm:inline">{d}</span>
+          </div>
         ))}
       </div>
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-7 auto-rows-[minmax(100px,1fr)]">
+        <div className="grid grid-cols-7 auto-rows-[minmax(64px,1fr)] sm:auto-rows-[minmax(100px,1fr)]">
           {loading ? Array.from({length:35}).map((_,i)=>(
             <div key={`sk-${i}`} className={cn('border-b border-r border-border p-1.5',i%7===6&&'border-r-0')}>
               <div className="w-5 h-5 rounded-full bg-muted animate-pulse mb-1"/>
@@ -223,14 +226,14 @@ export default function CalendarPage() {
                 const isOv=overflowDay===dateStr
 
                 return (
-                  <div key={day} className={cn('group border-b border-r border-border p-1.5 overflow-visible relative',
+                  <div key={day} className={cn('group border-b border-r border-border p-1 sm:p-1.5 overflow-visible relative',
                     isLast&&'border-r-0', isToday&&'bg-primary/5 ring-1 ring-inset ring-primary/20',
                     hasSel&&'ring-2 ring-inset ring-primary')}>
                     <div className="flex items-center justify-between mb-1">
                       <div className={cn('text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full',
                         isToday?'bg-primary text-primary-foreground':'text-muted-foreground')}>{day}</div>
                       <button onClick={e=>{e.stopPropagation();setAddDate(dateStr)}}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-all text-muted-foreground hover:text-foreground" title="Add">
+                        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-all text-muted-foreground hover:text-foreground" title="Add">
                         <Plus className="w-3 h-3"/>
                       </button>
                     </div>
@@ -289,20 +292,21 @@ function EntryChip({entry,onClick}:{entry:CalendarEntry;onClick:(e:React.MouseEv
   const dot  = STATUS_DOT[entry.status]??'bg-muted-foreground/40'
   const type = entry.type?.toLowerCase()
 
+  const dotColor = PLATFORM_DOT[entry.platform]??'bg-muted-foreground/40'
   return (
     <button onClick={onClick} className="w-full text-left">
-      <div className={cn('flex items-center gap-1 rounded-sm px-1 py-0.5 hover:brightness-95 transition-all',pill)}>
+      {/* Mobile: dot only */}
+      <div className={cn('sm:hidden w-2.5 h-2.5 rounded-full mx-auto my-0.5',dotColor)}/>
+      {/* Desktop: full chip */}
+      <div className={cn('hidden sm:flex items-center gap-1 rounded-sm px-1 py-0.5 hover:brightness-95 transition-all',pill)}>
         <span className="text-[9px] font-bold shrink-0 opacity-70">{abbr}</span>
-        {/* Type icon */}
         {VIDEO_TYPES.has(type)  && <Video    className="w-2 h-2 shrink-0 opacity-60"/>}
-        {type==='image'          && <Image    className="w-2 h-2 shrink-0 opacity-60"/>}
-        {type==='carousel'       && <Image    className="w-2 h-2 shrink-0 opacity-60"/>}
+        {type==='image'          && <ImageIcon className="w-2 h-2 shrink-0 opacity-60"/>}
+        {type==='carousel'       && <ImageIcon className="w-2 h-2 shrink-0 opacity-60"/>}
         {type==='blog'           && <FileText className="w-2 h-2 shrink-0 opacity-60"/>}
-        {/* Content preview */}
         {type==='blog'&&entry.title ? (
           <span className="text-[10px] truncate leading-tight flex-1">{entry.title}</span>
         ) : entry.media_type==='image'&&entry.media_url ? (
-          // Tiny image thumbnail
           // eslint-disable-next-line @next/next/no-img-element
           <img src={entry.media_url} alt="" className="w-4 h-4 rounded object-cover shrink-0"/>
         ) : (
@@ -321,7 +325,7 @@ function EntryChip({entry,onClick}:{entry:CalendarEntry;onClick:(e:React.MouseEv
 function OverflowPopover({entries,onSelect,onClose}:{entries:CalendarEntry[];onSelect:(e:CalendarEntry)=>void;onClose:()=>void}){
   return (
     <div onClick={e=>e.stopPropagation()}
-      className="absolute top-0 left-full z-30 ml-1 w-56 bg-card border border-border rounded-lg shadow-xl p-2 space-y-1">
+      className="absolute top-full left-0 sm:top-0 sm:left-full z-30 mt-1 sm:mt-0 sm:ml-1 w-48 sm:w-56 bg-card border border-border rounded-lg shadow-xl p-2 space-y-1">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">All entries</span>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3"/></button>
@@ -367,10 +371,10 @@ function ImageUploadZone({projectId,value,onChange,label='Image'}:{
     <>
       <div onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)handleFile(f)}}
         onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current?.click()}
-        className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+        className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-4 sm:p-6 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
         {uploading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground"/> : (
           <>
-            <Image className="w-5 h-5 text-muted-foreground"/>
+            <ImageIcon className="w-5 h-5 text-muted-foreground"/>
             <span className="text-xs text-muted-foreground text-center">
               Drag & drop or click to upload {label}<br/>
               <span className="text-[10px]">PNG, JPG, GIF, WebP · max 50 MB</span>
@@ -417,7 +421,7 @@ function VideoUploadZone({projectId,value,onChange}:{projectId:string;value:stri
     <>
       <div onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)handleFile(f)}}
         onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current?.click()}
-        className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+        className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-4 sm:p-6 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
         {uploading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground"/> : (
           <>
             <Video className="w-5 h-5 text-muted-foreground"/>
@@ -515,7 +519,7 @@ function ContentFields({
             return (
               <button key={p} onClick={()=>{
                 if(isEdit) setState({platforms:[p]})
-                else setState({platforms:active&&state.platforms.length>1?state.platforms.filter(x=>x!==p):[...new Set([...state.platforms,p])]})
+                else setState({platforms:active&&state.platforms.length>1?state.platforms.filter(x=>x!==p):Array.from(new Set([...state.platforms,p]))})
               }}
               className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border',
                 active?'bg-primary text-primary-foreground border-primary':'bg-muted text-muted-foreground border-transparent hover:text-foreground')}>
@@ -546,7 +550,7 @@ function ContentFields({
       </div>
 
       {/* Date + Time */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</label>
           <input type="date" value={state.date} onChange={e=>setState({date:e.target.value})}
@@ -762,19 +766,23 @@ function AddEntryModal({projectId,defaultDate,onClose,onCreated}:{
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+        {/* Mobile drag handle */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-8 h-1 rounded-full bg-muted-foreground/30"/>
+        </div>
+        <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <Plus className="w-4 h-4 text-primary"/>
             <span className="font-semibold text-sm">Add to Calendar</span>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4"/></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           <ContentFields state={state} setState={setState} projectId={projectId}/>
         </div>
-        <div className="px-5 py-4 border-t border-border shrink-0">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-t border-border shrink-0">
           <button onClick={submit} disabled={saving}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
             {saving?<Loader2 className="w-4 h-4 animate-spin"/>:<Plus className="w-4 h-4"/>}
@@ -839,10 +847,14 @@ function EntryDetailModal({entry,projectId,onClose,onStatusChange,onSave,onDelet
   const badge=PLATFORM_BADGE[entry.platform]??'bg-muted text-muted-foreground'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+        {/* Mobile drag handle */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-8 h-1 rounded-full bg-muted-foreground/30"/>
+        </div>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className={cn('w-2.5 h-2.5 rounded-full',PLATFORM_DOT[entry.platform]??'bg-muted-foreground')}/>
             <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full',badge)}>{entry.platform}</span>
@@ -861,7 +873,7 @@ function EntryDetailModal({entry,projectId,onClose,onStatusChange,onSave,onDelet
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {editing ? (
             <ContentFields state={state} setState={setState} projectId={projectId} isEdit/>
           ) : (
@@ -956,7 +968,7 @@ function EntryDetailModal({entry,projectId,onClose,onStatusChange,onSave,onDelet
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-border flex items-center gap-2 shrink-0">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-t border-border flex items-center gap-2 shrink-0">
           {editing?(
             <>
               <button onClick={save} disabled={saving}
@@ -1002,13 +1014,16 @@ function GenerateForm({projectId,year,month,generating,setGenerating,onClose,onD
     finally{setGenerating(false)}
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4">
+      <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-8 h-1 rounded-full bg-muted-foreground/30"/>
+        </div>
+        <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-border">
           <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary"/><span className="font-semibold text-sm">Generate {MONTH_NAMES[month]} Calendar</span></div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4"/></button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-4 sm:p-5 space-y-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Platforms</label>
             <div className="flex flex-wrap gap-1.5">
