@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, Circle, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/stores/app-store'
 import type { Project } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,7 @@ interface CheckItem {
 }
 
 const STORAGE_KEY = (projectId: string) => `leo_checklist_dismissed_${projectId}`
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 // ---------------------------------------------------------------------------
 // Component
@@ -28,6 +30,7 @@ const STORAGE_KEY = (projectId: string) => `leo_checklist_dismissed_${projectId}
 export function SetupChecklist({ project }: { project: Project }) {
   const router = useRouter()
   const projectId = project.id
+  const { checklistCache, setChecklistCache } = useAppStore()
 
   const [items, setItems] = useState<CheckItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,55 +40,81 @@ export function SetupChecklist({ project }: { project: Project }) {
     return localStorage.getItem(STORAGE_KEY(projectId)) === 'true'
   })
 
-  const buildChecklist = useCallback(async () => {
-    setLoading(true)
+  function buildItems(
+    hasContent: boolean,
+    hasCalendar: boolean,
+    hasTeam: boolean,
+  ): CheckItem[] {
+    return [
+      {
+        id: 'brand_core',
+        label: 'Extract Brand Core',
+        description: 'Let LEO analyse your brand to build its intelligence layer.',
+        done: !!project.brandCore,
+        action: project.brandCore ? undefined : { label: 'Set up now', path: `/projects/${projectId}/chats` },
+      },
+      {
+        id: 'first_content',
+        label: 'Create your first content',
+        description: 'Generate a caption, script, or campaign in chat.',
+        done: hasContent,
+        action: hasContent ? undefined : { label: 'Open chat', path: `/projects/${projectId}/chats` },
+      },
+      {
+        id: 'calendar',
+        label: 'Schedule content to calendar',
+        description: 'Plan your posting schedule to stay consistent.',
+        done: hasCalendar,
+        action: hasCalendar ? undefined : { label: 'View calendar', path: `/projects/${projectId}/calendar` },
+      },
+      {
+        id: 'team',
+        label: 'Invite a team member',
+        description: 'Collaborate with editors, designers, or clients.',
+        done: hasTeam,
+        action: hasTeam ? undefined : { label: 'Invite', path: `/projects/${projectId}/team` },
+      },
+    ]
+  }
+
+  const fetchAndBuild = useCallback(async () => {
     try {
       const [libraryData, calendarData, membersData] = await Promise.all([
         api.contentLibrary.list(projectId, {}).catch(() => ({ items: [] })),
         api.calendar.get(projectId).catch(() => ({ entries: [] })),
         api.members.list(projectId).catch(() => []),
       ])
-
-      const hasContent = (libraryData?.items?.length ?? 0) > 0
+      const hasContent  = (libraryData?.items?.length ?? 0) > 0
       const hasCalendar = (calendarData?.entries?.length ?? 0) > 0
-      const hasTeam = (membersData?.length ?? 0) > 1
-
-      setItems([
-        {
-          id: 'brand_core',
-          label: 'Extract Brand Core',
-          description: 'Let LEO analyse your brand to build its intelligence layer.',
-          done: !!project.brandCore,
-          action: project.brandCore ? undefined : { label: 'Set up now', path: `/projects/${projectId}/chats` },
-        },
-        {
-          id: 'first_content',
-          label: 'Create your first content',
-          description: 'Generate a caption, script, or campaign in chat.',
-          done: hasContent,
-          action: hasContent ? undefined : { label: 'Open chat', path: `/projects/${projectId}/chats` },
-        },
-        {
-          id: 'calendar',
-          label: 'Schedule content to calendar',
-          description: 'Plan your posting schedule to stay consistent.',
-          done: hasCalendar,
-          action: hasCalendar ? undefined : { label: 'View calendar', path: `/projects/${projectId}/calendar` },
-        },
-        {
-          id: 'team',
-          label: 'Invite a team member',
-          description: 'Collaborate with editors, designers, or clients.',
-          done: hasTeam,
-          action: hasTeam ? undefined : { label: 'Invite', path: `/projects/${projectId}/team` },
-        },
-      ])
-    } finally {
-      setLoading(false)
+      const hasTeam     = (membersData?.length ?? 0) > 1
+      const built = buildItems(hasContent, hasCalendar, hasTeam)
+      setItems(built)
+      setChecklistCache(projectId, built)
+      return built
+    } catch {
+      return null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, project.brandCore])
 
-  useEffect(() => { buildChecklist() }, [buildChecklist])
+  useEffect(() => {
+    if (dismissed) return
+
+    const cached = checklistCache[projectId]
+    const isFresh = cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS
+
+    if (isFresh) {
+      // Render immediately from cache, refresh silently in background
+      setItems(cached.items as CheckItem[])
+      setLoading(false)
+      fetchAndBuild() // silent background refresh
+    } else {
+      // No cache or stale — fetch with loading state
+      setLoading(true)
+      fetchAndBuild().finally(() => setLoading(false))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId])
 
   const doneCount = items.filter((i) => i.done).length
   const allDone = items.length > 0 && doneCount === items.length

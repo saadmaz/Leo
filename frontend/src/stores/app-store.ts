@@ -24,6 +24,7 @@ import type {
   AppUser,
   BillingStatus,
   BrandCore,
+  CalendarEntry,
   Campaign,
   Chat,
   CreditsStatus,
@@ -192,6 +193,20 @@ interface AppState {
   setCarouselSession: (session: import('@/types').CarouselSession | null) => void
   updateCarouselSession: (patch: Partial<import('@/types').CarouselSession>) => void
   resetCarouselSession: () => void
+
+  // ---------------------------------------------------------------------------
+  // Calendar Cache — keyed by "projectId-YYYY-MM"
+  // ---------------------------------------------------------------------------
+  calendarCache: Record<string, CalendarEntry[]>
+  setCalendarCache: (key: string, entries: CalendarEntry[]) => void
+  invalidateCalendarCache: (key: string) => void
+
+  // ---------------------------------------------------------------------------
+  // Checklist Cache — keyed by projectId; expires after 5 min
+  // ---------------------------------------------------------------------------
+  checklistCache: Record<string, { items: unknown[]; fetchedAt: number }>
+  setChecklistCache: (projectId: string, items: unknown[]) => void
+  invalidateChecklistCache: (projectId: string) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -399,4 +414,35 @@ export const useAppStore = create<AppState>((set) => ({
       carouselSession: s.carouselSession ? { ...s.carouselSession, ...patch } : null,
     })),
   resetCarouselSession: () => set({ carouselSession: null }),
+
+  // ---------------------------------------------------------------------------
+  // Calendar Cache
+  // ---------------------------------------------------------------------------
+  calendarCache: {},
+  setCalendarCache: (key, entries) =>
+    set((s) => ({ calendarCache: { ...s.calendarCache, [key]: entries } })),
+  invalidateCalendarCache: (key) =>
+    set((s) => {
+      const next = { ...s.calendarCache }
+      delete next[key]
+      return { calendarCache: next }
+    }),
+
+  // ---------------------------------------------------------------------------
+  // Checklist Cache
+  // ---------------------------------------------------------------------------
+  checklistCache: {},
+  setChecklistCache: (projectId, items) =>
+    set((s) => ({
+      checklistCache: {
+        ...s.checklistCache,
+        [projectId]: { items, fetchedAt: Date.now() },
+      },
+    })),
+  invalidateChecklistCache: (projectId) =>
+    set((s) => {
+      const next = { ...s.checklistCache }
+      delete next[projectId]
+      return { checklistCache: next }
+    }),
 }))
