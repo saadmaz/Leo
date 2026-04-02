@@ -105,7 +105,7 @@ function PlatformRow({ platform, cfg }: { platform: string; cfg: { focusLevel?: 
         <span className="text-sm font-medium text-foreground capitalize">{platform}</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full capitalize', focusColor[cfg.focusLevel] ?? focusColor.passive)}>
+        <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full capitalize', focusColor[cfg.focusLevel ?? ''] ?? focusColor.passive)}>
           {cfg.focusLevel}
         </span>
         <span className="text-xs text-muted-foreground w-12 text-right">{cfg.postsPerWeek}×/wk</span>
