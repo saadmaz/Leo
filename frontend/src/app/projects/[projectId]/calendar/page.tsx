@@ -26,7 +26,6 @@ const STATUSES    = ['planned','drafted','approved','scheduled','posted']
 // Content types grouped by their primary input mode
 const CONTENT_TYPES = ['Post','Image','Video','Blog','Carousel','Story','Reel']
 const VIDEO_TYPES   = new Set(['video','story','reel'])
-const IMAGE_TYPES   = new Set(['image','carousel'])
 
 const TYPE_FORMAT_MAP: Record<string,string> = {
   Post:'post', Image:'post', Video:'reel', Blog:'post', Carousel:'carousel', Story:'story', Reel:'reel',
