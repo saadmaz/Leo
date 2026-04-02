@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["assets"])
 
 _ALLOWED_MIME_PREFIXES = ("image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/svg+xml")
-_MAX_LOGO_BYTES = 5 * 1024 * 1024  # 5 MB
+_ALLOWED_MEDIA_PREFIXES = ("image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "video/mp4", "video/quicktime", "video/webm")
+_MAX_LOGO_BYTES = 5 * 1024 * 1024   # 5 MB
+_MAX_MEDIA_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 def _get_r2_client():
@@ -124,3 +126,71 @@ async def upload_logo(
 
     logger.info("Logo saved for project %s", project_id)
     return {"url": logo_url}
+
+
+@router.post("/{project_id}/assets/media")
+async def upload_media(
+    project_id: str,
+    user: CurrentUser,
+    file: UploadFile = File(...),
+) -> dict:
+    """Upload a media file (image or video) for a calendar entry. Returns { url, content_type }."""
+    try:
+        project = get_project_or_404(project_id)
+        assert_editor(project, user["uid"])
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Project fetch failed for %s: %s", project_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to load project.") from exc
+
+    content_type = (file.content_type or "").lower()
+    if not any(content_type.startswith(p) for p in _ALLOWED_MEDIA_PREFIXES):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type '{content_type}'. Upload an image (PNG, JPEG, GIF, WebP) or video (MP4, MOV, WebM).",
+        )
+
+    data = await file.read()
+    if len(data) > _MAX_MEDIA_BYTES:
+        raise HTTPException(status_code=413, detail="File must be ≤ 50 MB.")
+
+    media_url: str | None = None
+
+    r2 = None
+    try:
+        r2 = _get_r2_client()
+    except Exception as exc:
+        logger.warning("R2 client init failed, falling back to base64: %s", exc)
+
+    if r2 is not None:
+        _ext_map = {
+            "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
+            "image/gif": "gif", "image/webp": "webp",
+            "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm",
+        }
+        ext = _ext_map.get(content_type, "bin")
+        object_key = f"media/{project_id}/{uuid.uuid4().hex}.{ext}"
+        bucket = settings.CLOUDFLARE_R2_BUCKET_NAME
+        try:
+            r2.put_object(
+                Bucket=bucket,
+                Key=object_key,
+                Body=data,
+                ContentType=content_type,
+                CacheControl="public, max-age=31536000",
+            )
+            public_base = settings.CLOUDFLARE_R2_PUBLIC_URL
+            if public_base:
+                media_url = f"{public_base.rstrip('/')}/{object_key}"
+            else:
+                logger.warning("CLOUDFLARE_R2_PUBLIC_URL not set — falling back to base64 for project %s", project_id)
+        except Exception as exc:
+            logger.error("R2 upload failed for project %s: %s", project_id, exc, exc_info=True)
+
+    if media_url is None:
+        b64 = base64.b64encode(data).decode("utf-8")
+        media_url = f"data:{content_type};base64,{b64}"
+        logger.info("Storing media as base64 data URL for project %s", project_id)
+
+    return {"url": media_url, "content_type": content_type}

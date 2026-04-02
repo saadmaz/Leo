@@ -570,6 +570,8 @@ export interface CalendarEntry {
   content_format: string // post | story | reel | carousel
   status: string         // planned | drafted | approved | scheduled | posted
   contentLibraryItemId?: string | null
+  media_url?: string | null
+  media_type?: string | null  // 'image' | 'video' | 'blog'
   createdAt: string
   updatedAt: string
 }

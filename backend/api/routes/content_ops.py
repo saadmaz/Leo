@@ -94,6 +94,8 @@ class CalendarEntryCreate(BaseModel):
     content_format: str = Field(default="post", max_length=64)
     status: str = Field(default="planned")
     content_library_item_id: Optional[str] = None
+    media_url: Optional[str] = Field(None, max_length=2000)
+    media_type: Optional[str] = Field(None, max_length=32)   # image | video | blog
 
 
 class CalendarEntryUpdate(BaseModel):
@@ -102,6 +104,11 @@ class CalendarEntryUpdate(BaseModel):
     time: Optional[str] = None
     status: Optional[str] = None
     hashtags: Optional[list[str]] = None
+    platform: Optional[str] = Field(None, max_length=64)
+    type: Optional[str] = Field(None, max_length=64)
+    content_format: Optional[str] = Field(None, max_length=64)
+    media_url: Optional[str] = Field(None, max_length=2000)
+    media_type: Optional[str] = Field(None, max_length=32)
 
 
 # ---------------------------------------------------------------------------

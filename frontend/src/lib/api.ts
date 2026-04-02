@@ -489,6 +489,21 @@ export const api = {
     return res.json()
   },
 
+  async uploadMedia(projectId: string, file: File): Promise<{ url: string; content_type: string }> {
+    const user = auth.currentUser
+    if (!user) throw new Error('Not authenticated')
+    const token = await user.getIdToken()
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${API}/projects/${projectId}/assets/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+    return res.json()
+  },
+
   // -------------------------------------------------------------------------
   // Campaigns
   // -------------------------------------------------------------------------
@@ -978,7 +993,18 @@ export const api = {
     updateEntry: (
       projectId: string,
       entryId: string,
-      updates: { content?: string; date?: string; time?: string; status?: string },
+      updates: {
+        content?: string
+        date?: string
+        time?: string
+        status?: string
+        hashtags?: string[]
+        platform?: string
+        type?: string
+        content_format?: string
+        media_url?: string | null
+        media_type?: string | null
+      },
       signal?: AbortSignal,
     ) =>
       patch<CalendarEntry>(`/projects/${projectId}/calendar/entries/${entryId}`, updates, signal),
