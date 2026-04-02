@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronRight, ChevronLeft, Loader2, Check } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Loader2, Check, Building2, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -152,12 +152,14 @@ const PROMPT_MODELS: ModelOption[] = [
 // Step indicators
 // ---------------------------------------------------------------------------
 
-const STEPS = ['Brand', 'Links', 'Models']
+const BUSINESS_STEPS = ['Brand', 'Links', 'Models']
+const PERSONAL_STEPS = ['You', 'Models']
 
-function StepDots({ current }: { current: number }) {
+function StepDots({ current, projectType }: { current: number; projectType: 'business' | 'personal' }) {
+  const steps = projectType === 'personal' ? PERSONAL_STEPS : BUSINESS_STEPS
   return (
     <div className="flex items-center gap-2 mb-6">
-      {STEPS.map((label, i) => (
+      {steps.map((label, i) => (
         <div key={i} className="flex items-center gap-2">
           <div className={cn(
             'flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold transition-all',
@@ -171,7 +173,7 @@ function StepDots({ current }: { current: number }) {
             'text-xs',
             i === current ? 'text-foreground font-medium' : 'text-muted-foreground',
           )}>{label}</span>
-          {i < STEPS.length - 1 && <div className="w-6 h-px bg-border" />}
+          {i < steps.length - 1 && <div className="w-6 h-px bg-border" />}
         </div>
       ))}
     </div>
@@ -191,18 +193,23 @@ export function ProjectWizard() {
     setIngestionOpen, openUpgradeModal,
   } = useAppStore()
 
-  const [step, setStep] = useState(0)
+  // Type selection (step -1 before the numbered flow)
+  const [projectType, setProjectType] = useState<'business' | 'personal' | null>(null)
+  const [step, setStep] = useState(-1)   // -1 = type selection
   const [submitting, setSubmitting] = useState(false)
 
-  // Step 1
+  // Shared
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
 
-  // Step 2
+  // Business-only: social links
   const [socialLinks, setSocialLinks] = useState<Partial<Record<keyof ProjectCreate, string>>>({})
   const [socialErrors, setSocialErrors] = useState<Partial<Record<keyof ProjectCreate, string>>>({})
 
-  // Step 3
+  // Personal-only
+  const [linkedinUrl, setLinkedinUrl] = useState('')
+
+  // Models (both)
   const [contentModel, setContentModel] = useState('claude-sonnet-4-6')
   const [imageModel,   setImageModel]   = useState('dall-e-3')
   const [videoModel,   setVideoModel]   = useState('gemini-flash')
@@ -217,24 +224,31 @@ export function ProjectWizard() {
   }
 
   function resetState() {
-    setStep(0)
+    setProjectType(null)
+    setStep(-1)
     setName('')
     setDescription('')
     setSocialLinks({})
     setSocialErrors({})
+    setLinkedinUrl('')
     setContentModel('claude-sonnet-4-6')
     setImageModel('dall-e-3')
     setVideoModel('gemini-flash')
     setPromptModel('claude-opus-4-6')
   }
 
-  // Step 1 → Step 2
+  function selectType(type: 'business' | 'personal') {
+    setProjectType(type)
+    setStep(0)
+  }
+
+  // Business: Step 0 → Step 1
   function goToLinks() {
     if (!name.trim()) return
     setStep(1)
   }
 
-  // Step 2 → Step 3 with validation
+  // Business: Step 1 → Step 2
   function goToModels() {
     const errors: Partial<Record<keyof ProjectCreate, string>> = {}
     if (!socialLinks.websiteUrl?.trim())   errors.websiteUrl   = 'Website URL is required'
@@ -244,38 +258,80 @@ export function ProjectWizard() {
     setStep(2)
   }
 
+  // Personal: Step 0 → Step 1
+  function personalGoToModels() {
+    if (!name.trim()) return
+    setStep(1)
+  }
+
   async function handleSubmit() {
     setSubmitting(true)
     try {
-      const payload: ProjectCreate = {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        ...socialLinks,
-        contentModel,
-        imageModel,
-        videoModel,
-        promptModel,
+      if (projectType === 'personal') {
+        // Personal brand project
+        const payload: ProjectCreate = {
+          name: name.trim(),
+          projectType: 'personal',
+          linkedinUrl: linkedinUrl.trim() || undefined,
+          contentModel,
+          imageModel,
+          videoModel,
+          promptModel,
+        }
+
+        const project = await api.projects.create(payload)
+        setProjects([project, ...projects])
+        setActiveProject(project)
+
+        // Create initial Personal Core
+        await api.persona.initCore(project.id, {
+          fullName: name.trim(),
+          linkedinUrl: linkedinUrl.trim() || undefined,
+        })
+
+        // Create a default chat
+        const chat = await api.chats.create(project.id, 'New Chat')
+        setChats([chat])
+        setActiveChat(chat)
+
+        setWizardOpen(false)
+        resetState()
+
+        // Navigate to the interview onboarding page
+        router.push(`/projects/${project.id}/personal-brand/onboarding`)
+        toast.success(`Personal brand "${project.name}" created! Let's build your identity.`)
+      } else {
+        // Business brand project (existing flow)
+        const payload: ProjectCreate = {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          projectType: 'business',
+          ...socialLinks,
+          contentModel,
+          imageModel,
+          videoModel,
+          promptModel,
+        }
+
+        const project = await api.projects.create(payload)
+        setProjects([project, ...projects])
+        setActiveProject(project)
+
+        const chat = await api.chats.create(project.id, 'New Chat')
+        setChats([chat])
+        setActiveChat(chat)
+
+        setWizardOpen(false)
+        resetState()
+
+        router.push(`/projects/${project.id}/chats/${chat.id}`)
+
+        if (payload.websiteUrl || payload.instagramUrl) {
+          setTimeout(() => setIngestionOpen(true), 400)
+        }
+
+        toast.success(`Brand "${project.name}" created!`)
       }
-
-      const project = await api.projects.create(payload)
-      setProjects([project, ...projects])
-      setActiveProject(project)
-
-      const chat = await api.chats.create(project.id, 'New Chat')
-      setChats([chat])
-      setActiveChat(chat)
-
-      setWizardOpen(false)
-      resetState()
-
-      router.push(`/projects/${project.id}/chats/${chat.id}`)
-
-      // Auto-open ingestion overlay if social links were provided
-      if (payload.websiteUrl || payload.instagramUrl) {
-        setTimeout(() => setIngestionOpen(true), 400)
-      }
-
-      toast.success(`Brand "${project.name}" created!`)
     } catch (err) {
       const msg = String(err)
       if (msg.includes('402')) {

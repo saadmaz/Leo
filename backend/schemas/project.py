@@ -5,6 +5,7 @@ from typing import Optional
 class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = ""
+    projectType: Optional[str] = "business"   # "business" | "personal"
     # Social links — website + instagram are mandatory in the UI but optional at schema level
     websiteUrl: Optional[str] = None
     instagramUrl: Optional[str] = None
@@ -49,6 +50,7 @@ class Project(BaseModel):
     name: str
     description: Optional[str] = ""
     ownerId: str
+    projectType: Optional[str] = "business"   # "business" | "personal"
     brandCore: Optional[dict] = None
     ingestionStatus: Optional[str] = None
     # Social links

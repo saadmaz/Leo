@@ -79,6 +79,10 @@ import type {
   MonitorChangeAlert,
   DiscoveredCompetitorSuggestion,
   CompetitorInput,
+  PersonalCore,
+  PersonalVoiceProfile,
+  InterviewNextResponse,
+  PersonalCoreExtractionEvent,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -1813,5 +1817,66 @@ export const api = {
     /** Get alerts for a monitor. */
     listAlerts: (projectId: string, monitorId: string) =>
       get<{ alerts: MonitorChangeAlert[] }>(`/projects/${projectId}/competitors/monitors/${monitorId}/alerts`),
+  },
+
+  // -------------------------------------------------------------------------
+  // Personal Branding Module
+  // -------------------------------------------------------------------------
+  persona: {
+    /** Create the initial Personal Core (called once after personal brand project creation). */
+    initCore: (projectId: string, body: { fullName: string; linkedinUrl?: string }) =>
+      post<PersonalCore>(`/projects/${projectId}/persona/core/init`, body),
+
+    /** Get the Personal Core for a personal brand project. */
+    getCore: (projectId: string) =>
+      get<PersonalCore>(`/projects/${projectId}/persona/core`),
+
+    /** Update Personal Core fields. */
+    updateCore: (projectId: string, updates: Partial<PersonalCore>) =>
+      patch<PersonalCore>(`/projects/${projectId}/persona/core`, updates),
+
+    /** Get all interview questions grouped by module. */
+    getQuestions: (projectId: string) =>
+      get<{ modules: Record<string, unknown> }>(`/projects/${projectId}/persona/interview/questions`),
+
+    /** Get the next unanswered question and current progress. */
+    getNextQuestion: (projectId: string) =>
+      get<InterviewNextResponse>(`/projects/${projectId}/persona/interview/next`),
+
+    /** Save a single interview answer. */
+    saveAnswer: (projectId: string, questionKey: string, answer: string) =>
+      post<InterviewNextResponse>(`/projects/${projectId}/persona/interview/answer`, {
+        module: questionKey.split('_')[0],
+        questionKey,
+        answer,
+      }),
+
+    /** Extract Personal Core from interview answers (SSE stream). */
+    streamExtract: (
+      projectId: string,
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (personalCore: PersonalCore) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<PersonalCoreExtractionEvent>(
+        `/projects/${projectId}/persona/interview/extract`,
+        {},
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event.personalCore)
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Get the voice profile for a personal brand project. */
+    getVoice: (projectId: string) =>
+      get<PersonalVoiceProfile>(`/projects/${projectId}/persona/voice`),
   },
 }

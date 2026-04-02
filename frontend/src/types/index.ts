@@ -66,6 +66,7 @@ export interface Project {
   name: string
   description?: string
   ownerId: string
+  projectType?: 'business' | 'personal'
   brandCore?: BrandCore | null
   ingestionStatus?: 'pending' | 'processing' | 'complete' | 'error' | null
   // Social links
@@ -93,6 +94,7 @@ export interface Project {
 export interface ProjectCreate {
   name: string
   description?: string
+  projectType?: 'business' | 'personal'
   // Social links
   websiteUrl?: string
   instagramUrl?: string
@@ -1445,4 +1447,108 @@ export type DeepResearchEvent =
   | { type: 'layer_done'; layer: number; name: string }
   | { type: 'competitor_done'; name: string; report_id: string }
   | { type: 'research_complete'; run_id: string; reports: { id: string; name: string }[] }
+  | { type: 'error'; message: string }
+
+// ---------------------------------------------------------------------------
+// Personal Branding Module
+// ---------------------------------------------------------------------------
+
+export interface PersonaExpertiseTopic {
+  topic: string
+  depth: 1 | 2 | 3
+  differentiatingAngle?: string
+}
+
+export interface PersonaAudience {
+  role?: string
+  industry?: string
+  painPoints: string[]
+  goals: string[]
+  primaryPlatforms: string[]
+}
+
+export interface PersonaContentPillar {
+  name: string
+  description?: string
+  contentAngles: string[]
+  percentage: number
+}
+
+export interface PersonaPlatformConfig {
+  focusLevel: 'primary' | 'secondary' | 'passive'
+  postsPerWeek: number
+  contentTypes: string[]
+  toneAdjustment?: string
+}
+
+export interface PersonalCore {
+  projectId: string
+  fullName: string
+  headline?: string
+  linkedinUrl?: string
+  positioningStatement?: string
+  uniqueAngle?: string
+  originStory?: string
+  values: string[]
+  credentialHighlights: string[]
+  expertiseTopics: PersonaExpertiseTopic[]
+  avoidedTopics: string[]
+  targetAudience?: PersonaAudience
+  secondaryAudiences: PersonaAudience[]
+  contentPillars: PersonaContentPillar[]
+  platformStrategy: Record<string, PersonaPlatformConfig>
+  brandGoals: string[]
+  goal90Day?: string
+  goal12Month?: string
+  admiredVoices: string[]
+  antiVoices: string[]
+  nicheTiredTopics: string[]
+  // Interview state
+  interviewStatus: 'not_started' | 'in_progress' | 'complete'
+  interviewAnswers: Record<string, string>
+  interviewProgress: number
+  // Enrichment
+  enrichmentStatus: 'pending' | 'running' | 'complete' | 'error'
+  completenessScore: number
+  version: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface PersonalVoiceProfile {
+  projectId: string
+  formalityLevel: number
+  sentenceLength: 'short' | 'medium' | 'long' | 'mixed'
+  emotionalRegister: 'analytical' | 'warm' | 'direct' | 'storytelling' | 'provocative'
+  signaturePhrases: string[]
+  avoidedPhrases: string[]
+  punctuationStyle: string
+  writingSamples: string[]
+  approvedOutputs: { text: string; platform: string; editedByUser: boolean }[]
+  accuracyScore: number
+  toneVariants: Record<string, { formalityAdjustment: number; notes: string }>
+  lastCalibrated?: string
+}
+
+export interface InterviewQuestion {
+  key: string
+  module: string
+  moduleLabel: string
+  prompt: string
+  hint?: string
+  chips: string[]
+}
+
+export interface InterviewNextResponse {
+  question: InterviewQuestion | null
+  progress: number
+  answeredCount: number
+  totalCount: number
+  interviewStatus: 'not_started' | 'in_progress' | 'complete'
+}
+
+export type PersonalCoreExtractionEvent =
+  | { type: 'step'; label: string; status: 'running' | 'done' | 'error' }
+  | { type: 'progress'; pct: number }
+  | { type: 'done'; personalCore: PersonalCore }
   | { type: 'error'; message: string }

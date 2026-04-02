@@ -35,6 +35,7 @@ async def create_project(body: ProjectCreate, user: CurrentUser):
         owner_uid=user["uid"],
         name=body.name,
         description=body.description or "",
+        project_type=body.projectType or "business",
         website_url=body.websiteUrl,
         instagram_url=body.instagramUrl,
         facebook_url=body.facebookUrl,

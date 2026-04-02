@@ -888,6 +888,7 @@ def create_project(
     name: str,
     description: str = "",
     *,
+    project_type: str = "business",
     website_url: Optional[str] = None,
     instagram_url: Optional[str] = None,
     facebook_url: Optional[str] = None,
@@ -914,6 +915,7 @@ def create_project(
         "name": name,
         "description": description,
         "ownerId": owner_uid,
+        "projectType": project_type,
         # members is a map of uid → role so membership queries stay O(1).
         "members": {owner_uid: "admin"},
         "brandCore": None,
@@ -2654,3 +2656,90 @@ def list_monitor_alerts(project_id: str, monitor_id: str) -> list[dict]:
         .stream()
     )
     return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Personal Brand — Personal Core
+# ---------------------------------------------------------------------------
+
+def get_personal_core(project_id: str) -> Optional[dict]:
+    """Return the Personal Core for a personal brand project, or None."""
+    db = get_db()
+    doc = db.collection("personal_cores").document(project_id).get()
+    if not doc.exists:
+        return None
+    return {"projectId": project_id, **doc.to_dict()}
+
+
+def create_personal_core(project_id: str, full_name: str, linkedin_url: Optional[str] = None) -> dict:
+    """Create the initial Personal Core document for a personal brand project."""
+    db = get_db()
+    now = _utcnow()
+    data = {
+        "fullName": full_name,
+        "linkedinUrl": linkedin_url,
+        "headline": None,
+        "positioningStatement": None,
+        "uniqueAngle": None,
+        "originStory": None,
+        "values": [],
+        "credentialHighlights": [],
+        "expertiseTopics": [],
+        "avoidedTopics": [],
+        "targetAudience": None,
+        "secondaryAudiences": [],
+        "contentPillars": [],
+        "platformStrategy": {},
+        "brandGoals": [],
+        "goal90Day": None,
+        "goal12Month": None,
+        "admiredVoices": [],
+        "antiVoices": [],
+        "nicheTiredTopics": [],
+        "interviewStatus": "not_started",
+        "interviewAnswers": {},
+        "interviewProgress": 0,
+        "enrichmentStatus": "pending",
+        "completenessScore": 0,
+        "version": 1,
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    db.collection("personal_cores").document(project_id).set(data)
+    return {"projectId": project_id, **data}
+
+
+def update_personal_core(project_id: str, updates: dict) -> dict:
+    """Merge updates into an existing Personal Core document."""
+    db = get_db()
+    updates["updatedAt"] = _utcnow()
+    db.collection("personal_cores").document(project_id).update(updates)
+    return get_personal_core(project_id)
+
+
+def save_interview_answer(project_id: str, question_key: str, answer: str) -> dict:
+    """
+    Persist a single interview answer and update interview progress.
+    Answers are stored as interviewAnswers.{question_key} = answer.
+    """
+    db = get_db()
+    now = _utcnow()
+
+    # Count total questions across all 5 modules (A=6, B=5, C=5, D=5, E=3 = 24)
+    TOTAL_QUESTIONS = 24
+
+    core = get_personal_core(project_id)
+    existing_answers: dict = core.get("interviewAnswers", {}) if core else {}
+    existing_answers[question_key] = answer
+
+    answered = len(existing_answers)
+    progress = min(int((answered / TOTAL_QUESTIONS) * 100), 99)
+    status = "in_progress" if answered < TOTAL_QUESTIONS else "in_progress"
+
+    db.collection("personal_cores").document(project_id).update({
+        f"interviewAnswers.{question_key}": answer,
+        "interviewProgress": progress,
+        "interviewStatus": status,
+        "updatedAt": now,
+    })
+    return get_personal_core(project_id)
