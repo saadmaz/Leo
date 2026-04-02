@@ -980,6 +980,7 @@ export const api = {
         date: string
         platform: string
         content: string
+        title?: string
         time?: string
         hashtags?: string[]
         type?: string
@@ -995,6 +996,7 @@ export const api = {
       entryId: string,
       updates: {
         content?: string
+        title?: string | null
         date?: string
         time?: string
         status?: string

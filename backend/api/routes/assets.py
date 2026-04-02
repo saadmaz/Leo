@@ -189,6 +189,17 @@ async def upload_media(
             logger.error("R2 upload failed for project %s: %s", project_id, exc, exc_info=True)
 
     if media_url is None:
+        # Videos must not fall back to base64 — they would exceed Firestore's 1 MB document limit.
+        if content_type.startswith("video/"):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Video upload requires Cloudflare R2 storage to be configured. "
+                    "Please set CLOUDFLARE_R2_ACCESS_KEY_ID, CLOUDFLARE_R2_SECRET_ACCESS_KEY, "
+                    "CLOUDFLARE_R2_ENDPOINT, CLOUDFLARE_R2_BUCKET_NAME, and CLOUDFLARE_R2_PUBLIC_URL."
+                ),
+            )
+        # Images: fall back to base64 (safe for files up to ~700 KB)
         b64 = base64.b64encode(data).decode("utf-8")
         media_url = f"data:{content_type};base64,{b64}"
         logger.info("Storing media as base64 data URL for project %s", project_id)

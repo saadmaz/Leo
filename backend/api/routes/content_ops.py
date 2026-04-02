@@ -87,7 +87,8 @@ class CalendarGenerateRequest(BaseModel):
 class CalendarEntryCreate(BaseModel):
     date: str = Field(..., max_length=10)         # YYYY-MM-DD
     platform: str = Field(..., max_length=64)
-    content: str = Field(..., max_length=5000)
+    content: str = Field(default="", max_length=50000)
+    title: Optional[str] = Field(None, max_length=300)
     time: Optional[str] = Field(None, max_length=5)   # HH:MM
     hashtags: list[str] = Field(default_factory=list)
     type: str = Field(default="post", max_length=64)
@@ -95,11 +96,12 @@ class CalendarEntryCreate(BaseModel):
     status: str = Field(default="planned")
     content_library_item_id: Optional[str] = None
     media_url: Optional[str] = Field(None, max_length=2000)
-    media_type: Optional[str] = Field(None, max_length=32)   # image | video | blog
+    media_type: Optional[str] = Field(None, max_length=32)   # image | video | blog | carousel
 
 
 class CalendarEntryUpdate(BaseModel):
-    content: Optional[str] = Field(None, max_length=5000)
+    content: Optional[str] = Field(None, max_length=50000)
+    title: Optional[str] = Field(None, max_length=300)
     date: Optional[str] = None
     time: Optional[str] = None
     status: Optional[str] = None
