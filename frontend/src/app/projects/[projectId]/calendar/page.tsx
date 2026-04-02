@@ -74,12 +74,6 @@ const firstDayOfMonth = (y:number,m:number) => new Date(y,m,1).getDay()
 const formatDate = (d:string) => new Date(d+'T00:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})
 const parseHashtags = (raw:string) => raw.split(/[\s,]+/).map(t=>t.replace(/^#/,'').trim()).filter(Boolean)
 
-function resolveMediaType(type: string, existingMediaType?: string | null): string {
-  if (VIDEO_TYPES.has(type.toLowerCase())) return 'video'
-  if (IMAGE_TYPES.has(type.toLowerCase())) return 'image'
-  if (type.toLowerCase() === 'blog') return 'blog'
-  return existingMediaType ?? 'image'
-}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -806,7 +800,6 @@ function EntryDetailModal({entry,projectId,onClose,onStatusChange,onSave,onDelet
   const [saving,setSaving]=useState(false)
 
   const type=entry.type?.toLowerCase()
-  const isVideo   =VIDEO_TYPES.has(type)
   const isCarousel=type==='carousel'
   const isBlog    =type==='blog'
 
