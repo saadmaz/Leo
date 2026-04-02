@@ -188,12 +188,14 @@ function PlatformPlanTab({ projectId }: { projectId: string }) {
       </div>
 
       {/* Growth Roadmap section (if included in strategy) */}
-      {strategy?.roadmap && (
+      {strategy?.roadmap && (() => {
+        const roadmap = strategy.roadmap!
+        return (
         <div className="space-y-4">
           <h2 className="text-base font-semibold text-foreground">Growth Roadmap</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {['months_1_3', 'months_4_6', 'months_7_12'].map((key, i) => {
-              const phase = strategy.roadmap[key]
+              const phase = roadmap[key]
               if (!phase) return null
               return (
                 <div key={key} className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -215,7 +217,8 @@ function PlatformPlanTab({ projectId }: { projectId: string }) {
             })}
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
