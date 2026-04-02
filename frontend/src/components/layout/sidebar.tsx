@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter, useParams } from 'next/navigation'
-import { signOut } from 'firebase/auth'
+import { signOut, updateProfile } from 'firebase/auth'
 import {
-  PlusIcon, MessageSquare, ChevronDown, ChevronRight, LogOut, Layers,
-  CreditCard, Pencil, Trash2, X, Moon, Sun, Settings, Menu, Megaphone, SlidersHorizontal, Sparkles,
+  PlusIcon, LogOut, Layers,
+  CreditCard, X, Moon, Sun, Settings, Menu, Megaphone, Sparkles,
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
+  ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -16,11 +17,173 @@ import { auth } from '@/lib/firebase'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
 import { NotificationBell } from '@/components/layout/notification-bell'
 import { CommandPalette } from '@/components/layout/command-palette'
-import type { Project, Chat } from '@/types'
+
+// ---------------------------------------------------------------------------
+// My Account modal
+// ---------------------------------------------------------------------------
+
+function AccountModal({ onClose }: { onClose: () => void }) {
+  const { user, setUser, billingStatus, credits } = useAppStore()
+  const [displayName, setDisplayName] = useState(user?.displayName ?? '')
+  const [saving, setSaving] = useState(false)
+  const router = useRouter()
+
+  const initials = (user?.displayName || user?.email || 'U')
+    .split(/[\s@]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('')
+
+  async function save() {
+    setSaving(true)
+    try {
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: displayName.trim() })
+        setUser({ ...user!, displayName: displayName.trim() })
+        toast.success('Profile updated')
+      }
+    } catch {
+      toast.error('Failed to update profile')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSignOut() {
+    await signOut(auth)
+    onClose()
+    router.replace('/login')
+  }
+
+  const plan = credits?.plan ?? billingStatus?.plan ?? null
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Mobile drag handle */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">My Account</span>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          {/* Avatar */}
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xl select-none">
+              {initials}
+            </div>
+          </div>
+
+          {/* Plan badge */}
+          {plan && (
+            <div className="flex justify-center">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                <Zap className="w-2.5 h-2.5" />
+                {plan} plan
+              </span>
+            </div>
+          )}
+
+          {/* Display name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Display name
+            </label>
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') save() }}
+              placeholder="Your name"
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Email
+            </label>
+            <input
+              value={user?.email ?? ''}
+              readOnly
+              className="w-full px-3 py-2 text-sm bg-muted border border-border rounded-lg text-muted-foreground cursor-not-allowed"
+            />
+          </div>
+
+          {/* Credits */}
+          {credits && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Credits remaining</span>
+                <span className="font-medium text-foreground">
+                  {credits.balance.toLocaleString()} / {credits.planAllotment.toLocaleString()}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    credits.balance / credits.planAllotment <= 0.1 ? 'bg-red-500'
+                    : credits.balance / credits.planAllotment <= 0.3 ? 'bg-amber-500'
+                    : 'bg-primary',
+                  )}
+                  style={{ width: `${Math.min((credits.balance / credits.planAllotment) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-border shrink-0 flex items-center gap-2">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+          <button
+            onClick={() => { router.push('/billing'); onClose() }}
+            className="px-3 py-2 text-xs border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            Plans
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="px-3 py-2 text-xs text-destructive border border-destructive/20 rounded-lg hover:bg-destructive/5 transition-colors flex items-center gap-1.5"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Sidebar shell
@@ -28,23 +191,23 @@ import type { Project, Chat } from '@/types'
 
 export function Sidebar() {
   const router = useRouter()
-  const params = useParams<{ projectId?: string; chatId?: string }>()
+  const params = useParams<{ projectId?: string }>()
   const { resolvedTheme, setTheme } = useTheme()
 
   const {
     user, projects, setProjects, activeProject, setActiveProject,
-    chats, setChats, setActiveChat,
+    setChats,
     billingStatus, credits, setCredits,
-    upsertProject, removeProject, upsertChat, removeChat,
     sidebarOpen, setSidebarOpen,
+    sidebarCollapsed, setSidebarCollapsed,
     setWizardOpen,
-    setProjectSettingsPanelOpen,
   } = useAppStore()
 
   const [projectsLoading, setProjectsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const hasUnseenChangelog = useHasUnseenChangelog()
 
   useEffect(() => { setMounted(true) }, [])
@@ -82,101 +245,6 @@ export function Sidebar() {
     if (found && found.id !== activeProject?.id) setActiveProject(found)
   }, [params.projectId, projects, activeProject, setActiveProject])
 
-  async function openChat(project: Project, chat: Chat) {
-    setActiveProject(project)
-    setActiveChat(chat)
-    router.push(`/projects/${project.id}/chats/${chat.id}`)
-    // Close sidebar on mobile after navigation
-    setSidebarOpen(false)
-  }
-
-  async function newChat(project: Project) {
-    try {
-      const chat = await api.chats.create(project.id)
-      setChats([chat, ...chats])
-      openChat(project, chat)
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to create chat')
-    }
-  }
-
-  async function newCarouselChat(project: Project) {
-    try {
-      const chat = await api.chats.create(project.id, 'Carousel Studio')
-      setChats([chat, ...chats])
-      setActiveProject(project)
-      setActiveChat(chat)
-      router.push(`/projects/${project.id}/chats/${chat.id}?trigger=carousel`)
-      setSidebarOpen(false)
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to create chat')
-    }
-  }
-
-  async function handleRenameProject(project: Project, name: string) {
-    try {
-      await api.projects.update(project.id, { name })
-      upsertProject({ ...project, name })
-      toast.success('Project renamed')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to rename project')
-    }
-  }
-
-  async function handleDeleteProject(project: Project) {
-    try {
-      await api.projects.delete(project.id)
-      removeProject(project.id)
-      toast.success(`"${project.name}" deleted`)
-      if (activeProject?.id === project.id) {
-        router.push('/')
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to delete project')
-    }
-  }
-
-  async function handleRenameChat(chat: Chat, name: string) {
-    if (!activeProject) return
-    try {
-      await api.chats.rename(activeProject.id, chat.id, name)
-      upsertChat({ ...chat, name })
-      toast.success('Chat renamed')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to rename chat')
-    }
-  }
-
-  async function handleDeleteChat(chat: Chat) {
-    if (!activeProject) return
-    try {
-      await api.chats.delete(activeProject.id, chat.id)
-      removeChat(chat.id)
-      toast.success('Chat deleted')
-      if (params.chatId === chat.id) {
-        const remaining = chats.filter((c) => c.id !== chat.id)
-        if (remaining.length > 0) {
-          openChat(activeProject, remaining[0])
-        } else {
-          router.push('/')
-        }
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to delete chat')
-    }
-  }
-
-  async function handleSignOut() {
-    await signOut(auth)
-    router.replace('/login')
-  }
-
   // Close on Escape key (mobile UX)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -187,6 +255,13 @@ export function Sidebar() {
   }, [setSidebarOpen])
 
   const isDark = mounted && resolvedTheme === 'dark'
+
+  const userInitials = (user?.displayName || user?.email || 'U')
+    .split(/[\s@]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('')
 
   return (
     <>
@@ -201,16 +276,17 @@ export function Sidebar() {
       <aside
         className={cn(
           // Base layout
-          'flex flex-col w-60 shrink-0 border-r border-border bg-card h-screen z-50',
-          // Desktop: always in-flow
-          'md:relative md:translate-x-0 md:flex',
+          'flex flex-col shrink-0 border-r border-border bg-card h-screen z-50',
+          // Desktop: collapse by reducing width (smooth transition)
+          'hidden md:flex md:relative md:translate-x-0 transition-all duration-200',
+          sidebarCollapsed ? 'md:w-0 md:overflow-hidden md:border-r-0' : 'md:w-60',
           // Mobile: fixed overlay, slide in/out
-          'fixed inset-y-0 left-0 transition-transform duration-200',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          'fixed inset-y-0 left-0',
+          sidebarOpen ? 'flex w-64' : 'hidden md:flex',
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/Leo-agent.png" alt="LEO" width={28} height={28} className="rounded-lg" />
             <span className="text-base font-bold tracking-tight">LEO</span>
@@ -223,15 +299,13 @@ export function Sidebar() {
             >
               <Search className="w-3.5 h-3.5" />
             </button>
-            {activeProject && (
-              <NotificationBell projectId={activeProject.id} />
-            )}
+            {activeProject && <NotificationBell projectId={activeProject.id} />}
             <button
-              onClick={() => setWizardOpen(true)}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="New project"
+              onClick={() => setSidebarCollapsed(true)}
+              title="Collapse sidebar"
+              className="hidden md:flex p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              <PlusIcon className="w-4 h-4" />
+              <PanelLeft className="w-3.5 h-3.5" />
             </button>
             {/* Close button — mobile only */}
             <button
@@ -244,98 +318,91 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Project list */}
+        {/* Scrollable nav */}
         <div className="flex-1 overflow-y-auto py-2">
-          {projectsLoading ? (
-            <div className="px-3 py-2 space-y-1">
-              {[80, 65, 72].map((w) => (
-                <div key={w} className="flex items-center gap-2 px-2 py-2">
-                  <Skeleton className="h-3 w-3 rounded shrink-0" />
-                  <Skeleton className={`h-3 rounded`} style={{ width: `${w}%` }} />
+
+          {/* Active project context + switch link */}
+          <div className="px-3 pb-2">
+            {activeProject ? (
+              <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-5 h-5 rounded bg-primary/15 text-primary flex items-center justify-center font-bold text-[9px] shrink-0">
+                    {activeProject.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="text-xs font-medium truncate">{activeProject.name}</span>
                 </div>
-              ))}
-            </div>
-          ) : projects.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <Layers className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-xs text-muted-foreground">No projects yet.</p>
-              <button onClick={() => setWizardOpen(true)} className="mt-2 text-xs text-primary underline underline-offset-2">
-                Create your first brand
+                <button
+                  onClick={() => { router.push('/projects'); setSidebarOpen(false) }}
+                  title="Switch brand"
+                  className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { router.push('/projects'); setSidebarOpen(false) }}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Select a brand
               </button>
-            </div>
-          ) : null}
+            )}
+          </div>
 
-          {!projectsLoading && projects.map((project) => (
-            <ProjectRow
-              key={project.id}
-              project={project}
-              isActive={activeProject?.id === project.id}
-              activeChatId={params.chatId}
-              chats={activeProject?.id === project.id ? chats : []}
-              onOpenChat={(chat) => openChat(project, chat)}
-              onNewChat={() => newChat(project)}
-              onRename={(name) => handleRenameProject(project, name)}
-              onDelete={() => handleDeleteProject(project)}
-              onRenameChat={handleRenameChat}
-              onDeleteChat={handleDeleteChat}
-              onOpenSettings={() => { setActiveProject(project); setProjectSettingsPanelOpen(true) }}
-              onSelect={() => {
-                setActiveProject(project)
-                if (activeProject?.id !== project.id) {
-                  api.chats.list(project.id).then((c) => {
-                    setChats(c)
-                    if (c.length > 0) openChat(project, c[0])
-                  })
-                }
-              }}
-            />
-          ))}
+          {/* New project shortcut */}
+          <button
+            onClick={() => { setWizardOpen(true); setSidebarOpen(false) }}
+            className="flex items-center gap-2 w-full px-5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            New brand
+          </button>
 
-          {/* Project-scoped tool groups */}
-          {!projectsLoading && activeProject && (
+          {/* Project-scoped nav groups — only visible when a project is active */}
+          {activeProject && (
             <div className="mt-1 border-t border-border/50 pt-1">
               <NavGroup label="Workspace" storageKey="nav_workspace">
-                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"       onClick={() => router.push(`/projects/${activeProject.id}/campaigns`)} />
-                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"           onClick={() => router.push(`/projects/${activeProject.id}/posts`)} />
-                <NavItem icon={<Users className="w-3.5 h-3.5" />}         label="Team"            onClick={() => router.push(`/projects/${activeProject.id}/team`)} />
+                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"       onClick={() => { router.push(`/projects/${activeProject.id}/campaigns`); setSidebarOpen(false) }} />
+                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"           onClick={() => { router.push(`/projects/${activeProject.id}/posts`); setSidebarOpen(false) }} />
+                <NavItem icon={<Users className="w-3.5 h-3.5" />}         label="Team"            onClick={() => { router.push(`/projects/${activeProject.id}/team`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Create" storageKey="nav_content">
-                <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => router.push(`/projects/${activeProject.id}/dashboard`)} />
-                <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => router.push(`/projects/${activeProject.id}/library`)} />
-                <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => router.push(`/projects/${activeProject.id}/bulk`)} />
-                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => router.push(`/projects/${activeProject.id}/planner`)} />
-                <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}       label="Image Studio"    onClick={() => router.push(`/projects/${activeProject.id}/images`)} />
-                <NavItem icon={<Layers className="w-3.5 h-3.5" />}          label="Carousel Studio" onClick={() => newCarouselChat(activeProject)} />
+                <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => { router.push(`/projects/${activeProject.id}/dashboard`); setSidebarOpen(false) }} />
+                <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => { router.push(`/projects/${activeProject.id}/library`); setSidebarOpen(false) }} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => { router.push(`/projects/${activeProject.id}/bulk`); setSidebarOpen(false) }} />
+                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => { router.push(`/projects/${activeProject.id}/planner`); setSidebarOpen(false) }} />
+                <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}       label="Image Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/images`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Publish" storageKey="nav_schedule">
-                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue" onClick={() => router.push(`/projects/${activeProject.id}/review`)} />
-                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"      onClick={() => router.push(`/projects/${activeProject.id}/calendar`)} />
-                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue" onClick={() => router.push(`/projects/${activeProject.id}/publish`)} />
+                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue" onClick={() => { router.push(`/projects/${activeProject.id}/review`); setSidebarOpen(false) }} />
+                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"      onClick={() => { router.push(`/projects/${activeProject.id}/calendar`); setSidebarOpen(false) }} />
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue" onClick={() => { router.push(`/projects/${activeProject.id}/publish`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Insights" storageKey="nav_intelligence">
-                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"   onClick={() => router.push(`/projects/${activeProject.id}/analytics`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"     onClick={() => router.push(`/projects/${activeProject.id}/reports`)} />
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"        onClick={() => router.push(`/projects/${activeProject.id}/deep-search`)} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"        onClick={() => router.push(`/projects/${activeProject.id}/intelligence`)} />
-                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"      onClick={() => router.push(`/projects/${activeProject.id}/intelligence/deep-research`)} />
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"      onClick={() => { router.push(`/projects/${activeProject.id}/analytics`); setSidebarOpen(false) }} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"        onClick={() => { router.push(`/projects/${activeProject.id}/reports`); setSidebarOpen(false) }} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"    onClick={() => { router.push(`/projects/${activeProject.id}/deep-search`); setSidebarOpen(false) }} />
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"    onClick={() => { router.push(`/projects/${activeProject.id}/intelligence`); setSidebarOpen(false) }} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"  onClick={() => { router.push(`/projects/${activeProject.id}/intelligence/deep-research`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Studio" storageKey="nav_studio">
-                <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => router.push(`/projects/${activeProject.id}/seo`)} />
-                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => router.push(`/projects/${activeProject.id}/emails`)} />
-                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"     onClick={() => router.push(`/projects/${activeProject.id}/templates`)} />
-                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}       label="Style Guide"   onClick={() => router.push(`/projects/${activeProject.id}/style-guide`)} />
-                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />}    label="Brand Health"  onClick={() => router.push(`/projects/${activeProject.id}/brand-health`)} />
+                <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/seo`); setSidebarOpen(false) }} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => { router.push(`/projects/${activeProject.id}/emails`); setSidebarOpen(false) }} />
+                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"     onClick={() => { router.push(`/projects/${activeProject.id}/templates`); setSidebarOpen(false) }} />
+                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}       label="Style Guide"   onClick={() => { router.push(`/projects/${activeProject.id}/style-guide`); setSidebarOpen(false) }} />
+                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />}    label="Brand Health"  onClick={() => { router.push(`/projects/${activeProject.id}/brand-health`); setSidebarOpen(false) }} />
               </NavGroup>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-3 space-y-1">
+        <div className="border-t border-border p-3 space-y-1 shrink-0">
           {/* Credits bar */}
           {credits ? (
             <div className="px-1 mb-2 space-y-1">
@@ -402,35 +469,36 @@ export function Sidebar() {
             <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
           </button>
 
-
           {/* Settings */}
           <button
-            onClick={() => router.push('/settings')}
+            onClick={() => { router.push('/settings'); setSidebarOpen(false) }}
             className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings className="w-3.5 h-3.5" />
             <span>Settings</span>
           </button>
 
-          {/* Billing */}
+          {/* My Account — user avatar + name */}
           <button
-            onClick={() => router.push('/billing')}
-            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            onClick={() => setAccountOpen(true)}
+            className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md hover:bg-muted transition-colors group"
           >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>Plans & Billing</span>
-          </button>
-
-          {/* Sign out */}
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="truncate text-xs">{user?.email ?? 'Sign out'}</span>
+            <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-[10px] shrink-0 group-hover:bg-primary/20 transition-colors">
+              {userInitials}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-xs font-medium truncate">{user?.displayName || user?.email || 'Account'}</p>
+              {user?.displayName && (
+                <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+              )}
+            </div>
+            <User className="w-3 h-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         </div>
       </aside>
+
+      {/* Modals */}
+      {accountOpen && <AccountModal onClose={() => setAccountOpen(false)} />}
       <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </>
@@ -493,276 +561,37 @@ function NavItem({ icon, label, onClick }: {
 }
 
 // ---------------------------------------------------------------------------
-// Hamburger toggle — render this in any page header for mobile
+// Sidebar toggle — works for both mobile (open) and desktop (uncollapse)
 // ---------------------------------------------------------------------------
 
 export function SidebarToggle({ className }: { className?: string }) {
-  const { setSidebarOpen } = useAppStore()
+  const { setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useAppStore()
   return (
-    <button
-      onClick={() => setSidebarOpen(true)}
-      className={cn(
-        'md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors',
-        className,
-      )}
-      title="Open sidebar"
-    >
-      <Menu className="w-4 h-4" />
-    </button>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// ProjectRow
-// ---------------------------------------------------------------------------
-
-interface ProjectRowProps {
-  project: Project
-  isActive: boolean
-  activeChatId?: string
-  chats: Chat[]
-  onSelect: () => void
-  onOpenChat: (chat: Chat) => void
-  onNewChat: () => void
-  onRename: (name: string) => void
-  onDelete: () => void
-  onRenameChat: (chat: Chat, name: string) => void
-  onDeleteChat: (chat: Chat) => void
-  onOpenSettings: () => void
-}
-
-function ProjectRow({
-  project, isActive, activeChatId, chats,
-  onSelect, onOpenChat, onNewChat,
-  onRename, onDelete, onRenameChat, onDeleteChat,
-  onOpenSettings,
-}: ProjectRowProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(project.name)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  function startEdit(e: React.MouseEvent) {
-    e.stopPropagation()
-    setDraft(project.name)
-    setEditing(true)
-    setTimeout(() => inputRef.current?.select(), 0)
-  }
-
-  function saveEdit() {
-    if (draft.trim() && draft !== project.name) onRename(draft.trim())
-    setEditing(false)
-  }
-
-  function startDelete(e: React.MouseEvent) {
-    e.stopPropagation()
-    setConfirmDelete(true)
-  }
-
-  return (
-    <div>
-      {/* Project header row */}
-      <div
+    <>
+      {/* Mobile: open sidebar overlay */}
+      <button
+        onClick={() => setSidebarOpen(true)}
         className={cn(
-          'group flex items-center gap-1 w-full px-3 py-2 transition-colors',
-          isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          'md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors',
+          className,
         )}
+        title="Open sidebar"
       >
-        {editing ? (
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={saveEdit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') saveEdit()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-            className="flex-1 min-w-0 text-xs bg-transparent border-b border-primary focus:outline-none py-0.5"
-            onClick={(e) => e.stopPropagation()}
-          />
-        ) : confirmDelete ? (
-          <span className="flex-1 min-w-0 text-xs truncate text-destructive">Delete &quot;{project.name}&quot;?</span>
-        ) : (
-          <button
-            onClick={onSelect}
-            className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
-          >
-            <ChevronDown
-              className={cn(
-                'w-3 h-3 shrink-0 transition-transform',
-                isActive ? 'rotate-0' : '-rotate-90',
-              )}
-            />
-            <span className="text-xs font-medium truncate">{project.name}</span>
-          </button>
-        )}
-
-        {confirmDelete ? (
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); setConfirmDelete(false) }}
-              className="text-[10px] text-destructive hover:underline"
-            >
-              Yes
-            </button>
-            <span className="text-muted-foreground/40 text-[10px]">/</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
-              className="text-[10px] text-muted-foreground hover:text-foreground"
-            >
-              No
-            </button>
-          </div>
-        ) : !editing && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); onOpenSettings() }}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Project settings"
-            >
-              <SlidersHorizontal className="w-3 h-3" />
-            </button>
-            <button
-              onClick={startEdit}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Rename"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
-            <button
-              onClick={startDelete}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-              title="Delete"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onNewChat() }}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="New chat"
-            >
-              <PlusIcon className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Chat list — only shown when project is active */}
-      {isActive && (
-        <div className="pb-1">
-          {chats.map((chat) => (
-            <ChatRow
-              key={chat.id}
-              chat={chat}
-              isActive={chat.id === activeChatId}
-              onOpen={() => onOpenChat(chat)}
-              onRename={(name) => onRenameChat(chat, name)}
-              onDelete={() => onDeleteChat(chat)}
-            />
-          ))}
-        </div>
+        <Menu className="w-4 h-4" />
+      </button>
+      {/* Desktop: show when collapsed */}
+      {sidebarCollapsed && (
+        <button
+          onClick={() => setSidebarCollapsed(false)}
+          className={cn(
+            'hidden md:flex p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors',
+            className,
+          )}
+          title="Show sidebar"
+        >
+          <PanelLeft className="w-4 h-4" />
+        </button>
       )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// ChatRow
-// ---------------------------------------------------------------------------
-
-interface ChatRowProps {
-  chat: Chat
-  isActive: boolean
-  onOpen: () => void
-  onRename: (name: string) => void
-  onDelete: () => void
-}
-
-function ChatRow({ chat, isActive, onOpen, onRename, onDelete }: ChatRowProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(chat.name)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  function startEdit(e: React.MouseEvent) {
-    e.stopPropagation()
-    setDraft(chat.name)
-    setEditing(true)
-    setTimeout(() => inputRef.current?.select(), 0)
-  }
-
-  function saveEdit() {
-    if (draft.trim() && draft !== chat.name) onRename(draft.trim())
-    setEditing(false)
-  }
-
-  return (
-    <div
-      className={cn(
-        'group flex items-center gap-1 pl-6 pr-2 py-1.5 mx-1 rounded-md transition-colors',
-        isActive
-          ? 'bg-muted text-foreground'
-          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-      )}
-    >
-      <MessageSquare className="w-3 h-3 shrink-0" />
-
-      {editing ? (
-        <input
-          ref={inputRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={saveEdit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') saveEdit()
-            if (e.key === 'Escape') setEditing(false)
-          }}
-          className="flex-1 min-w-0 text-xs bg-transparent border-b border-primary focus:outline-none py-0.5"
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : confirmDelete ? (
-        <>
-          <span className="flex-1 min-w-0 text-xs truncate text-destructive">Delete?</span>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); setConfirmDelete(false) }}
-              className="text-[10px] text-destructive hover:underline"
-            >
-              Yes
-            </button>
-            <span className="text-muted-foreground/40 text-[10px]">/</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
-              className="text-[10px] text-muted-foreground hover:text-foreground"
-            >
-              No
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <button onClick={onOpen} className="flex-1 min-w-0 text-left">
-            <span className="text-xs truncate block">{chat.name}</span>
-          </button>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button
-              onClick={startEdit}
-              className="p-0.5 rounded hover:bg-background text-muted-foreground hover:text-foreground"
-              title="Rename"
-            >
-              <Pencil className="w-2.5 h-2.5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
-              className="p-0.5 rounded hover:bg-background text-muted-foreground hover:text-destructive"
-              title="Delete"
-            >
-              <Trash2 className="w-2.5 h-2.5" />
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+    </>
   )
 }

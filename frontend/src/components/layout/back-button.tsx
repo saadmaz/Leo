@@ -4,11 +4,11 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function BackButton({ className }: { className?: string }) {
+export function BackButton({ className, href }: { className?: string; href?: string }) {
   const router = useRouter()
   return (
     <button
-      onClick={() => router.back()}
+      onClick={() => href ? router.push(href) : router.back()}
       className={cn(
         'p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors',
         className,

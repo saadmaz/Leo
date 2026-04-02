@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   MessageSquare, Library, BarChart2, Plus, Sparkles,
-  CheckCircle2, Clock, ArrowRight,
+  CheckCircle2, Clock, ArrowRight, Globe,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
@@ -56,18 +56,45 @@ function ProjectCard({
     .slice(0, 2)
 
   return (
-    <div className="group relative bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-sm transition-all">
+    <div
+      className="group relative bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
+      onClick={() => onNavigate(`/projects/${project.id}/dashboard`)}
+    >
       {/* Card header */}
       <div className="p-5 pb-3">
         <div className="flex items-start gap-3">
-          {/* Avatar */}
-          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-            {initials}
-          </div>
+          {/* Logo or initials avatar */}
+          {project.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={project.logoUrl}
+              alt={project.name}
+              className="w-10 h-10 rounded-xl object-cover shrink-0 border border-border"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+              {initials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm leading-tight truncate">{project.name}</h3>
+            <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">
+              {project.name}
+            </h3>
             {project.description && (
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{project.description}</p>
+            )}
+            {/* Website link */}
+            {project.websiteUrl && (
+              <a
+                href={project.websiteUrl.startsWith('http') ? project.websiteUrl : `https://${project.websiteUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 mt-1 text-[10px] text-primary/70 hover:text-primary hover:underline transition-colors"
+              >
+                <Globe className="w-2.5 h-2.5" />
+                {project.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              </a>
             )}
           </div>
         </div>
@@ -93,36 +120,32 @@ function ProjectCard({
         </div>
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions — stop propagation so they don't trigger card click */}
       <div className="px-4 pb-4 flex items-center gap-1.5">
         <button
-          onClick={onOpenChat}
+          onClick={(e) => { e.stopPropagation(); onOpenChat() }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <MessageSquare className="w-3 h-3" />
           Chat
         </button>
         <button
-          onClick={() => onNavigate(`/projects/${project.id}/library`)}
+          onClick={(e) => { e.stopPropagation(); onNavigate(`/projects/${project.id}/library`) }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground border border-border hover:bg-muted transition-colors"
         >
           <Library className="w-3 h-3" />
           Library
         </button>
         <button
-          onClick={() => onNavigate(`/projects/${project.id}/analytics`)}
+          onClick={(e) => { e.stopPropagation(); onNavigate(`/projects/${project.id}/analytics`) }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground border border-border hover:bg-muted transition-colors"
         >
           <BarChart2 className="w-3 h-3" />
           Analytics
         </button>
-        <button
-          onClick={() => onNavigate(`/projects/${project.id}/dashboard`)}
-          className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title="Open dashboard"
-        >
+        <div className="ml-auto p-1.5 rounded-lg text-muted-foreground group-hover:text-primary transition-colors">
           <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        </div>
       </div>
     </div>
   )
@@ -195,15 +218,15 @@ export default function ProjectsPage() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <AnnouncementBanner />
 
-        {/* Mobile top bar */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border md:hidden">
+        {/* Top bar */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
           <SidebarToggle />
           <Image src="/Leo-agent.png" alt="LEO" width={24} height={24} className="rounded-md" />
           <span className="font-bold text-sm">LEO</span>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
             {/* Greeting */}
             <div>

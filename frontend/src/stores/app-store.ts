@@ -94,6 +94,8 @@ interface AppState {
   // ---------------------------------------------------------------------------
   sidebarOpen: boolean
   setSidebarOpen: (v: boolean) => void
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (v: boolean) => void
 
   // ---------------------------------------------------------------------------
   // Brand Core panel
@@ -289,6 +291,8 @@ export const useAppStore = create<AppState>((set) => ({
   // ---------------------------------------------------------------------------
   sidebarOpen: true,
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+  sidebarCollapsed: false,
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
 
   // ---------------------------------------------------------------------------
   // Brand Core panel
