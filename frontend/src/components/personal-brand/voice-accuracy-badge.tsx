@@ -24,7 +24,7 @@ export function VoiceAccuracyBadge({ projectId, score, generatedContent }: Voice
     : score >= 60 ? 'text-amber-600 bg-amber-500/10 border-amber-500/20'
     : 'text-red-500 bg-red-500/10 border-red-500/20'
 
-  async function handleVote(_vote: 'yes' | 'somewhat' | 'no') {
+  async function handleVote() {
     setSaved(true)
     setCalibrating(false)
     if (!generatedContent) return
@@ -61,21 +61,21 @@ export function VoiceAccuracyBadge({ projectId, score, generatedContent }: Voice
         <div className="inline-flex items-center gap-1 bg-card border border-border rounded-full px-2 py-0.5 shadow-sm">
           <span className="text-[10px] text-muted-foreground mr-1">Sounds like you?</span>
           <button
-            onClick={() => handleVote('yes')}
+            onClick={() => handleVote()}
             className="p-0.5 rounded-full hover:bg-green-500/10 text-green-600 transition-colors"
             title="Yes, this sounds like me"
           >
             <ThumbsUp className="w-3 h-3" />
           </button>
           <button
-            onClick={() => handleVote('somewhat')}
+            onClick={() => handleVote()}
             className="p-0.5 rounded-full hover:bg-amber-500/10 text-amber-600 transition-colors"
             title="Somewhat"
           >
             <Minus className="w-3 h-3" />
           </button>
           <button
-            onClick={() => handleVote('no')}
+            onClick={() => handleVote()}
             className="p-0.5 rounded-full hover:bg-red-500/10 text-red-500 transition-colors"
             title="No, this doesn't sound like me"
           >
