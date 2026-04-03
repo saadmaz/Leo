@@ -116,6 +116,16 @@ class ReformatRequest(BaseModel):
     targetPlatforms: List[str]          # Platforms to reformat for
 
 
+class ArticleRequest(BaseModel):
+    topic: str                          # The topic or angle for the article
+    platform: str = "linkedin"          # "linkedin" | "substack" | "medium" | "blog"
+    outline: Optional[str] = None       # Optional bullet-point outline to guide structure
+
+
+class AddSamplesRequest(BaseModel):
+    samples: List[str]                  # List of raw writing sample strings
+
+
 # ---------------------------------------------------------------------------
 # Personal Core
 # ---------------------------------------------------------------------------

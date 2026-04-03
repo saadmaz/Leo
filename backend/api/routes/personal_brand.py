@@ -23,7 +23,9 @@ from fastapi.responses import StreamingResponse
 from backend.api.deps import assert_editor, assert_member, get_project_or_404
 from backend.middleware.auth import CurrentUser
 from backend.schemas.personal_brand import (
+    AddSamplesRequest,
     ApproveOutputRequest,
+    ArticleRequest,
     GeneratePostRequest,
     InterviewAnswerRequest,
     OpinionRequest,
@@ -604,6 +606,99 @@ async def approve_output(project_id: str, body: ApproveOutputRequest, user: Curr
         project_id, body.content, body.platform, body.editedByUser,
     )
     return result
+
+
+@router.post("/{project_id}/persona/content/article")
+async def write_article(project_id: str, body: ArticleRequest, user: CurrentUser):
+    """Stream a full thought leadership article in the user's voice (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    voice_profile = await asyncio.to_thread(_get_voice_profile, project_id)
+
+    from backend.services.personal_brand import content_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in content_engine.write_article(
+                project_id, personal_core, voice_profile,
+                body.topic, body.platform, body.outline,
+            ):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Article writer error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Voice Calibration
+# ---------------------------------------------------------------------------
+
+@router.post("/{project_id}/persona/voice/samples")
+async def add_voice_samples(project_id: str, body: AddSamplesRequest, user: CurrentUser):
+    """Add new writing samples and trigger voice re-calibration (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    if not body.samples or not any(s.strip() for s in body.samples):
+        raise HTTPException(status_code=400, detail="At least one non-empty writing sample is required.")
+
+    from backend.services.personal_brand import voice_calibration
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in voice_calibration.add_samples_and_calibrate(
+                project_id, [s for s in body.samples if s.strip()]
+            ):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Add samples error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/voice/calibrate")
+async def calibrate_voice(project_id: str, user: CurrentUser):
+    """Re-calibrate voice profile from accumulated approved outputs (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import voice_calibration
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in voice_calibration.recalibrate_from_outputs(project_id):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Voice calibration error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---------------------------------------------------------------------------

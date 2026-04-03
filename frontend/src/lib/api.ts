@@ -85,6 +85,7 @@ import type {
   PersonalCoreExtractionEvent,
   ContentEngineEvent,
   ContentPlatform,
+  VoiceCalibrationEvent,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -2081,6 +2082,80 @@ export const api = {
       post<{ saved: boolean; approvedAt: string }>(
         `/projects/${projectId}/persona/content/approve`,
         { editedByUser: false, ...body },
+      ),
+
+    /** Write a full thought leadership article (SSE). */
+    streamArticle: (
+      projectId: string,
+      body: { topic: string; platform?: string; outline?: string },
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (result: ContentEngineEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<ContentEngineEvent>(
+        `/projects/${projectId}/persona/content/article`,
+        body,
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as ContentEngineEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Add new writing samples and re-calibrate voice profile (SSE). */
+    streamAddSamples: (
+      projectId: string,
+      samples: string[],
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (voiceProfile: VoiceCalibrationEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<VoiceCalibrationEvent>(
+        `/projects/${projectId}/persona/voice/samples`,
+        { samples },
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as VoiceCalibrationEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Re-calibrate voice profile from accumulated approved outputs (SSE). */
+    streamCalibrate: (
+      projectId: string,
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (event: VoiceCalibrationEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<VoiceCalibrationEvent>(
+        `/projects/${projectId}/persona/voice/calibrate`,
+        {},
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as VoiceCalibrationEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
       ),
   },
 }

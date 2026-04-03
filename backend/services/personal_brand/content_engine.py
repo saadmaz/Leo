@@ -684,3 +684,116 @@ def approve_output(project_id: str, content: str, platform: str, edited: bool) -
         doc_ref.set({"approvedOutputs": [entry], "updatedAt": now, "projectId": project_id})
 
     return {"saved": True, "approvedAt": now}
+
+
+# ---------------------------------------------------------------------------
+# 7. Thought Leadership Article Writer
+# ---------------------------------------------------------------------------
+
+_ARTICLE_SYSTEM = """
+You are a ghostwriter specialising in thought leadership content for personal brands.
+You write long-form articles that feel like genuine expertise — specific, opinionated,
+and unmistakably written by the person described.
+Return ONLY the article text — no commentary, no labels, no titles in markdown.
+""".strip()
+
+_ARTICLE_PROMPT = """
+VOICE CONTEXT:
+{voice_context}
+
+TOPIC / ANGLE: {topic}
+PLATFORM: {platform}
+TARGET LENGTH: {length}
+{outline_section}
+
+Write a full {platform} {format_label} with this structure:
+1. Opening hook — a specific claim, observation, or question that earns the read (2-3 sentences max)
+2. Context — why this matters now, for the specific audience
+3. Core argument — 3-5 sections, each with a clear subpoint supported by the person's direct experience or expertise
+4. Counterargument acknowledgment — steel-man the opposing view, then address it
+5. Close — a clear, opinionated summary and a single CTA (not "follow me", something of genuine value)
+
+Writing rules:
+- Write in the first person — this is their direct voice
+- Use specific examples from their field, not generic placeholders
+- Every section earns its place — no padding, no "in conclusion"
+- Do NOT use these phrases: "In today's fast-paced world", "Game-changing", "Dive deep", "Let's explore", "At the end of the day"
+- Subheadings are allowed — short and declarative, not questions
+- Write to be read, not to impress
+"""
+
+_PLATFORM_ARTICLE_FORMATS = {
+    "linkedin": ("article", "800-1200 words"),
+    "substack": ("newsletter post", "800-1500 words"),
+    "medium": ("article", "800-1400 words"),
+    "blog": ("blog post", "700-1200 words"),
+}
+
+
+async def write_article(
+    project_id: str,
+    personal_core: dict,
+    voice_profile: dict | None,
+    topic: str,
+    platform: str,
+    outline: str | None = None,
+) -> AsyncIterator[str]:
+    """Write a full thought leadership article in the user's voice."""
+    try:
+        yield _sse("step", {"label": "Building your voice context…", "status": "running"})
+        yield _sse("progress", {"pct": 10})
+
+        voice_context = _build_voice_context(personal_core, voice_profile)
+        fmt, length = _PLATFORM_ARTICLE_FORMATS.get(platform.lower(), ("article", "800-1200 words"))
+        outline_section = f"OUTLINE / KEY POINTS TO COVER:\n{outline}" if outline else ""
+
+        prompt = _ARTICLE_PROMPT.format(
+            voice_context=voice_context,
+            topic=topic,
+            platform=platform.capitalize(),
+            length=length,
+            format_label=fmt,
+            outline_section=outline_section,
+        )
+
+        yield _sse("step", {"label": "Building your voice context…", "status": "done"})
+        yield _sse("step", {"label": f"Writing your {platform.capitalize()} {fmt}…", "status": "running"})
+        yield _sse("progress", {"pct": 25})
+
+        from backend.config import settings
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
+            system=_ARTICLE_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        article_text = response.content[0].text.strip()
+
+        yield _sse("step", {"label": f"Writing your {platform.capitalize()} {fmt}…", "status": "done"})
+        yield _sse("step", {"label": "Scoring voice accuracy…", "status": "running"})
+        yield _sse("progress", {"pct": 90})
+
+        accuracy = _voice_accuracy_score(article_text, voice_profile)
+
+        yield _sse("step", {"label": "Scoring voice accuracy…", "status": "done"})
+        yield _sse("progress", {"pct": 100})
+        yield _sse("done", {
+            "result": {
+                "type": "article",
+                "platform": platform,
+                "topic": topic,
+                "content": article_text,
+                "voiceAccuracyScore": accuracy,
+                "wordCount": len(article_text.split()),
+                "generatedAt": datetime.now(timezone.utc).isoformat(),
+            }
+        })
+
+    except Exception as exc:
+        logger.exception("Article writer failed for project %s", project_id)
+        yield _sse("error", {"message": str(exc)})
+
+    return {"saved": True, "approvedAt": now}

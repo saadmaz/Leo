@@ -1523,12 +1523,19 @@ export interface PersonalVoiceProfile {
   signaturePhrases: string[]
   avoidedPhrases: string[]
   punctuationStyle: string
+  writingPatterns?: string[]
   writingSamples: string[]
-  approvedOutputs: { text: string; platform: string; editedByUser: boolean }[]
+  approvedOutputs: { content: string; platform: string; editedByUser: boolean; approvedAt: string }[]
   accuracyScore: number
   toneVariants: Record<string, { formalityAdjustment: number; notes: string }>
   lastCalibrated?: string
 }
+
+export type VoiceCalibrationEvent =
+  | { type: 'step'; label: string; status: 'running' | 'done' | 'error' }
+  | { type: 'progress'; pct: number }
+  | { type: 'done'; voiceProfile: PersonalVoiceProfile }
+  | { type: 'error'; message: string }
 
 export interface InterviewQuestion {
   key: string
@@ -1560,14 +1567,15 @@ export type PersonalCoreExtractionEvent =
 export type ContentPlatform = 'linkedin' | 'instagram' | 'twitter' | 'tiktok' | 'threads' | 'youtube'
 
 export interface GeneratedPost {
-  type: 'post' | 'story' | 'opinion'
-  platform: ContentPlatform
+  type: 'post' | 'story' | 'opinion' | 'article'
+  platform: ContentPlatform | string
   content: string
   voiceAccuracyScore: number
   generatedAt: string
   topic?: string
   originalStory?: string
   take?: string
+  wordCount?: number
 }
 
 export interface OpinionQuestions {
