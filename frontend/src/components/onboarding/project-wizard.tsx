@@ -294,8 +294,8 @@ export function ProjectWizard() {
         const payload: ProjectCreate = {
           name: name.trim(),
           description: description.trim() || undefined,
-          projectType: 'business',
           ...socialLinks,
+          projectType: 'business',
           contentModel,
           imageModel,
           videoModel,
@@ -358,7 +358,7 @@ export function ProjectWizard() {
         </div>
 
         <div className="p-6">
-          <StepDots current={step} />
+          {projectType !== null && step >= 0 && <StepDots current={step} projectType={projectType} />}
 
           <AnimatePresence mode="wait">
             {/* ── Step 1: Name & Description ── */}
