@@ -395,6 +395,22 @@ async def get_weekly_brief(project_id: str, user: CurrentUser):
     return brief
 
 
+@router.post("/{project_id}/persona/analytics/brief/regenerate")
+async def regenerate_weekly_brief(project_id: str, user: CurrentUser):
+    """Force-regenerate the weekly brief (ignores any cached version)."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    from backend.services.personal_brand import analytics_service
+    brief = await asyncio.to_thread(analytics_service.generate_weekly_brief, project_id, personal_core)
+    return brief
+
+
 # ---------------------------------------------------------------------------
 # Reputation Monitoring
 # ---------------------------------------------------------------------------
@@ -873,3 +889,22 @@ async def get_publish_history(project_id: str, user: CurrentUser):
         .stream()
     )
     return {"posts": [{"id": d.id, **d.to_dict()} for d in docs]}
+
+
+@router.get("/{project_id}/persona/publishing/analytics/{post_id}")
+async def get_post_analytics(project_id: str, post_id: str, user: CurrentUser):
+    """Return Ayrshare post-level analytics for a specific published post."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    try:
+        data = await ayrshare_service.get_post_analytics(project_id, post_id)
+        return data
+    except Exception as exc:
+        logger.error("Post analytics error: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Could not fetch post analytics: {exc}") from exc

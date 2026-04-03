@@ -10,6 +10,7 @@ import {
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
+  Mic2, Shield,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -365,13 +366,23 @@ export function Sidebar() {
 
               {/* Personal Brand section — only for personal brand projects */}
               {activeProject.projectType === 'personal' && (
-                <NavGroup label="Personal Brand" storageKey="nav_personal_brand">
-                  <NavItem icon={<User className="w-3.5 h-3.5" />}        label="My Brand"   onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
-                  <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard" onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/dashboard`); setSidebarOpen(false) }} />
-                  <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}    label="Interview"  onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/onboarding`); setSidebarOpen(false) }} />
-                  <NavItem icon={<Map className="w-3.5 h-3.5" />}         label="Strategy"   onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/strategy`); setSidebarOpen(false) }} />
-                  <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}   label="Analytics"  onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/analytics`); setSidebarOpen(false) }} />
-                </NavGroup>
+                <>
+                  <NavGroup label="Personal Brand" storageKey="nav_personal_brand">
+                    <NavItem icon={<User className="w-3.5 h-3.5" />}            label="My Brand"        onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
+                    <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/dashboard`); setSidebarOpen(false) }} />
+                    <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}        label="Interview"       onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/onboarding`); setSidebarOpen(false) }} />
+                    <NavItem icon={<Map className="w-3.5 h-3.5" />}             label="Strategy"        onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/strategy`); setSidebarOpen(false) }} />
+                    <NavItem icon={<Mic2 className="w-3.5 h-3.5" />}            label="Content Engine"  onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/content`); setSidebarOpen(false) }} />
+                  </NavGroup>
+                  <NavGroup label="Personal Publish" storageKey="nav_personal_publish">
+                    <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Publishing"      onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/publishing`); setSidebarOpen(false) }} />
+                    <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}    label="Calendar"        onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/calendar`); setSidebarOpen(false) }} />
+                  </NavGroup>
+                  <NavGroup label="Personal Insights" storageKey="nav_personal_insights">
+                    <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}       label="Analytics"       onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/analytics`); setSidebarOpen(false) }} />
+                    <NavItem icon={<Shield className="w-3.5 h-3.5" />}          label="Reputation"      onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/reputation`); setSidebarOpen(false) }} />
+                  </NavGroup>
+                </>
               )}
 
               <NavGroup label="Workspace" storageKey="nav_workspace">

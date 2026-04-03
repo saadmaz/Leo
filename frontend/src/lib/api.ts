@@ -1942,6 +1942,14 @@ export const api = {
     getWeeklyBrief: (projectId: string) =>
       get<Record<string, unknown>>(`/projects/${projectId}/persona/analytics/brief`),
 
+    /** Manually trigger an analytics snapshot for all connected platforms. */
+    triggerSnapshot: (projectId: string) =>
+      post<Record<string, unknown>>(`/projects/${projectId}/persona/analytics/snapshot`, {}),
+
+    /** Force-regenerate the weekly brief. */
+    regenerateBrief: (projectId: string) =>
+      post<Record<string, unknown>>(`/projects/${projectId}/persona/analytics/brief/regenerate`, {}),
+
     /** Check reputation (Google + social mentions). */
     checkReputation: (projectId: string) =>
       post<Record<string, unknown>>(`/projects/${projectId}/persona/reputation/check`, {}),
@@ -1949,6 +1957,10 @@ export const api = {
     /** Get last reputation snapshot. */
     getReputation: (projectId: string) =>
       get<Record<string, unknown>>(`/projects/${projectId}/persona/reputation`),
+
+    /** Get post-level analytics from Ayrshare for a specific post. */
+    getPostAnalytics: (projectId: string, postId: string) =>
+      get<Record<string, unknown>>(`/projects/${projectId}/persona/publishing/analytics/${postId}`),
 
     // -----------------------------------------------------------------------
     // Content Engine

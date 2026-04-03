@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, Calendar, Trash2, RefreshCw, XCircle, Clock, Send,
+  BarChart2, ChevronDown, ChevronUp, Heart, MessageCircle, Repeat2, Eye,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -50,15 +51,72 @@ function groupByDate(posts: PublishedPost[]): { date: string; posts: PublishedPo
 }
 
 // ---------------------------------------------------------------------------
+// Post analytics expander
+// ---------------------------------------------------------------------------
+
+function PostAnalytics({ projectId, postId }: { projectId: string; postId: string }) {
+  const [data, setData] = useState<Record<string, unknown> | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  async function load() {
+    if (loaded) return
+    setLoading(true)
+    try {
+      const result = await api.persona.getPostAnalytics(projectId, postId)
+      setData(result as Record<string, unknown>)
+    } catch {
+      setData({})
+    } finally {
+      setLoading(false)
+      setLoaded(true)
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <button onClick={load} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+        {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BarChart2 className="w-3 h-3" />}
+        View stats
+      </button>
+    )
+  }
+
+  const platforms = (data?.platforms as Record<string, unknown>[] | undefined) ?? []
+  const totals = platforms.reduce<{ likes: number; comments: number; shares: number; impressions: number }>(
+    (acc, p) => {
+      const d = (p as Record<string, unknown>)
+      acc.likes += Number((d.likes ?? d.likeCount ?? 0))
+      acc.comments += Number((d.comments ?? d.commentCount ?? 0))
+      acc.shares += Number((d.shares ?? d.retweetCount ?? d.repostCount ?? 0))
+      acc.impressions += Number((d.impressions ?? d.views ?? 0))
+      return acc
+    },
+    { likes: 0, comments: 0, shares: 0, impressions: 0 },
+  )
+
+  return (
+    <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+      {totals.impressions > 0 && <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{totals.impressions.toLocaleString()}</span>}
+      <span className="flex items-center gap-1"><Heart className="w-3 h-3" />{totals.likes.toLocaleString()}</span>
+      <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" />{totals.comments.toLocaleString()}</span>
+      <span className="flex items-center gap-1"><Repeat2 className="w-3 h-3" />{totals.shares.toLocaleString()}</span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Post card
 // ---------------------------------------------------------------------------
 
 function PostCard({
   post,
+  projectId,
   onCancel,
   cancelling,
 }: {
   post: PublishedPost
+  projectId: string
   onCancel?: (id: string) => void
   cancelling: boolean
 }) {
@@ -97,21 +155,26 @@ function PostCard({
       </p>
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2">
         <span className="flex items-center gap-1.5">
           {isPending ? <Clock className="w-3 h-3" /> : <Send className="w-3 h-3" />}
           {isPending ? `Scheduled: ${formatDate(post.scheduledAt)}` : `Published: ${formatDate(post.scheduledAt ?? post.createdAt)}`}
         </span>
-        {isPending && onCancel && post.ayrsharePostId && (
-          <button
-            onClick={() => onCancel(post.ayrsharePostId!)}
-            disabled={cancelling}
-            className="flex items-center gap-1 text-destructive hover:opacity-70 disabled:opacity-40 transition-opacity"
-          >
-            {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            Cancel
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {!isPending && post.ayrsharePostId && (
+            <PostAnalytics projectId={projectId} postId={post.ayrsharePostId} />
+          )}
+          {isPending && onCancel && post.ayrsharePostId && (
+            <button
+              onClick={() => onCancel(post.ayrsharePostId!)}
+              disabled={cancelling}
+              className="flex items-center gap-1 text-destructive hover:opacity-70 disabled:opacity-40 transition-opacity"
+            >
+              {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              Cancel
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -249,6 +312,7 @@ export default function CalendarPage() {
                   <PostCard
                     key={post.id}
                     post={post}
+                    projectId={projectId}
                     onCancel={tab === 'scheduled' ? handleCancel : undefined}
                     cancelling={cancelling === post.ayrsharePostId}
                   />

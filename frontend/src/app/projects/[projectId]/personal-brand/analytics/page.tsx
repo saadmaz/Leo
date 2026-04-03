@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, RefreshCw, TrendingUp, Users, BarChart2, Star, Sparkles,
+  Camera, RotateCcw,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -186,6 +187,8 @@ export default function PersonalBrandAnalyticsPage() {
   const [brief, setBrief] = useState<WeeklyBrief | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [takingSnapshot, setTakingSnapshot] = useState(false)
+  const [regeneratingBrief, setRegeneratingBrief] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -228,6 +231,33 @@ export default function PersonalBrandAnalyticsPage() {
     }
   }
 
+  async function handleTakeSnapshot() {
+    setTakingSnapshot(true)
+    try {
+      await api.persona.triggerSnapshot(params.projectId)
+      // Reload snapshots after a short delay for Firestore to settle
+      setTimeout(async () => {
+        const snaps = await api.persona.getAnalytics(params.projectId) as unknown as AnalyticsSnapshot[]
+        setSnapshots(snaps ?? [])
+        setTakingSnapshot(false)
+      }, 1500)
+    } catch {
+      setTakingSnapshot(false)
+    }
+  }
+
+  async function handleRegenerateBrief() {
+    setRegeneratingBrief(true)
+    try {
+      const newBrief = await api.persona.regenerateBrief(params.projectId) as unknown as WeeklyBrief
+      setBrief(newBrief)
+    } catch {
+      // Non-critical
+    } finally {
+      setRegeneratingBrief(false)
+    }
+  }
+
   // Compute overall consistency score (average of all platforms)
   const latestSnaps = Object.values(
     snapshots.reduce<Record<string, AnalyticsSnapshot>>((acc, s) => {
@@ -262,25 +292,49 @@ export default function PersonalBrandAnalyticsPage() {
       <div className="max-w-4xl mx-auto w-full px-6 py-8 space-y-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Brand Analytics</h1>
             {personalCore?.fullName && (
               <p className="text-sm text-muted-foreground mt-0.5">{personalCore.fullName}</p>
             )}
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors disabled:opacity-40"
-          >
-            {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            Refresh
-          </button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={handleTakeSnapshot}
+              disabled={takingSnapshot}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors disabled:opacity-40"
+            >
+              {takingSnapshot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              Take snapshot
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors disabled:opacity-40"
+            >
+              {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Weekly Brief */}
-        {brief && <WeeklyBriefCard brief={brief} />}
+        {brief && (
+          <div className="space-y-2">
+            <WeeklyBriefCard brief={brief} />
+            <div className="flex justify-end">
+              <button
+                onClick={handleRegenerateBrief}
+                disabled={regeneratingBrief}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {regeneratingBrief ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                Regenerate brief
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Consistency Hero */}
         <div className="flex items-center gap-6 p-6 rounded-2xl border border-border bg-card">
