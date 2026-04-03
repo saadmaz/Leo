@@ -83,6 +83,8 @@ import type {
   PersonalVoiceProfile,
   InterviewNextResponse,
   PersonalCoreExtractionEvent,
+  ContentEngineEvent,
+  ContentPlatform,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -1942,5 +1944,143 @@ export const api = {
     /** Get last reputation snapshot. */
     getReputation: (projectId: string) =>
       get<Record<string, unknown>>(`/projects/${projectId}/persona/reputation`),
+
+    // -----------------------------------------------------------------------
+    // Content Engine
+    // -----------------------------------------------------------------------
+
+    /** Generate a quick on-brand post for any platform (SSE). */
+    streamGeneratePost: (
+      projectId: string,
+      body: { platform: ContentPlatform; topic: string },
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (result: ContentEngineEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<ContentEngineEvent>(
+        `/projects/${projectId}/persona/content/generate`,
+        body,
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as ContentEngineEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Convert a story/experience into a platform-native post (SSE). */
+    streamStoryToPost: (
+      projectId: string,
+      body: { story: string; platform: ContentPlatform },
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (result: ContentEngineEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<ContentEngineEvent>(
+        `/projects/${projectId}/persona/content/story`,
+        body,
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as ContentEngineEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Opinion extractor — phase 1 returns questions, phase 2 returns the post (SSE). */
+    streamOpinion: (
+      projectId: string,
+      body: { take: string; platform: ContentPlatform; answers?: string[] },
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (result: ContentEngineEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<ContentEngineEvent>(
+        `/projects/${projectId}/persona/content/opinion`,
+        body,
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as ContentEngineEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Generate per-platform bios and headlines (SSE). */
+    streamBioWriter: (
+      projectId: string,
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (result: ContentEngineEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<ContentEngineEvent>(
+        `/projects/${projectId}/persona/content/bio`,
+        {},
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as ContentEngineEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Reformat one piece of content for multiple platforms simultaneously (SSE). */
+    streamReformat: (
+      projectId: string,
+      body: { content: string; sourcePlatform: ContentPlatform; targetPlatforms: ContentPlatform[] },
+      callbacks: {
+        onStep?: (label: string, status: 'running' | 'done' | 'error') => void
+        onProgress?: (pct: number) => void
+        onDone?: (result: ContentEngineEvent & { type: 'done' }) => void
+        onError?: (message: string) => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<ContentEngineEvent>(
+        `/projects/${projectId}/persona/content/reformat`,
+        body,
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label, event.status)
+          else if (event.type === 'progress') callbacks.onProgress?.(event.pct)
+          else if (event.type === 'done') callbacks.onDone?.(event as ContentEngineEvent & { type: 'done' })
+          else if (event.type === 'error') callbacks.onError?.(event.message)
+        },
+        () => {},
+        signal,
+      ),
+
+    /** Mark a generated output as approved — saves to voice profile for calibration. */
+    approveOutput: (
+      projectId: string,
+      body: { content: string; platform: ContentPlatform; editedByUser?: boolean },
+    ) =>
+      post<{ saved: boolean; approvedAt: string }>(
+        `/projects/${projectId}/persona/content/approve`,
+        { editedByUser: false, ...body },
+      ),
   },
 }

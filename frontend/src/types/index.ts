@@ -1552,3 +1552,51 @@ export type PersonalCoreExtractionEvent =
   | { type: 'progress'; pct: number }
   | { type: 'done'; personalCore: PersonalCore }
   | { type: 'error'; message: string }
+
+// ---------------------------------------------------------------------------
+// Content Engine types
+// ---------------------------------------------------------------------------
+
+export type ContentPlatform = 'linkedin' | 'instagram' | 'twitter' | 'tiktok' | 'threads' | 'youtube'
+
+export interface GeneratedPost {
+  type: 'post' | 'story' | 'opinion'
+  platform: ContentPlatform
+  content: string
+  voiceAccuracyScore: number
+  generatedAt: string
+  topic?: string
+  originalStory?: string
+  take?: string
+}
+
+export interface OpinionQuestions {
+  type: 'questions'
+  take: string
+  questions: string[]
+}
+
+export interface GeneratedBios {
+  type: 'bios'
+  bios: {
+    linkedin?: { headline: string; aboutPreview: string; aboutFull: string }
+    instagram?: { bio: string; linkLabel: string }
+    twitter?: { bio: string }
+    tiktok?: { bio: string }
+  }
+  generatedAt: string
+}
+
+export interface ReformattedContent {
+  type: 'reformat'
+  sourcePlatform: ContentPlatform
+  originalContent: string
+  platforms: Record<string, { content: string; notes: string }>
+  generatedAt: string
+}
+
+export type ContentEngineEvent =
+  | { type: 'step'; label: string; status: 'running' | 'done' | 'error' }
+  | { type: 'progress'; pct: number }
+  | { type: 'done'; result: GeneratedPost | OpinionQuestions | GeneratedBios | ReformattedContent }
+  | { type: 'error'; message: string }

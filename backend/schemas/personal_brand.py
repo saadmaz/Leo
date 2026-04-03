@@ -84,6 +84,42 @@ class PersonalCoreUpdate(BaseModel):
     nicheTiredTopics: Optional[List[str]] = None
 
 
+# ---------------------------------------------------------------------------
+# Content Engine request schemas
+# ---------------------------------------------------------------------------
+
+class GeneratePostRequest(BaseModel):
+    platform: str          # "linkedin" | "instagram" | "twitter" | "tiktok" | "threads" | "youtube"
+    topic: str             # What to write about
+
+
+class StoryToPostRequest(BaseModel):
+    story: str             # The raw experience / event description
+    platform: str
+
+
+class OpinionRequest(BaseModel):
+    take: str              # The opinion / controversial view
+    platform: str
+    answers: Optional[List[str]] = None   # None on first call → returns questions; populated on second call
+
+
+class ApproveOutputRequest(BaseModel):
+    content: str           # The final post text (may be edited by user)
+    platform: str
+    editedByUser: bool = False
+
+
+class ReformatRequest(BaseModel):
+    content: str                        # Original content to reformat
+    sourcePlatform: str                 # Platform it was written for
+    targetPlatforms: List[str]          # Platforms to reformat for
+
+
+# ---------------------------------------------------------------------------
+# Personal Core
+# ---------------------------------------------------------------------------
+
 class PersonalCore(BaseModel):
     projectId: str
     fullName: str

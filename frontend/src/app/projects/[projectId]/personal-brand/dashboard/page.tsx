@@ -174,7 +174,7 @@ export default function PersonalBrandDashboardPage() {
     {
       done: false,
       label: 'Generate your first personal post',
-      href: `/projects/${params.projectId}/chats`,
+      href: `/projects/${params.projectId}/personal-brand/content`,
     },
     {
       done: false,
@@ -235,7 +235,7 @@ export default function PersonalBrandDashboardPage() {
         <div>
           <h2 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <QuickAction icon={<MessageSquare className="w-4 h-4" />} label="Generate a post" href={`/projects/${params.projectId}/chats`} />
+            <QuickAction icon={<MessageSquare className="w-4 h-4" />} label="Content Engine" href={`/projects/${params.projectId}/personal-brand/content`} />
             <QuickAction icon={<Map className="w-4 h-4" />} label="Build my strategy" href={`/projects/${params.projectId}/personal-brand/strategy`} />
             <QuickAction icon={<Mic2 className="w-4 h-4" />} label="View voice profile" onClick={() => setMyBrandPanelOpen(true)} />
             <QuickAction icon={<Search className="w-4 h-4" />} label="Analyse my niche" href={`/projects/${params.projectId}/personal-brand/strategy?tab=niche`} />

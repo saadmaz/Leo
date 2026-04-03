@@ -23,10 +23,15 @@ from fastapi.responses import StreamingResponse
 from backend.api.deps import assert_editor, assert_member, get_project_or_404
 from backend.middleware.auth import CurrentUser
 from backend.schemas.personal_brand import (
+    ApproveOutputRequest,
+    GeneratePostRequest,
     InterviewAnswerRequest,
+    OpinionRequest,
     PersonalCore,
     PersonalCoreCreate,
     PersonalCoreUpdate,
+    ReformatRequest,
+    StoryToPostRequest,
 )
 from backend.services import firebase_service
 from backend.services.personal_brand.interview_questions import (
@@ -402,6 +407,208 @@ async def get_reputation(project_id: str, user: CurrentUser):
         raise HTTPException(status_code=404, detail="No reputation data yet. Run a check first.")
     return doc.to_dict()
 
+
+# ---------------------------------------------------------------------------
+# Content Engine
+# ---------------------------------------------------------------------------
+
+def _get_voice_profile(project_id: str) -> dict | None:
+    """Load voice profile from Firestore, return None if missing."""
+    db = firebase_service.get_db()
+    doc = db.collection("personal_voice_profiles").document(project_id).get()
+    return doc.to_dict() if doc.exists else None
+
+
+@router.post("/{project_id}/persona/content/generate")
+async def generate_post(project_id: str, body: GeneratePostRequest, user: CurrentUser):
+    """Stream a quick on-brand post for any platform (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found. Complete the interview first.")
+
+    voice_profile = await asyncio.to_thread(_get_voice_profile, project_id)
+
+    from backend.services.personal_brand import content_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in content_engine.generate_post(
+                project_id, personal_core, voice_profile, body.platform, body.topic
+            ):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Content generation error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/content/story")
+async def story_to_post(project_id: str, body: StoryToPostRequest, user: CurrentUser):
+    """Stream a story → platform-native post conversion (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    voice_profile = await asyncio.to_thread(_get_voice_profile, project_id)
+
+    from backend.services.personal_brand import content_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in content_engine.story_to_post(
+                project_id, personal_core, voice_profile, body.story, body.platform
+            ):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Story-to-post error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/content/opinion")
+async def opinion_extractor(project_id: str, body: OpinionRequest, user: CurrentUser):
+    """
+    Opinion extractor — two-phase SSE flow.
+    Phase 1 (answers=null): returns 3 probing questions.
+    Phase 2 (answers provided): returns the full opinion post.
+    """
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    voice_profile = await asyncio.to_thread(_get_voice_profile, project_id)
+
+    from backend.services.personal_brand import content_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in content_engine.opinion_extractor(
+                project_id, personal_core, voice_profile,
+                body.take, body.answers, body.platform,
+            ):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Opinion extractor error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/content/bio")
+async def bio_writer(project_id: str, user: CurrentUser):
+    """Stream per-platform bio + headline generation (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    voice_profile = await asyncio.to_thread(_get_voice_profile, project_id)
+
+    from backend.services.personal_brand import content_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in content_engine.bio_writer(project_id, personal_core, voice_profile):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Bio writer error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/content/reformat")
+async def reformat_content(project_id: str, body: ReformatRequest, user: CurrentUser):
+    """Stream reformatting of one piece of content for multiple platforms (SSE)."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    if not body.targetPlatforms:
+        raise HTTPException(status_code=400, detail="At least one target platform is required.")
+
+    personal_core = firebase_service.get_personal_core(project_id)
+    if not personal_core:
+        raise HTTPException(status_code=400, detail="Personal Core not found.")
+
+    voice_profile = await asyncio.to_thread(_get_voice_profile, project_id)
+
+    from backend.services.personal_brand import content_engine
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in content_engine.reformat_content(
+                project_id, personal_core, voice_profile,
+                body.content, body.sourcePlatform, body.targetPlatforms,
+            ):
+                yield chunk
+        except Exception as exc:
+            logger.exception("Reformat error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{project_id}/persona/content/approve")
+async def approve_output(project_id: str, body: ApproveOutputRequest, user: CurrentUser):
+    """Save an approved (or edited) output to the voice profile for future calibration."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import content_engine
+    result = await asyncio.to_thread(
+        content_engine.approve_output,
+        project_id, body.content, body.platform, body.editedByUser,
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Reputation Monitoring
+# ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/persona/reputation/check")
 async def check_reputation(project_id: str, user: CurrentUser):
