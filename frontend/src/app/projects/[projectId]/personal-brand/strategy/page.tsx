@@ -282,8 +282,8 @@ function NicheResearchTab({ projectId }: { projectId: string }) {
     )
   }
 
-  const voices: NicheVoice[] = result?.voices ?? []
-  const contentGaps: string[] = result?.contentGaps ?? []
+  const voices: NicheVoice[] = (result?.voices as NicheVoice[]) ?? []
+  const contentGaps: string[] = (result?.contentGaps as string[]) ?? []
 
   return (
     <div className="space-y-6">
