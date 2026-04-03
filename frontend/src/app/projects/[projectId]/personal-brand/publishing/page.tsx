@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Loader2, ExternalLink, CheckCircle2, XCircle, RefreshCw,
+  Loader2, CheckCircle2, XCircle, RefreshCw,
   Link2, Share2, Twitter, Linkedin, Instagram,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -230,7 +230,7 @@ export default function PublishingPage() {
             {/* Help note */}
             <div className="rounded-xl border border-border bg-muted/30 p-4">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">How it works:</strong> Click "Connect" to open the platform's auth page.
+                <strong className="text-foreground">How it works:</strong> Click &quot;Connect&quot; to open the platform&apos;s auth page.
                 Once you approve access, your account will appear here. Posts generated in the Content Engine can then be published
                 or scheduled directly from that page.
               </p>

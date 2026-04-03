@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, Calendar, Trash2, RefreshCw, XCircle, Clock, Send,
-  BarChart2, ChevronDown, ChevronUp, Heart, MessageCircle, Repeat2, Eye,
+  BarChart2, Heart, MessageCircle, Repeat2, Eye,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'

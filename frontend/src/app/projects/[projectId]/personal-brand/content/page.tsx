@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, Sparkles, Zap, BookOpen, Flame, User, RefreshCw,
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { ConnectedPlatform, ContentPlatform, GeneratedPost, OpinionQuestions, GeneratedBios, ReformattedContent } from '@/types'
+import type { ConnectedPlatform, ContentPlatform, GeneratedPost, OpinionQuestions, GeneratedBios } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -515,7 +515,7 @@ function StoryMode({ projectId }: { projectId: string }) {
             rows={5}
             className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
           />
-          <p className="text-[11px] text-muted-foreground mt-1">Don't clean it up — LEO structures it. Just write what happened.</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Don&apos;t clean it up — LEO structures it. Just write what happened.</p>
         </div>
         <button
           onClick={handleGenerate}
@@ -616,7 +616,7 @@ function OpinionMode({ projectId }: { projectId: string }) {
           <PlatformSelector value={platform} onChange={setPlatform} />
         </div>
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-1.5">What's your take? State it bluntly.</p>
+          <p className="text-xs font-medium text-muted-foreground mb-1.5">What&apos;s your take? State it bluntly.</p>
           <textarea
             value={take}
             onChange={(e) => setTake(e.target.value)}

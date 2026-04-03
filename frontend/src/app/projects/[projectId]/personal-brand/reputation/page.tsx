@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Loader2, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert,
-  Shield, TrendingUp, Search, MessageSquare, XCircle,
+  Loader2, ExternalLink, ShieldCheck, ShieldAlert,
+  Shield, Search, MessageSquare, XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
