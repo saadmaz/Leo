@@ -1608,3 +1608,40 @@ export type ContentEngineEvent =
   | { type: 'progress'; pct: number }
   | { type: 'done'; result: GeneratedPost | OpinionQuestions | GeneratedBios | ReformattedContent }
   | { type: 'error'; message: string }
+
+// ---------------------------------------------------------------------------
+// Publishing (Ayrshare)
+// ---------------------------------------------------------------------------
+
+export interface ConnectedPlatform {
+  platform: string
+  username: string
+  displayName: string
+  isActive: boolean
+  profileUrl: string
+}
+
+export interface PublishingProfile {
+  profileKey: string
+  title: string
+  createdAt: string
+  connectedPlatforms: ConnectedPlatform[]
+}
+
+export interface PublishedPost {
+  id: string
+  projectId: string
+  post: string
+  platforms: string[]
+  scheduledAt: string | null
+  status: 'published' | 'scheduled' | 'failed'
+  ayrsharePostId?: string
+  createdAt: string
+}
+
+export interface AyrsharePostResult {
+  id?: string
+  status?: string
+  postIds?: Record<string, string>
+  errors?: Record<string, string>
+}

@@ -1,14 +1,15 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, Sparkles, Zap, BookOpen, Flame, User, RefreshCw,
   Copy, Check, ThumbsUp, ChevronDown, ChevronUp, ArrowRight, FileText,
+  Send, Calendar,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { ContentPlatform, GeneratedPost, OpinionQuestions, GeneratedBios, ReformattedContent } from '@/types'
+import type { ConnectedPlatform, ContentPlatform, GeneratedPost, OpinionQuestions, GeneratedBios, ReformattedContent } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -181,6 +182,154 @@ function PlatformSelector({
 }
 
 // ---------------------------------------------------------------------------
+// Publish panel (embedded in PostOutput)
+// ---------------------------------------------------------------------------
+
+function PublishPanel({ projectId, content }: { projectId: string; content: string }) {
+  const [open, setOpen] = useState(false)
+  const [platforms, setPlatforms] = useState<ConnectedPlatform[]>([])
+  const [selected, setSelected] = useState<string[]>([])
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [tab, setTab] = useState<'now' | 'schedule'>('now')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [errMsg, setErrMsg] = useState('')
+
+  const loadPlatforms = useCallback(async () => {
+    if (platforms.length) return
+    try {
+      const data = await api.persona.getPublishingProfile(projectId)
+      setPlatforms(data.connectedPlatforms)
+      if (data.connectedPlatforms.length > 0) {
+        setSelected([data.connectedPlatforms[0].platform])
+      }
+    } catch {
+      // ignore — user may not have connected platforms yet
+    }
+  }, [projectId, platforms.length])
+
+  function toggle() {
+    if (!open) loadPlatforms()
+    setOpen(!open)
+    setStatus('idle')
+  }
+
+  function togglePlatform(p: string) {
+    setSelected((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
+    )
+  }
+
+  async function handlePublish() {
+    if (!selected.length) return
+    setStatus('loading')
+    try {
+      if (tab === 'now') {
+        await api.persona.publishNow(projectId, content, selected)
+      } else {
+        if (!scheduleDate) { setErrMsg('Pick a date & time'); setStatus('error'); return }
+        await api.persona.schedulePost(projectId, content, selected, new Date(scheduleDate).toISOString())
+      }
+      setStatus('done')
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : 'Publish failed')
+      setStatus('error')
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={toggle}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Send className="w-3.5 h-3.5" />
+        {open ? 'Close' : 'Publish'}
+      </button>
+
+      {open && (
+        <div className="mt-3 rounded-lg border border-border bg-background p-3 space-y-3">
+          {/* Tab toggle */}
+          <div className="flex gap-1">
+            {(['now', 'schedule'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={cn(
+                  'flex-1 text-xs py-1 rounded-md font-medium transition-colors',
+                  tab === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {t === 'now' ? 'Publish Now' : 'Schedule'}
+              </button>
+            ))}
+          </div>
+
+          {/* Platform toggles */}
+          {platforms.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No platforms connected yet.{' '}
+              <a href={`publishing`} className="underline text-primary hover:opacity-80">Connect platforms →</a>
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {platforms.map((p) => (
+                <button
+                  key={p.platform}
+                  onClick={() => togglePlatform(p.platform)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-md text-xs border transition-colors',
+                    selected.includes(p.platform)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {p.displayName || p.platform}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Schedule date */}
+          {tab === 'schedule' && (
+            <input
+              type="datetime-local"
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          )}
+
+          {/* Action button */}
+          {status === 'done' ? (
+            <p className="text-xs text-green-600 font-medium flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              {tab === 'now' ? 'Published!' : 'Scheduled!'}
+            </p>
+          ) : (
+            <button
+              onClick={handlePublish}
+              disabled={status === 'loading' || !selected.length || platforms.length === 0}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-xs py-1.5 font-medium disabled:opacity-50 transition-opacity"
+            >
+              {status === 'loading' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {tab === 'now' ? (
+                <><Send className="w-3.5 h-3.5" /> Publish Now</>
+              ) : (
+                <><Calendar className="w-3.5 h-3.5" /> Schedule</>
+              )}
+            </button>
+          )}
+
+          {status === 'error' && (
+            <p className="text-xs text-destructive">{errMsg}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Generated post output card
 // ---------------------------------------------------------------------------
 
@@ -225,7 +374,8 @@ function PostOutput({
           <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{text}</p>
         )}
       </div>
-      <div className="flex items-center justify-end gap-4 px-4 py-2.5 border-t border-border/60 bg-muted/20">
+      <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-t border-border/60 bg-muted/20">
+        <PublishPanel projectId={projectId} content={text} />
         <ApproveButton
           projectId={projectId}
           content={text}

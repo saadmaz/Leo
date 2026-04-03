@@ -26,13 +26,16 @@ from backend.schemas.personal_brand import (
     AddSamplesRequest,
     ApproveOutputRequest,
     ArticleRequest,
+    CancelScheduledRequest,
     GeneratePostRequest,
     InterviewAnswerRequest,
     OpinionRequest,
     PersonalCore,
     PersonalCoreCreate,
     PersonalCoreUpdate,
+    PublishNowRequest,
     ReformatRequest,
+    SchedulePostRequest,
     StoryToPostRequest,
 )
 from backend.services import firebase_service
@@ -723,3 +726,150 @@ async def check_reputation(project_id: str, user: CurrentUser):
     from backend.services.personal_brand import reputation_service
     result = await asyncio.to_thread(reputation_service.check_reputation, project_id, full_name)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Publishing — Ayrshare
+# ---------------------------------------------------------------------------
+
+@router.get("/{project_id}/persona/publishing/profile")
+async def get_publishing_profile(project_id: str, user: CurrentUser):
+    """Return the Ayrshare profile + connected platforms for this project."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    profile = await ayrshare_service.get_profile(project_id)
+    if not profile:
+        # Auto-create profile on first call
+        profile = await ayrshare_service.get_or_create_profile(project_id)
+
+    platforms = await ayrshare_service.get_connected_platforms(project_id)
+    return {"profile": profile, "connectedPlatforms": platforms}
+
+
+@router.get("/{project_id}/persona/publishing/connect/{platform}")
+async def get_connect_url(project_id: str, platform: str, user: CurrentUser):
+    """Return a social-auth URL for connecting a platform to this project's profile."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    try:
+        data = await ayrshare_service.get_social_link_url(project_id, platform)
+        return data
+    except Exception as exc:
+        logger.error("Connect URL error: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Could not generate connect URL: {exc}") from exc
+
+
+@router.post("/{project_id}/persona/publishing/publish")
+async def publish_post_now(project_id: str, body: PublishNowRequest, user: CurrentUser):
+    """Publish a post immediately to the selected platforms."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    if not body.platforms:
+        raise HTTPException(status_code=400, detail="At least one platform is required.")
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    try:
+        result = await ayrshare_service.publish_now(
+            project_id, body.post, body.platforms, body.mediaUrls
+        )
+        return result
+    except Exception as exc:
+        logger.error("Publish error: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Publishing failed: {exc}") from exc
+
+
+@router.post("/{project_id}/persona/publishing/schedule")
+async def schedule_post(project_id: str, body: SchedulePostRequest, user: CurrentUser):
+    """Schedule a post for a future UTC datetime."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    if not body.platforms:
+        raise HTTPException(status_code=400, detail="At least one platform is required.")
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    try:
+        result = await ayrshare_service.schedule_post(
+            project_id, body.post, body.platforms, body.scheduledDate, body.mediaUrls
+        )
+        return result
+    except Exception as exc:
+        logger.error("Schedule error: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Scheduling failed: {exc}") from exc
+
+
+@router.get("/{project_id}/persona/publishing/scheduled")
+async def list_scheduled(project_id: str, user: CurrentUser):
+    """Return all pending scheduled posts for this project."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    try:
+        posts = await ayrshare_service.list_scheduled_posts(project_id)
+        return {"posts": posts}
+    except Exception as exc:
+        logger.error("List scheduled error: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Could not fetch scheduled posts: {exc}") from exc
+
+
+@router.delete("/{project_id}/persona/publishing/scheduled")
+async def cancel_scheduled(project_id: str, body: CancelScheduledRequest, user: CurrentUser):
+    """Cancel a pending scheduled post."""
+    project = get_project_or_404(project_id)
+    assert_editor(project, user["uid"])
+    _assert_personal(project)
+
+    from backend.services.personal_brand import ayrshare_service
+    if not ayrshare_service.settings.AYRSHARE_API_KEY:
+        raise HTTPException(status_code=503, detail="Publishing integration not configured.")
+
+    try:
+        result = await ayrshare_service.cancel_scheduled_post(project_id, body.postId)
+        return result
+    except Exception as exc:
+        logger.error("Cancel scheduled error: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Could not cancel post: {exc}") from exc
+
+
+@router.get("/{project_id}/persona/publishing/history")
+async def get_publish_history(project_id: str, user: CurrentUser):
+    """Return the publish history stored in Firestore."""
+    project = get_project_or_404(project_id)
+    assert_member(project, user["uid"])
+    _assert_personal(project)
+
+    db = firebase_service.get_db()
+    docs = (
+        db.collection("personal_publishing_history")
+        .where("projectId", "==", project_id)
+        .order_by("createdAt", direction="DESCENDING")
+        .limit(100)
+        .stream()
+    )
+    return {"posts": [{"id": d.id, **d.to_dict()} for d in docs]}

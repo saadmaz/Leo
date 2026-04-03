@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   Loader2, MessageSquare, Map, Mic2, Search, ChevronRight,
   CheckCircle2, Circle, ArrowRight, Target, BarChart2,
+  Send, CalendarDays,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
@@ -181,6 +182,11 @@ export default function PersonalBrandDashboardPage() {
       label: 'Build your platform strategy',
       href: `/projects/${params.projectId}/personal-brand/strategy`,
     },
+    {
+      done: false,
+      label: 'Connect your social accounts for publishing',
+      href: `/projects/${params.projectId}/personal-brand/publishing`,
+    },
   ]
 
   const hasPlatforms = core.platformStrategy && Object.keys(core.platformStrategy).length > 0
@@ -234,11 +240,13 @@ export default function PersonalBrandDashboardPage() {
         {/* Quick Actions */}
         <div>
           <h2 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <QuickAction icon={<MessageSquare className="w-4 h-4" />} label="Content Engine" href={`/projects/${params.projectId}/personal-brand/content`} />
             <QuickAction icon={<Map className="w-4 h-4" />} label="Build my strategy" href={`/projects/${params.projectId}/personal-brand/strategy`} />
             <QuickAction icon={<Mic2 className="w-4 h-4" />} label="View voice profile" onClick={() => setMyBrandPanelOpen(true)} />
             <QuickAction icon={<Search className="w-4 h-4" />} label="Analyse my niche" href={`/projects/${params.projectId}/personal-brand/strategy?tab=niche`} />
+            <QuickAction icon={<Send className="w-4 h-4" />} label="Connect & Publish" href={`/projects/${params.projectId}/personal-brand/publishing`} />
+            <QuickAction icon={<CalendarDays className="w-4 h-4" />} label="Content Calendar" href={`/projects/${params.projectId}/personal-brand/calendar`} />
           </div>
         </div>
 

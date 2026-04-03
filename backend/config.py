@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     SEARCH_CACHE_TTL_HOURS: int = 6
 
     # --- Social & Data APIs ---
+    AYRSHARE_API_KEY: Optional[str] = None
     YOUTUBE_API_KEY: Optional[str] = None
     META_APP_ID: Optional[str] = None
     META_APP_SECRET: Optional[str] = None

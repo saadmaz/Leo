@@ -127,6 +127,27 @@ class AddSamplesRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Publishing / Ayrshare schemas
+# ---------------------------------------------------------------------------
+
+class PublishNowRequest(BaseModel):
+    post: str                           # Final post text
+    platforms: List[str]                # Ayrshare platform slugs
+    mediaUrls: Optional[List[str]] = None
+
+
+class SchedulePostRequest(BaseModel):
+    post: str
+    platforms: List[str]
+    scheduledDate: str                  # ISO-8601 UTC, e.g. "2024-11-01T13:00:00Z"
+    mediaUrls: Optional[List[str]] = None
+
+
+class CancelScheduledRequest(BaseModel):
+    postId: str                         # Ayrshare post ID
+
+
+# ---------------------------------------------------------------------------
 # Personal Core
 # ---------------------------------------------------------------------------
 

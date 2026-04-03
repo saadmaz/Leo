@@ -86,6 +86,10 @@ import type {
   ContentEngineEvent,
   ContentPlatform,
   VoiceCalibrationEvent,
+  PublishingProfile,
+  ConnectedPlatform,
+  AyrsharePostResult,
+  PublishedPost,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -2157,5 +2161,48 @@ export const api = {
         () => {},
         signal,
       ),
+
+    // -------------------------------------------------------------------------
+    // Publishing (Ayrshare)
+    // -------------------------------------------------------------------------
+
+    getPublishingProfile: (projectId: string): Promise<{ profile: PublishingProfile; connectedPlatforms: ConnectedPlatform[] }> =>
+      get(`/projects/${projectId}/persona/publishing/profile`),
+
+    getConnectUrl: (projectId: string, platform: string): Promise<{ url: string }> =>
+      get(`/projects/${projectId}/persona/publishing/connect/${platform}`),
+
+    publishNow: (
+      projectId: string,
+      postText: string,
+      platforms: string[],
+      mediaUrls?: string[],
+    ): Promise<AyrsharePostResult> =>
+      post(`/projects/${projectId}/persona/publishing/publish`, { post: postText, platforms, mediaUrls }),
+
+    schedulePost: (
+      projectId: string,
+      postText: string,
+      platforms: string[],
+      scheduledDate: string,
+      mediaUrls?: string[],
+    ): Promise<AyrsharePostResult> =>
+      post(`/projects/${projectId}/persona/publishing/schedule`, { post: postText, platforms, scheduledDate, mediaUrls }),
+
+    listScheduled: (projectId: string): Promise<{ posts: PublishedPost[] }> =>
+      get(`/projects/${projectId}/persona/publishing/scheduled`),
+
+    cancelScheduled: async (projectId: string, postId: string): Promise<unknown> => {
+      const res = await fetch(`${API}/projects/${projectId}/persona/publishing/scheduled`, {
+        method: 'DELETE',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+
+    getPublishHistory: (projectId: string): Promise<{ posts: PublishedPost[] }> =>
+      get(`/projects/${projectId}/persona/publishing/history`),
   },
 }
