@@ -154,6 +154,7 @@ function ProfileCard({
   onSelect,
   onDelete,
   onRefresh,
+  onDeepDive,
   deleting,
   refreshing,
 }: {
@@ -161,6 +162,7 @@ function ProfileCard({
   onSelect: () => void
   onDelete: () => void
   onRefresh: () => void
+  onDeepDive: () => void
   deleting: boolean
   refreshing: boolean
 }) {
@@ -289,11 +291,17 @@ function ProfileCard({
               )}
             </div>
 
-            {/* View details arrow */}
-            <div className="flex items-center justify-end mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Action row */}
+            <div className="flex items-center justify-between mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="text-[11px] text-primary flex items-center gap-0.5">
-                View full profile <ChevronRight className="w-3 h-3" />
+                View profile <ChevronRight className="w-3 h-3" />
               </span>
+              <button
+                onClick={e => { e.stopPropagation(); onDeepDive() }}
+                className="text-[11px] text-violet-400 hover:text-violet-300 flex items-center gap-0.5 transition-colors"
+              >
+                <Zap className="w-3 h-3" /> Deep Dive
+              </button>
             </div>
           </>
         )}
@@ -319,9 +327,11 @@ function ProfileCard({
 function DetailPanel({
   profile,
   onClose,
+  onDeepDive,
 }: {
   profile: CompetitorProfile
   onClose: () => void
+  onDeepDive: () => void
 }) {
   const geo      = profile.geographic_scope ? GEO_CONFIG[profile.geographic_scope]     : null
   const size     = profile.size_tier        ? SIZE_CONFIG[profile.size_tier]            : null
@@ -366,12 +376,21 @@ function DetailPanel({
             </a>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onDeepDive}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 text-xs font-medium transition-colors border border-violet-500/20"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            Deep Dive
+          </button>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Scrollable Content */}
@@ -720,6 +739,7 @@ function ClassificationView({
   onSelectProfile,
   onDelete,
   onRefresh,
+  onDeepDive,
   deletingIds,
   refreshingIds,
 }: {
@@ -728,6 +748,7 @@ function ClassificationView({
   onSelectProfile: (p: CompetitorProfile) => void
   onDelete: (p: CompetitorProfile) => void
   onRefresh: (p: CompetitorProfile) => void
+  onDeepDive: (p: CompetitorProfile) => void
   deletingIds: Set<string>
   refreshingIds: Set<string>
 }) {
@@ -787,6 +808,13 @@ function ClassificationView({
                     </div>
                     {/* Actions */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onDeepDive(profile)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors text-[10px] font-medium"
+                        title="Run 7-layer deep research"
+                      >
+                        <Zap className="w-3 h-3" /> Deep Dive
+                      </button>
                       <button
                         onClick={() => onRefresh(profile)}
                         disabled={refreshingIds.has(profile.id) || deletingIds.has(profile.id)}
@@ -931,6 +959,16 @@ export default function CompetitorProfilesPage() {
       setClassifyStep(null)
       setPendingProfile(null)
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Deep Dive — navigate to intelligence analysis tab with prefill
+  // ---------------------------------------------------------------------------
+  function handleDeepDive(profile: CompetitorProfile) {
+    const qs = new URLSearchParams()
+    qs.set('prefill', profile.competitor_name)
+    if (profile.website) qs.set('website', profile.website)
+    router.push(`/projects/${params.projectId}/intelligence?${qs.toString()}`)
   }
 
   // ---------------------------------------------------------------------------
@@ -1181,6 +1219,7 @@ export default function CompetitorProfilesPage() {
               onSelectProfile={setSelectedProfile}
               onDelete={handleDelete}
               onRefresh={handleRefresh}
+              onDeepDive={handleDeepDive}
               deletingIds={deletingIds}
               refreshingIds={refreshingIds}
             />
@@ -1200,6 +1239,7 @@ export default function CompetitorProfilesPage() {
                       onSelect={() => setSelectedProfile(profile)}
                       onDelete={() => handleDelete(profile)}
                       onRefresh={() => handleRefresh(profile)}
+                      onDeepDive={() => handleDeepDive(profile)}
                       deleting={deletingIds.has(profile.id)}
                       refreshing={refreshingIds.has(profile.id)}
                     />
@@ -1228,6 +1268,7 @@ export default function CompetitorProfilesPage() {
               key="panel"
               profile={selectedProfile}
               onClose={() => setSelectedProfile(null)}
+              onDeepDive={() => handleDeepDive(selectedProfile)}
             />
           </>
         )}

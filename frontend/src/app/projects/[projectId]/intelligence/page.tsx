@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   BarChart2, RefreshCw, Plus, X, Loader2, ChevronDown, ChevronUp,
   TrendingUp, AlertTriangle, Lightbulb, Zap, Search,
@@ -94,6 +94,7 @@ function emptyForm(): CompetitorForm {
 export default function IntelligencePage() {
   const params = useParams<{ projectId: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [tab, setTab] = useState<Tab>('snapshots')
   const [snapshots, setSnapshots] = useState<CompetitorSnapshot[]>([])
@@ -129,6 +130,27 @@ export default function IntelligencePage() {
   useEffect(() => {
     if (params.projectId) loadSnapshots()
   }, [params.projectId, loadSnapshots])
+
+  // Pre-fill competitor form from ?prefill=Name&website=url (sent by Profiles "Deep Dive" button)
+  useEffect(() => {
+    const prefill = searchParams.get('prefill')
+    if (!prefill) return
+    setCompetitors([{
+      name: prefill,
+      website: searchParams.get('website') ?? '',
+      instagram: '',
+      facebook: '',
+      tiktok: '',
+      linkedin: '',
+      youtube: '',
+    }])
+    setShowAddForm(true)
+    // Clean the params from the URL without triggering a navigation
+    const url = new URL(window.location.href)
+    url.searchParams.delete('prefill')
+    url.searchParams.delete('website')
+    window.history.replaceState({}, '', url.toString())
+  }, [searchParams])
 
   // ---------------------------------------------------------------------------
   // Helpers
