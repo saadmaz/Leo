@@ -1002,6 +1002,11 @@ export interface DiscoveredCompetitor {
   employee_count?: string
   founded?: string
   industry?: string
+  logo_url?: string
+  type?: 'company' | 'influencer' | 'creator' | 'media'
+  segments?: string[]
+  geography?: 'Local' | 'Regional' | 'National' | 'Global'
+  estimated_revenue_range?: string
   social_hints?: {
     instagram?: string
     facebook?: string

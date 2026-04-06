@@ -104,6 +104,8 @@ export default function IntelligencePage() {
   const [discovering, setDiscovering] = useState(false)
   const [strategyLoading, setStrategyLoading] = useState(false)
   const [discovered, setDiscovered] = useState<DiscoveredCompetitor[]>([])
+  const [savedNames, setSavedNames] = useState<Set<string>>(new Set())
+  const [savingNames, setSavingNames] = useState<Set<string>>(new Set())
   const [showAddForm, setShowAddForm] = useState(false)
   const [competitors, setCompetitors] = useState<CompetitorForm[]>([emptyForm()])
   const [liveLog, setLiveLog] = useState<LogEntry[]>([])
@@ -262,8 +264,8 @@ export default function IntelligencePage() {
   async function addDiscoveredCompetitor(c: DiscoveredCompetitor) {
     const name = c.name || (() => { try { return new URL(c.url).hostname.replace('www.', '') } catch { return c.url } })()
 
-    // Remove from discovered banner immediately
-    setDiscovered(prev => prev.filter(d => d.name !== c.name))
+    // Mark as saving — card stays visible in the discovery panel
+    setSavingNames(prev => new Set([...prev, c.name]))
     setRefreshing(true)
     setShowAddForm(false)
     setLiveLog([])
@@ -291,6 +293,8 @@ export default function IntelligencePage() {
       })
     })
 
+    setSavingNames(prev => { const s = new Set(prev); s.delete(c.name); return s })
+    setSavedNames(prev => new Set([...prev, c.name]))
     setRefreshing(false)
   }
 
@@ -376,8 +380,14 @@ export default function IntelligencePage() {
         )}
 
         {/* ── Auto-discovered suggestions ── */}
-        {!refreshing && discovered.length > 0 && (
-          <DiscoveredBanner discovered={discovered} onAdd={addDiscoveredCompetitor} onDismiss={() => setDiscovered([])} />
+        {discovered.length > 0 && (
+          <DiscoveredBanner
+            discovered={discovered}
+            onSave={addDiscoveredCompetitor}
+            onDismiss={() => { setDiscovered([]); setSavedNames(new Set()); setSavingNames(new Set()) }}
+            savedNames={savedNames}
+            savingNames={savingNames}
+          />
         )}
 
         {/* ── Tabs ── */}
@@ -640,7 +650,7 @@ function LiveLogPanel({ log, active }: { log: LogEntry[]; active: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Discovered Banner — rich cards
+// Discovered Banner — filterable rich cards with per-card Save button
 // ---------------------------------------------------------------------------
 
 const RELEVANCE_LABEL = (score: number) => {
@@ -651,20 +661,42 @@ const RELEVANCE_LABEL = (score: number) => {
 
 function DiscoveredBanner({
   discovered,
-  onAdd,
+  onSave,
   onDismiss,
+  savedNames,
+  savingNames,
 }: {
   discovered: DiscoveredCompetitor[]
-  onAdd: (c: DiscoveredCompetitor) => void
+  onSave: (c: DiscoveredCompetitor) => void
   onDismiss: () => void
+  savedNames: Set<string>
+  savingNames: Set<string>
 }) {
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
+  const [geoFilter, setGeoFilter] = useState<string | null>(null)
+
+  const types = [...new Set(discovered.map(c => c.type).filter(Boolean))] as string[]
+  const geos = [...new Set(discovered.map(c => c.geography).filter(Boolean))] as string[]
+
+  const filtered = discovered.filter(c => {
+    if (typeFilter && c.type !== typeFilter) return false
+    if (geoFilter && c.geography !== geoFilter) return false
+    return true
+  })
+
+  const savedCount = discovered.filter(c => savedNames.has(c.name)).length
+
   return (
     <div className="mx-4 sm:mx-6 mt-4 rounded-2xl border border-border bg-muted/10 p-4">
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-sm font-semibold">Competitors found — click any to add</p>
+          <p className="text-sm font-semibold">
+            {discovered.length} competitors discovered
+            {savedCount > 0 && <span className="ml-2 text-emerald-400 text-xs font-normal">· {savedCount} saved</span>}
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Sourced from web search · {discovered.length} found
+            Sourced from Tavily · Exa · Claude AI — cached 24h
           </p>
         </div>
         <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground p-1">
@@ -672,27 +704,98 @@ function DiscoveredBanner({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {discovered.map((c, i) => {
-          const rel = RELEVANCE_LABEL(c.relevance_score ?? 0.6)
-          return (
+      {/* Filter chips */}
+      {(types.length > 1 || geos.length > 1) && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {types.map(t => (
             <button
+              key={t}
+              onClick={() => setTypeFilter(typeFilter === t ? null : t)}
+              className={cn(
+                'px-2.5 py-0.5 rounded-full text-[10px] font-medium border transition-colors capitalize',
+                typeFilter === t
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/50 text-muted-foreground border-border hover:text-foreground',
+              )}
+            >
+              {t}
+            </button>
+          ))}
+          {geos.map(g => (
+            <button
+              key={g}
+              onClick={() => setGeoFilter(geoFilter === g ? null : g)}
+              className={cn(
+                'px-2.5 py-0.5 rounded-full text-[10px] font-medium border transition-colors',
+                geoFilter === g
+                  ? 'bg-violet-600 text-white border-violet-600'
+                  : 'bg-muted/50 text-muted-foreground border-border hover:text-foreground',
+              )}
+            >
+              {g}
+            </button>
+          ))}
+          {(typeFilter || geoFilter) && (
+            <button
+              onClick={() => { setTypeFilter(null); setGeoFilter(null) }}
+              className="px-2.5 py-0.5 rounded-full text-[10px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {filtered.map((c, i) => {
+          const rel = RELEVANCE_LABEL(c.relevance_score ?? 0.6)
+          const isSaved = savedNames.has(c.name)
+          const isSaving = savingNames.has(c.name)
+          return (
+            <div
               key={i}
-              onClick={() => onAdd(c)}
-              className="group relative text-left rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-primary/5 transition-all p-4 flex flex-col gap-2"
+              className={cn(
+                'relative rounded-xl border bg-card p-4 flex flex-col gap-2 transition-all',
+                isSaved ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border',
+              )}
             >
               {/* Top row */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                    {c.name.charAt(0).toUpperCase()}
-                  </div>
+                  {c.logo_url ? (
+                    <img
+                      src={c.logo_url}
+                      alt={c.name}
+                      className="w-7 h-7 rounded-lg object-contain bg-white shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                      {c.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <span className="text-sm font-semibold truncate">{c.name}</span>
                 </div>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${rel.color}`}>
                   {rel.label}
                 </span>
               </div>
+
+              {/* Segment badges */}
+              {(c.type || (c.segments && c.segments.length > 0)) && (
+                <div className="flex flex-wrap gap-1">
+                  {c.type && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">{c.type}</span>
+                  )}
+                  {c.segments?.map(s => (
+                    <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">{s}</span>
+                  ))}
+                  {c.geography && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">{c.geography}</span>
+                  )}
+                </div>
+              )}
 
               {/* Description */}
               {(c.what_they_do || c.description) && (
@@ -716,9 +819,9 @@ function DiscoveredBanner({
                     <MapPin className="w-2.5 h-2.5" />{c.location}
                   </span>
                 )}
-                {c.funding_amount && c.funding_amount !== 'unknown' && (
+                {c.estimated_revenue_range && c.estimated_revenue_range !== 'unknown' && (
                   <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <DollarSign className="w-2.5 h-2.5" />{c.funding_amount}
+                    <DollarSign className="w-2.5 h-2.5" />{c.estimated_revenue_range}
                   </span>
                 )}
                 {c.employee_count && c.employee_count !== 'unknown' && (
@@ -740,13 +843,28 @@ function DiscoveredBanner({
                 </p>
               )}
 
-              {/* Add indicator */}
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <Plus className="w-3 h-3 text-primary-foreground" />
-                </div>
-              </div>
-            </button>
+              {/* Save button */}
+              <button
+                onClick={() => !isSaved && !isSaving && onSave(c)}
+                disabled={isSaved || isSaving}
+                className={cn(
+                  'mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all',
+                  isSaved
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                    : isSaving
+                    ? 'bg-muted/50 text-muted-foreground border border-border cursor-wait'
+                    : 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20',
+                )}
+              >
+                {isSaved ? (
+                  <><CheckCircle2 className="w-3 h-3" /> Saved</>
+                ) : isSaving ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> Analysing…</>
+                ) : (
+                  <><Plus className="w-3 h-3" /> Save to profiles</>
+                )}
+              </button>
+            </div>
           )
         })}
       </div>

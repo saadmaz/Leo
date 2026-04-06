@@ -2124,6 +2124,18 @@ async def stream_discover_competitors(
     themes     = brand_core.get("themes") or []
     existing   = set(brand_core.get("competitors") or [])
 
+    # ── 0. Cache check (24h TTL) ─────────────────────────────────────────────
+    _cache_key = "competitor_discovery"
+    try:
+        from backend.services import firebase_service as _fs
+        _cached = _fs.get_cached_search(project_id, _cache_key)
+        if _cached is not None:
+            yield {"type": "step", "message": "Returning cached competitor intelligence (refreshes every 24h)", "icon": "check", "detail": ""}
+            yield {"type": "result", "competitors": _cached}
+            return
+    except Exception:
+        pass
+
     def _evt(message: str, icon: str = "search", detail: str = "") -> dict:
         return {"type": "step", "message": message, "icon": icon, "detail": detail}
 
@@ -2337,6 +2349,10 @@ Return ONLY valid JSON:
       "industry": "<industry>",
       "why_competitor": "<1 sentence: why they directly compete>",
       "relevance_score": <0.0-1.0>,
+      "type": "<company|influencer|creator|media>",
+      "segments": ["<B2B and/or B2C>"],
+      "geography": "<Local|Regional|National|Global>",
+      "estimated_revenue_range": "<<$1M | $1M-$10M | $10M-$50M | $50M+ | unknown — pick one>",
       "social_hints": {{
         "instagram": "<full URL or @handle if found, else null>",
         "facebook": "<full URL if found, else null>",
@@ -2359,8 +2375,17 @@ Order by relevance_score descending. Only include genuine competitors — no inv
         )
         result = _parse_json_response(response.content[0].text)
         competitors = [c for c in result.get("competitors", []) if c.get("name") and c["name"] not in existing]
+        # Enrich with logo URLs
+        for _comp in competitors:
+            _comp["logo_url"] = _logo_url(_comp.get("url", ""))
+        # Persist to 24h cache
+        try:
+            from backend.services import firebase_service as _fs
+            _fs.save_search_cache(project_id, _cache_key, competitors, "discovery", ttl_hours=24)
+        except Exception:
+            pass
         yield _evt(f"Analysis complete — {len(competitors)} competitors identified", "done")
-        yield {"type": "result", "competitors": competitors[:12]}
+        yield {"type": "result", "competitors": competitors}
     except Exception as exc:
         yield _evt("Synthesis failed — returning raw candidates", "warn", str(exc)[:80])
         fallback = [
@@ -2369,6 +2394,7 @@ Order by relevance_score descending. Only include genuine competitors — no inv
                 "description": c.get("snippet", ""),
                 "why_competitor": "Similar company in the same space",
                 "relevance_score": 0.6,
+                "logo_url": _logo_url(c.get("url", "")),
             }
             for c in deduped_candidates[:12] if c.get("name") and c["name"] not in existing
         ]
