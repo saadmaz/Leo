@@ -361,7 +361,40 @@ export function ProjectWizard() {
           {projectType !== null && step >= 0 && <StepDots current={step} projectType={projectType} />}
 
           <AnimatePresence mode="wait">
-            {/* ── Step 1: Name & Description ── */}
+            {/* ── Step -1: Type Selection ── */}
+            {step === -1 && (
+              <motion.div
+                key="step-type"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-3"
+              >
+                <p className="text-sm text-muted-foreground mb-4">What are you building?</p>
+                <button
+                  onClick={() => { setProjectType('business'); setStep(0) }}
+                  className="w-full flex items-start gap-3 rounded-xl border border-input bg-background px-4 py-3.5 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                >
+                  <span className="text-xl mt-0.5">🏢</span>
+                  <div>
+                    <p className="text-sm font-medium">Business Brand</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">For companies, products, or organizations</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setProjectType('personal'); setStep(0) }}
+                  className="w-full flex items-start gap-3 rounded-xl border border-input bg-background px-4 py-3.5 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                >
+                  <span className="text-xl mt-0.5">👤</span>
+                  <div>
+                    <p className="text-sm font-medium">Personal Brand</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">For creators, founders, or professionals</p>
+                  </div>
+                </button>
+              </motion.div>
+            )}
+
+            {/* ── Step 1: Name & Description (business) or Name & LinkedIn (personal) ── */}
             {step === 0 && (
               <motion.div
                 key="step-name"
@@ -371,29 +404,55 @@ export function ProjectWizard() {
                 className="space-y-4"
               >
                 <div>
-                  <p className="text-sm font-medium mb-1">Brand name <span className="text-destructive">*</span></p>
+                  <p className="text-sm font-medium mb-1">
+                    {projectType === 'personal' ? 'Your name' : 'Brand name'}{' '}
+                    <span className="text-destructive">*</span>
+                  </p>
                   <input
                     autoFocus
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) goToLinks() }}
-                    placeholder="e.g. Acme Coffee Co."
+                    placeholder={projectType === 'personal' ? 'e.g. Jane Smith' : 'e.g. Acme Coffee Co.'}
                     className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
-                <div>
-                  <p className="text-sm font-medium mb-1">Description <span className="text-muted-foreground text-xs">(optional)</span></p>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What does this brand sell or stand for?"
-                    rows={3}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                  />
-                </div>
-                <div className="flex justify-end pt-2">
+                {projectType === 'personal' ? (
+                  <div>
+                    <p className="text-sm font-medium mb-1">LinkedIn URL <span className="text-muted-foreground text-xs">(optional)</span></p>
+                    <input
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/yourprofile"
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-medium mb-1">Description <span className="text-muted-foreground text-xs">(optional)</span></p>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="What does this brand sell or stand for?"
+                      rows={3}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                    />
+                  </div>
+                )}
+                <div className="flex justify-between pt-2">
                   <button
-                    onClick={goToLinks}
+                    onClick={() => setStep(-1)}
+                    className="flex items-center gap-1 px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" /> Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!name.trim()) return
+                      if (projectType === 'personal') setStep(1)
+                      else goToLinks()
+                    }}
                     disabled={!name.trim()}
                     className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
                   >
@@ -470,8 +529,8 @@ export function ProjectWizard() {
               </motion.div>
             )}
 
-            {/* ── Step 3: Model Selection ── */}
-            {step === 2 && (
+            {/* ── Step 3: Model Selection (business step 2, personal step 1) ── */}
+            {(step === 2 || (projectType === 'personal' && step === 1)) && (
               <motion.div
                 key="step-models"
                 initial={{ opacity: 0, x: 20 }}
@@ -505,7 +564,7 @@ export function ProjectWizard() {
 
                 <div className="flex justify-between pt-4">
                   <button
-                    onClick={() => setStep(1)}
+                    onClick={() => setStep(projectType === 'personal' ? 0 : 1)}
                     className="flex items-center gap-1 px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" /> Back
