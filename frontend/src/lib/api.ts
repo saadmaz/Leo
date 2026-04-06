@@ -77,7 +77,6 @@ import type {
   DeepResearchReportSummary,
   CompetitorMonitor,
   MonitorChangeAlert,
-  DiscoveredCompetitor,
   CompetitorInput,
   PersonalCore,
   PersonalVoiceProfile,
