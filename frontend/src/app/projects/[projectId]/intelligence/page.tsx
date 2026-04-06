@@ -287,7 +287,7 @@ export default function IntelligencePage() {
     const name = c.name || (() => { try { return new URL(c.url).hostname.replace('www.', '') } catch { return c.url } })()
 
     // Mark as saving — card stays visible in the discovery panel
-    setSavingNames(prev => new Set([...prev, c.name]))
+    setSavingNames(prev => { const s = new Set(prev); s.add(c.name); return s })
     setRefreshing(true)
     setShowAddForm(false)
     setLiveLog([])
@@ -316,7 +316,7 @@ export default function IntelligencePage() {
     })
 
     setSavingNames(prev => { const s = new Set(prev); s.delete(c.name); return s })
-    setSavedNames(prev => new Set([...prev, c.name]))
+    setSavedNames(prev => { const s = new Set(prev); s.add(c.name); return s })
     setRefreshing(false)
   }
 
@@ -697,8 +697,8 @@ function DiscoveredBanner({
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [geoFilter, setGeoFilter] = useState<string | null>(null)
 
-  const types = [...new Set(discovered.map(c => c.type).filter(Boolean))] as string[]
-  const geos = [...new Set(discovered.map(c => c.geography).filter(Boolean))] as string[]
+  const types = Array.from(new Set(discovered.map(c => c.type).filter(Boolean))) as string[]
+  const geos = Array.from(new Set(discovered.map(c => c.geography).filter(Boolean))) as string[]
 
   const filtered = discovered.filter(c => {
     if (typeFilter && c.type !== typeFilter) return false
@@ -786,6 +786,7 @@ function DiscoveredBanner({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {c.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={c.logo_url}
                       alt={c.name}
