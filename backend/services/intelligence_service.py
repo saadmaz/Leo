@@ -587,7 +587,7 @@ Rules:
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=2000,  # strategy JSON rarely exceeds 1800 tokens
+        max_tokens=3500,  # strategy JSON with 5 competitors can hit 3000+ tokens
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -922,7 +922,7 @@ Return ONLY a valid JSON object, no markdown. Schema:
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=1500,  # competitor report JSON — bounded schema
+        max_tokens=3000,  # competitor report has 9 major sections including scorecard, trajectory
         messages=[{"role": "user", "content": prompt}],
     )
 
