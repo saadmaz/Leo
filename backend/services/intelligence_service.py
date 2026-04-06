@@ -382,259 +382,218 @@ async def generate_competitive_strategy(
     Generate a comprehensive, evidence-backed competitive strategy plan.
 
     Uses ALL available scraped data (follower counts, engagement, themes,
-    momentum, recent news) plus fresh web research to build a 12-section
-    strategy document with specific, provable claims.
+    momentum, recent news) plus optional web research.
+
+    Output shape matches the CompetitiveStrategy TypeScript interface exactly.
     """
+    import asyncio as _a
     client = get_client()
     brand_context = build_brand_core_context(brand_core)
 
     # ── 1. Extract rich competitor data blocks ────────────────────────────────
     all_sources: list[str] = []
     competitors_text = ""
+    # Capture per-competitor platform followers for data_snapshot
+    comp_followers: dict[str, dict] = {}
 
-    for snap in competitor_snapshots:
-        name_c      = snap.get("name", "Unknown")
-        analysis    = snap.get("analysis") or {}
-        web         = snap.get("web_analysis") or {}
-        web_raw     = snap.get("web") or {}
-        platforms   = snap.get("platforms") or {}
+    for snap in competitor_snapshots[:5]:  # cap at 5 to keep prompt manageable
+        name_c    = snap.get("name", "Unknown")
+        analysis  = snap.get("analysis") or {}
+        web       = snap.get("web_analysis") or {}
+        platforms = snap.get("platforms") or {}
 
-        # Build real metrics per platform
         platform_lines: list[str] = []
         all_followers = 0
+        plat_followers: dict[str, int] = {}
         for plat, pdata in platforms.items():
-            profile  = pdata.get("profile") or {}
+            profile   = pdata.get("profile") or {}
             followers = (
                 profile.get("followers") or
                 pdata.get("followers") or
                 pdata.get("likes") or 0
             )
             posts = pdata.get("posts") or pdata.get("videos") or []
-            num_posts = len(posts) or 1
-            total_likes    = sum(p.get("likes", 0) for p in posts)
-            total_comments = sum(p.get("comments", 0) for p in posts)
-            avg_likes    = round(total_likes / num_posts)
-            avg_comments = round(total_comments / num_posts)
+            num_posts    = len(posts) or 1
+            avg_likes    = round(sum(p.get("likes", 0) for p in posts) / num_posts)
+            avg_comments = round(sum(p.get("comments", 0) for p in posts) / num_posts)
             eng_rate     = round((avg_likes + avg_comments) / max(followers, 1) * 100, 2)
             all_followers += followers
+            plat_followers[plat] = followers
             platform_lines.append(
-                f"    {plat}: {followers:,} followers | avg {avg_likes} likes, {avg_comments} comments | "
-                f"~{eng_rate}% engagement | {len(posts)} posts scraped"
+                f"  {plat}: {followers:,} followers | avg {avg_likes} likes, {avg_comments} comments | ~{eng_rate}% engagement"
             )
-        platform_block = "\n".join(platform_lines) or "    No platform data scraped"
 
-        # Top hashtags and themes
-        top_tags   = (analysis.get("top_hashtags") or [])[:10]
-        key_themes = (analysis.get("key_themes") or [])[:8]
-        strengths  = (analysis.get("strengths") or [])[:4]
-        weaknesses = (analysis.get("weaknesses") or [])[:4]
-        gaps       = (analysis.get("content_gaps") or [])[:4]
+        comp_followers[name_c] = plat_followers
+        top_themes = (analysis.get("key_themes") or [])[:6]
+        top_tags   = (analysis.get("top_hashtags") or [])[:8]
 
-        # Recent news
-        news_items = (web_raw.get("recent_news") or [])[:5]
-        news_block = ""
-        if news_items:
-            news_lines = [f"    • {n.get('title', '')} ({n.get('date', '')[:10]})" for n in news_items]
-            news_block = "  RECENT NEWS:\n" + "\n".join(news_lines)
+        competitors_text += (
+            f"\n[{name_c}] website={snap.get('website','?')} | total_followers={all_followers:,}\n"
+            + "\n".join(platform_lines) + "\n"
+            + f"  themes: {', '.join(top_themes) or 'unknown'}\n"
+            + f"  top hashtags: {', '.join(top_tags) or 'none'}\n"
+            + f"  strengths: {'; '.join((analysis.get('strengths') or [])[:3]) or 'unknown'}\n"
+            + f"  weaknesses: {'; '.join((analysis.get('weaknesses') or [])[:3]) or 'unknown'}\n"
+            + f"  momentum: {web.get('momentum','unknown')} | position: {web.get('market_position','unknown')}\n"
+        )
 
-        competitors_text += f"""
-━━━ COMPETITOR: {name_c} ━━━
-  Website: {snap.get("website", "unknown")}
-  Total followers across platforms: {all_followers:,}
-  Active platforms:
-{platform_block}
-  Content tone: {analysis.get("tone", "unknown")}
-  Key content themes: {", ".join(key_themes) or "none detected"}
-  Posting style: {analysis.get("posting_style", "")}
-  Top hashtags: {", ".join(top_tags) or "none"}
-  Strengths: {"; ".join(strengths) or "none"}
-  Weaknesses: {"; ".join(weaknesses) or "none"}
-  Content gaps they have: {"; ".join(gaps) or "none"}
-  Engagement patterns: {analysis.get("engagement_patterns", "")}
-  Market position: {web.get("market_position", "unknown")}
-  Momentum: {web.get("momentum", "unknown")}
-  Recent moves: {"; ".join(web.get("recent_moves") or []) or "none"}
-  Opportunity for us: {web.get("opportunity", "")}
-{news_block}
-"""
-
-    # ── 2. Fresh web research for the strategy ────────────────────────────────
-    # Do targeted searches to fill gaps and get current market context
+    # ── 2. Optional fast web research (30s timeout) ───────────────────────────
     additional_intel = ""
     try:
-        from backend.services.integrations import tavily_client, exa_client
-        import asyncio as _a
-
-        search_tasks = []
-        comp_names = [s.get("name", "") for s in competitor_snapshots[:4]]
-        comp_list  = ", ".join(comp_names)
-
+        from backend.services.integrations import tavily_client
         if settings.TAVILY_API_KEY:
-            search_tasks += [
+            comp_names = [s.get("name", "") for s in competitor_snapshots[:3]]
+            result_raw = await _a.wait_for(
                 tavily_client.search_advanced(
-                    f"{brand_name} vs {comp_list} market comparison 2024 2025",
-                    max_results=4, include_answer=True, project_id=None,
-                ),
-                tavily_client.search_advanced(
-                    f"{brand_name} competitors industry trends marketing strategy",
+                    f"{brand_name} vs {', '.join(comp_names)} competitive landscape 2025",
                     max_results=3, include_answer=True, project_id=None,
                 ),
-            ]
-
-        if search_tasks:
-            search_results = await _a.gather(*search_tasks, return_exceptions=True)
-            intel_parts: list[str] = []
-            for sr in search_results:
-                if isinstance(sr, Exception):
-                    continue
-                if isinstance(sr, dict):
-                    if sr.get("answer"):
-                        intel_parts.append(sr["answer"])
-                    for r in (sr.get("results") or [])[:3]:
-                        snip = r.get("content") or r.get("snippet") or ""
-                        url  = r.get("url", "")
-                        if snip:
-                            intel_parts.append(f"• {snip[:300]} ({url})")
-                            if url:
-                                all_sources.append(url)
-            if intel_parts:
-                additional_intel = "\n\nADDITIONAL MARKET INTELLIGENCE (from live web research):\n" + "\n".join(intel_parts[:10])
+                timeout=30,
+            )
+            parts: list[str] = []
+            if result_raw.get("answer"):
+                parts.append(result_raw["answer"])
+            for r in (result_raw.get("results") or [])[:3]:
+                snip = (r.get("content") or r.get("snippet") or "")[:250]
+                url  = r.get("url", "")
+                if snip:
+                    parts.append(f"• {snip} ({url})")
+                    if url:
+                        all_sources.append(url)
+            if parts:
+                additional_intel = "\nLIVE MARKET CONTEXT:\n" + "\n".join(parts)
     except Exception as exc:
-        logger.warning("Strategy web research failed: %s", exc)
+        logger.info("Strategy web research skipped: %s", exc)
 
-    # ── 3. Build the comprehensive prompt ────────────────────────────────────
-    prompt = f"""You are a senior competitive intelligence strategist — the calibre hired by McKinsey, BCG, and top-tier VCs. You have been given REAL scraped data about competitors. Your job is to produce an EXCEPTIONAL, DETAILED competitive strategy document.
+    # ── 3. Build prompt with schema matching TypeScript types exactly ─────────
+    sources_json = json.dumps(all_sources[:10])
+    num_competitors = len(competitor_snapshots)
 
-━━━ OUR BRAND ━━━
-Name: {brand_name}
+    prompt = f"""You are a senior competitive intelligence strategist. Analyse the real competitor data below and produce a detailed strategy document for {brand_name}.
+
+OUR BRAND:
 {brand_context}
 
-━━━ COMPETITOR INTELLIGENCE (REAL SCRAPED DATA) ━━━
+COMPETITOR DATA (real scraped metrics):
 {competitors_text}
 {additional_intel}
 
-━━━ YOUR TASK ━━━
-Produce a comprehensive, evidence-backed competitive strategy. Every recommendation must:
-1. Reference SPECIFIC competitor names and real data points from above
-2. Use ACTUAL numbers (follower counts, engagement rates, etc.) where available
-3. Be CONCRETE — not "improve your content" but "launch weekly educational Reels targeting [competitor]'s weakness in [specific topic]"
-4. Identify REAL competitive gaps with evidence
-5. Prioritise by IMPACT × FEASIBILITY
-
-Return ONLY valid JSON matching this EXACT structure (no markdown, no explanation):
+Return ONLY a valid JSON object with NO markdown fences, NO explanation text. Match this schema exactly:
 
 {{
-  "executive_summary": "<4-5 sentences covering: who dominates, where opportunities lie, what our #1 strategic priority should be — cite specific competitor names and real numbers>",
+  "executive_summary": "3-5 sentences citing specific competitor names and real data points — who dominates, where our opportunity is, #1 priority",
 
   "market_snapshot": {{
-    "competitive_intensity": "low|medium|high|extreme",
-    "total_competitor_reach": "<sum of all competitor followers e.g. 2.3M across 4 competitors>",
-    "dominant_platform": "<which platform competitors are strongest on>",
-    "biggest_threat": "<name of competitor who poses highest threat and why in 1 sentence>",
-    "biggest_gap": "<the single biggest uncontested opportunity in this market>",
-    "market_trend": "<1-2 sentences on where the competitive landscape is heading>"
+    "total_competitors": {num_competitors},
+    "market_maturity": "emerging|growing|mature|saturated",
+    "top_channels": ["<platform1>", "<platform2>"],
+    "key_trends": ["<trend 1>", "<trend 2>", "<trend 3>"],
+    "data_points": ["<stat with competitor name e.g. Competitor X has 50K Instagram followers>", "<another data point>"]
   }},
 
   "brand_position": {{
-    "strengths": [
-      {{"point": "<strength>", "evidence": "<what in the competitor data supports this as a strength for us>"}},
-      {{"point": "<strength>", "evidence": "..."}}
-    ],
-    "vulnerabilities": [
-      {{"point": "<vulnerability>", "evidence": "<what competitor is exploiting this gap>"}},
-      {{"point": "<vulnerability>", "evidence": "..."}}
-    ],
-    "differentiation": "<what makes us genuinely different from ALL listed competitors — be specific>",
-    "unique_angle": "<the ONE thing we can own that no competitor currently owns>"
+    "strengths": ["<strength as plain string>", "<strength>"],
+    "vulnerabilities": ["<vulnerability as plain string>", "<vulnerability>"],
+    "differentiation": "<what genuinely separates us from all listed competitors>",
+    "evidence": ["<data point supporting brand position>", "<another data point>"]
   }},
 
   "competitor_breakdown": [
     {{
-      "name": "<competitor name — MUST match one from the data above>",
+      "name": "<must match a competitor name from data above>",
       "threat_level": "high|medium|low",
-      "total_followers": "<total across platforms>",
-      "strongest_platform": "<their best-performing platform with follower count>",
-      "avg_engagement": "<their approximate engagement rate>",
-      "momentum": "growing|stable|declining",
-      "what_they_do_better": "<2-3 specific things with evidence from the data>",
-      "their_weakness": "<specific exploitable weakness backed by data>",
-      "how_to_beat_them": "<concrete, specific tactic — include platform, content type, and theme>",
-      "key_evidence": ["<specific data point e.g. '12,400 avg likes on educational Reels'>", "<another data point>"]
+      "what_they_do_better": "<specific things with numbers from data>",
+      "their_weakness": "<exploitable gap backed by data>",
+      "how_to_beat_them": "<concrete tactic naming platform and content type>",
+      "key_evidence": ["<data point>", "<data point>"],
+      "data_snapshot": {{
+        "followers": {{}},
+        "top_themes": []
+      }}
     }}
   ],
 
-  "channel_strategy": [
-    {{
-      "channel": "<Instagram|TikTok|LinkedIn|YouTube|Facebook|Web>",
-      "competitor_presence": "<who is strong here and their follower count>",
-      "gap_level": "wide|moderate|narrow",
-      "our_recommended_position": "<attack|defend|ignore|dominate>",
-      "specific_tactic": "<exact content strategy for this channel>",
-      "priority": "high|medium|low",
-      "rationale": "<why this channel priority — cite competitor data>"
+  "channel_strategy": {{
+    "instagram": {{
+      "priority": "primary|secondary|deprioritize",
+      "rationale": "<why — cite competitor presence>",
+      "recommended_formats": ["Reels", "Stories"],
+      "posting_frequency": "<e.g. 5x/week>",
+      "content_angles": ["<angle 1>", "<angle 2>"]
+    }},
+    "tiktok": {{
+      "priority": "primary|secondary|deprioritize",
+      "rationale": "<cite competitor data>",
+      "recommended_formats": ["Short-form video"],
+      "posting_frequency": "<e.g. daily>",
+      "content_angles": ["<angle>"]
+    }},
+    "linkedin": {{
+      "priority": "primary|secondary|deprioritize",
+      "rationale": "<cite competitor data>",
+      "recommended_formats": ["Articles", "Posts"],
+      "posting_frequency": "<e.g. 3x/week>",
+      "content_angles": ["<angle>"]
     }}
-  ],
+  }},
 
   "content_strategy": {{
-    "themes_to_own": [
-      {{"theme": "<content theme>", "reason": "<why this is an opportunity — what gap exists in competitor content>", "format": "<recommended format>"}}
-    ],
-    "themes_to_attack": [
-      {{"theme": "<competitor's theme>", "competitor": "<who owns this>", "attack_angle": "<how to create superior content on this theme>"}}
-    ],
-    "posting_cadence": "<specific recommendation per platform e.g. Instagram 5x/week Reels + 2x Stories, LinkedIn 3x/week>",
-    "content_pillars": ["<pillar 1>", "<pillar 2>", "<pillar 3>", "<pillar 4>"],
-    "formats_to_prioritise": ["<format 1 with reason>", "<format 2 with reason>"],
-    "hashtag_strategy": "<specific hashtag recommendations based on competitor data>"
+    "themes_to_own": ["<theme where competitors are weak>", "<theme>"],
+    "themes_to_attack": ["<competitor theme to create superior content on>", "<theme>"],
+    "formats": [
+      {{"format": "Reels", "platform": "Instagram", "rationale": "<why — competitor gap>"}},
+      {{"format": "Short video", "platform": "TikTok", "rationale": "<why>"}}
+    ]
   }},
 
   "battlegrounds": [
     {{
-      "area": "<e.g. Short-form educational video, B2B LinkedIn thought leadership>",
+      "area": "<e.g. Short-form educational video>",
       "our_position": "winning|competitive|losing|untapped",
-      "competitor_leaders": ["<name>"],
-      "recommendation": "<specific, detailed action with expected outcome>"
+      "recommendation": "<specific action with expected outcome>"
     }}
   ],
 
   "action_plan": [
     {{
       "priority": "immediate|short_term|long_term",
-      "timeframe": "<e.g. This week, Next 30 days, 60-90 days>",
-      "action": "<specific action — what exactly to do>",
-      "rationale": "<why this — which competitor weakness does this exploit or which gap does this fill>",
-      "expected_impact": "<measurable expected outcome e.g. +15% engagement, beat [competitor] on [platform]>",
+      "timeframe": "<e.g. This week|Next 30 days|60-90 days>",
+      "action": "<specific what-to-do>",
+      "rationale": "<which competitor weakness this exploits>",
+      "expected_impact": "<measurable outcome>",
       "effort": "low|medium|high"
     }}
   ],
 
   "quick_wins": [
     {{
-      "win": "<action that can be done THIS WEEK>",
-      "why_now": "<why this is urgent — competitor context>",
-      "expected_result": "<specific expected outcome in 7 days>"
+      "action": "<action doable THIS WEEK>",
+      "why_now": "<competitor urgency reason>",
+      "expected_result": "<outcome in 7 days>"
     }}
   ],
 
-  "data_sources": {json.dumps(all_sources[:15])}
+  "data_sources": {sources_json}
 }}
 
-CRITICAL: Be exhaustively specific. A strategy document that says "create better content" is worthless. Every single recommendation must name competitors, cite data, specify platforms, content formats, and expected outcomes. The action_plan must have at least 6 items. The battlegrounds must have at least 5 areas. channel_strategy must cover every platform where competitors are active."""
+Rules:
+- competitor_breakdown must have one entry per competitor in the data
+- action_plan must have at least 5 items (immediate/short_term/long_term)
+- quick_wins must have 3-5 items
+- battlegrounds must have 4-6 items
+- channel_strategy keys must be lowercase platform names (instagram, tiktok, linkedin, youtube, facebook)
+- All strings must be specific — no generic advice like "create better content"
+- brand_position.strengths and vulnerabilities must be plain strings (not objects)"""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=8000,
+        max_tokens=4000,
         messages=[{"role": "user", "content": prompt}],
     )
 
     raw_text = response.content[0].text
     try:
         result = _parse_json_response(raw_text)
-        # Ensure backward-compatible fields always present
-        if "quick_wins" in result and result["quick_wins"] and isinstance(result["quick_wins"][0], dict):
-            # New format has objects — also expose flat list for backward compat
-            result["quick_wins_flat"] = [q.get("win", "") for q in result["quick_wins"]]
-        return result
     except Exception as exc:
         logger.error(
             "generate_competitive_strategy parse failed (%s). stop=%s raw[:800]=%s",
@@ -643,6 +602,72 @@ CRITICAL: Be exhaustively specific. A strategy document that says "create better
         raise ValueError(
             f"Strategy JSON parse failed (stop_reason={response.stop_reason}). Detail: {exc}"
         )
+
+    # ── 4. Normalize output to match TypeScript types exactly ─────────────────
+    # Fix brand_position.strengths/vulnerabilities — if objects, extract point strings
+    bp = result.get("brand_position") or {}
+    for field in ("strengths", "vulnerabilities"):
+        items = bp.get(field) or []
+        bp[field] = [
+            (x.get("point") or x.get("text") or str(x)) if isinstance(x, dict) else str(x)
+            for x in items
+        ]
+    result["brand_position"] = bp
+
+    # Fix competitor_breakdown — inject real follower data from scraped snapshots
+    for cb in (result.get("competitor_breakdown") or []):
+        cb_name = cb.get("name", "")
+        real_followers = comp_followers.get(cb_name, {})
+        if real_followers:
+            cb.setdefault("data_snapshot", {})["followers"] = real_followers
+        # Find real themes from snapshot
+        for snap in competitor_snapshots:
+            if snap.get("name", "").lower() == cb_name.lower():
+                themes = (snap.get("analysis") or {}).get("key_themes") or []
+                cb.setdefault("data_snapshot", {})["top_themes"] = themes[:5]
+                break
+
+    # Fix quick_wins — normalize to {action, why_now, expected_result}
+    raw_qw = result.get("quick_wins") or []
+    fixed_qw = []
+    for qw in raw_qw:
+        if isinstance(qw, str):
+            fixed_qw.append({"action": qw, "why_now": "", "expected_result": ""})
+        elif isinstance(qw, dict):
+            fixed_qw.append({
+                "action": qw.get("action") or qw.get("win") or qw.get("text") or str(qw),
+                "why_now": qw.get("why_now") or qw.get("urgency") or "",
+                "expected_result": qw.get("expected_result") or qw.get("outcome") or "",
+            })
+    result["quick_wins"] = fixed_qw
+
+    # Fix channel_strategy — if it's a list, convert to dict keyed by platform
+    cs = result.get("channel_strategy")
+    if isinstance(cs, list):
+        cs_dict: dict = {}
+        for item in cs:
+            if isinstance(item, dict):
+                key = (item.get("channel") or item.get("platform") or "other").lower()
+                cs_dict[key] = {
+                    "priority": item.get("priority") or "secondary",
+                    "rationale": item.get("rationale") or item.get("specific_tactic") or "",
+                    "recommended_formats": item.get("recommended_formats") or [],
+                    "posting_frequency": item.get("posting_frequency") or "",
+                    "content_angles": item.get("content_angles") or [],
+                }
+        result["channel_strategy"] = cs_dict
+
+    # Fix market_snapshot — normalize field names
+    ms = result.get("market_snapshot") or {}
+    if ms and "total_competitors" not in ms:
+        ms["total_competitors"] = num_competitors
+    result["market_snapshot"] = ms
+
+    # Ensure data_sources is always a list
+    if not isinstance(result.get("data_sources"), list):
+        result["data_sources"] = all_sources[:10]
+
+    return result
 
 
 # ---------------------------------------------------------------------------

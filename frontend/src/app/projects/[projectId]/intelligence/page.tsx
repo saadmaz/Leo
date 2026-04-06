@@ -228,8 +228,10 @@ export default function IntelligencePage() {
       const msg = err instanceof Error ? err.message : String(err)
       const userMsg = msg.includes('400')
         ? 'Run competitor analysis first — add at least one competitor and click Analyse.'
-        : msg.includes('500')
-        ? 'The AI could not generate a structured strategy. Try regenerating — it usually works on the second attempt.'
+        : (msg.includes('500') || msg.includes('parse') || msg.includes('JSON'))
+        ? 'The AI returned an unexpected response. Click Try Again — it usually succeeds on the second attempt.'
+        : (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('Failed'))
+        ? 'Request timed out — the strategy takes 20-40 seconds. Please try again.'
         : 'Strategy generation failed. Please try again.'
       setStrategyError(userMsg)
       toast.error(userMsg)
@@ -1020,7 +1022,7 @@ function StrategyPanel({
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 className="w-7 h-7 animate-spin text-violet-400" />
         <p className="text-sm text-muted-foreground">Generating strategy plan…</p>
-        <p className="text-xs text-muted-foreground/60">Comparing your brand against all competitors</p>
+        <p className="text-xs text-muted-foreground/60">Analysing competitor data + running AI — takes 20–40 seconds</p>
       </div>
     )
   }
@@ -1049,7 +1051,8 @@ function StrategyPanel({
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
         <Sparkles className="w-8 h-8 text-violet-400/50" />
-        <p className="text-sm text-muted-foreground">Click &ldquo;Strategy Plan&rdquo; to generate your competitive strategy.</p>
+        <p className="text-sm text-muted-foreground">Generate a detailed competitive strategy based on your competitor data.</p>
+        <p className="text-xs text-muted-foreground/60">Takes 20–40 seconds to analyse all competitors</p>
         <button
           onClick={onRegenerate}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
