@@ -7,7 +7,7 @@ import {
   Building2, DollarSign, Target, TrendingUp,
   Flame, Zap, Star, MapPin, ChevronRight, Loader2,
   AlertTriangle, CheckCircle2, Clock, Search, Sparkles, BarChart2,
-  Info,
+  Info, LayoutGrid, List, SlidersHorizontal, ChevronDown,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -676,6 +676,168 @@ function AddCompetitorModal({
 }
 
 // ---------------------------------------------------------------------------
+// Classification group types
+// ---------------------------------------------------------------------------
+
+type GroupBy = 'geographic_scope' | 'size_tier' | 'directness' | 'market_position'
+
+const GROUP_OPTIONS: { value: GroupBy; label: string; icon: React.ReactNode }[] = [
+  { value: 'geographic_scope',  label: 'Geographic Reach',  icon: <Globe className="w-3.5 h-3.5" /> },
+  { value: 'size_tier',         label: 'Revenue / Size',    icon: <DollarSign className="w-3.5 h-3.5" /> },
+  { value: 'directness',        label: 'Threat Level',      icon: <Flame className="w-3.5 h-3.5" /> },
+  { value: 'market_position',   label: 'Market Position',   icon: <TrendingUp className="w-3.5 h-3.5" /> },
+]
+
+const GROUP_BUCKETS: Record<GroupBy, { key: string; label: string; color: string; icon: React.ReactNode }[]> = {
+  geographic_scope: [
+    { key: 'Local',    label: 'Local',    color: 'text-slate-600 bg-slate-500/10 border-slate-500/20',      icon: <MapPin className="w-3 h-3" /> },
+    { key: 'Regional', label: 'Regional', color: 'text-blue-600 bg-blue-500/10 border-blue-500/20',          icon: <MapPin className="w-3 h-3" /> },
+    { key: 'National', label: 'National', color: 'text-violet-600 bg-violet-500/10 border-violet-500/20',    icon: <Globe className="w-3 h-3" /> },
+    { key: 'Global',   label: 'Global',   color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20', icon: <Globe className="w-3 h-3" /> },
+  ],
+  size_tier: [
+    { key: 'Micro',      label: 'Micro (<10 employees)',         color: 'text-slate-600 bg-slate-500/10 border-slate-500/20',  icon: <Users className="w-3 h-3" /> },
+    { key: 'SMB',        label: 'SMB (10–500 employees)',        color: 'text-blue-600 bg-blue-500/10 border-blue-500/20',     icon: <Building2 className="w-3 h-3" /> },
+    { key: 'Mid-Market', label: 'Mid-Market (500–5k employees)', color: 'text-amber-600 bg-amber-500/10 border-amber-500/20',  icon: <Building2 className="w-3 h-3" /> },
+    { key: 'Enterprise', label: 'Enterprise (5k+ employees)',    color: 'text-red-600 bg-red-500/10 border-red-500/20',        icon: <Building2 className="w-3 h-3" /> },
+  ],
+  directness: [
+    { key: 'Direct',     label: 'Direct Competitors',   color: 'text-red-600 bg-red-500/10 border-red-500/20',      icon: <Flame className="w-3 h-3" /> },
+    { key: 'Indirect',   label: 'Indirect Competitors', color: 'text-amber-600 bg-amber-500/10 border-amber-500/20', icon: <AlertTriangle className="w-3 h-3" /> },
+    { key: 'Substitute', label: 'Substitutes',          color: 'text-blue-600 bg-blue-500/10 border-blue-500/20',   icon: <Zap className="w-3 h-3" /> },
+  ],
+  market_position: [
+    { key: 'Market Leader', label: 'Market Leaders',  color: 'text-amber-600 bg-amber-500/10 border-amber-500/20',   icon: <Star className="w-3 h-3" /> },
+    { key: 'Challenger',    label: 'Challengers',     color: 'text-red-600 bg-red-500/10 border-red-500/20',         icon: <TrendingUp className="w-3 h-3" /> },
+    { key: 'Niche Player',  label: 'Niche Players',   color: 'text-violet-600 bg-violet-500/10 border-violet-500/20', icon: <Target className="w-3 h-3" /> },
+    { key: 'New Entrant',   label: 'New Entrants',    color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20', icon: <Sparkles className="w-3 h-3" /> },
+  ],
+}
+
+function ClassificationView({
+  profiles,
+  groupBy,
+  onSelectProfile,
+  onDelete,
+  onRefresh,
+  deletingIds,
+  refreshingIds,
+}: {
+  profiles: CompetitorProfile[]
+  groupBy: GroupBy
+  onSelectProfile: (p: CompetitorProfile) => void
+  onDelete: (p: CompetitorProfile) => void
+  onRefresh: (p: CompetitorProfile) => void
+  deletingIds: Set<string>
+  refreshingIds: Set<string>
+}) {
+  const complete = profiles.filter(p => p.status === 'complete')
+  const buckets = GROUP_BUCKETS[groupBy]
+  const unclassified = complete.filter(p => !p[groupBy])
+
+  return (
+    <div className="space-y-6">
+      {buckets.map(bucket => {
+        const members = complete.filter(p => p[groupBy] === bucket.key)
+        if (members.length === 0) return null
+        return (
+          <div key={bucket.key}>
+            {/* Bucket header */}
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border', bucket.color)}>
+                {bucket.icon}
+                {bucket.label}
+              </span>
+              <span className="text-xs text-muted-foreground">{members.length} {members.length === 1 ? 'competitor' : 'competitors'}</span>
+              <div className="flex-1 h-px bg-border/60" />
+            </div>
+            {/* Compact rows */}
+            <div className="space-y-2">
+              {members.map(profile => {
+                const geo      = profile.geographic_scope  ? GEO_CONFIG[profile.geographic_scope]      : null
+                const size     = profile.size_tier          ? SIZE_CONFIG[profile.size_tier]             : null
+                const direct   = profile.directness         ? DIRECTNESS_CONFIG[profile.directness]      : null
+                const position = profile.market_position    ? POSITION_CONFIG[profile.market_position]   : null
+                return (
+                  <div
+                    key={profile.id}
+                    onClick={() => onSelectProfile(profile)}
+                    className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-sm cursor-pointer transition-all"
+                  >
+                    {/* Name + website */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">{profile.competitor_name}</p>
+                      {profile.website && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {profile.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                        </p>
+                      )}
+                    </div>
+                    {/* Dimension badges */}
+                    <div className="hidden sm:flex items-center gap-1.5 flex-wrap justify-end">
+                      {geo      && groupBy !== 'geographic_scope' && <DimensionBadge label={geo.label}      colorClass={geo.color}                        icon={geo.icon} />}
+                      {size     && groupBy !== 'size_tier'         && <DimensionBadge label={size.label}     colorClass={size.color}                       icon={size.icon} />}
+                      {direct   && groupBy !== 'directness'        && <DimensionBadge label={direct.label}   colorClass={cn(direct.color, direct.bg)}      icon={direct.icon} />}
+                      {position && groupBy !== 'market_position'   && <DimensionBadge label={position.label} colorClass={cn(position.color, position.bg)}  icon={position.icon} />}
+                      {profile.overlap_score && (
+                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium', OVERLAP_COLOR[profile.overlap_score])}>
+                          {profile.overlap_score} overlap
+                        </span>
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onRefresh(profile)}
+                        disabled={refreshingIds.has(profile.id) || deletingIds.has(profile.id)}
+                        className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        title="Re-classify"
+                      >
+                        {refreshingIds.has(profile.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => onDelete(profile)}
+                        disabled={deletingIds.has(profile.id) || refreshingIds.has(profile.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                        title="Delete"
+                      >
+                        {deletingIds.has(profile.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Unclassified */}
+      {unclassified.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border text-muted-foreground bg-muted/40 border-border">
+              <AlertTriangle className="w-3 h-3" /> Unclassified
+            </span>
+            <span className="text-xs text-muted-foreground">{unclassified.length}</span>
+            <div className="flex-1 h-px bg-border/60" />
+          </div>
+          <div className="space-y-2">
+            {unclassified.map(p => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-border bg-muted/10 text-sm text-muted-foreground">
+                {p.competitor_name}
+                <span className="ml-auto text-[11px]">pending classification</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -692,6 +854,9 @@ export default function CompetitorProfilesPage() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'classify'>('grid')
+  const [groupBy, setGroupBy] = useState<GroupBy>('geographic_scope')
+  const [showGroupMenu, setShowGroupMenu] = useState(false)
 
   const classifyControllerRef = useRef<AbortController | null>(null)
 
@@ -906,24 +1071,93 @@ export default function CompetitorProfilesPage() {
           </button>
         </div>
 
-        {/* Search bar */}
+        {/* Toolbar: search + view toggle + group selector */}
         {profiles.length > 0 && (
-          <div className="shrink-0 px-6 py-3 border-b border-border/50">
-            <div className="relative max-w-xs">
+          <div className="shrink-0 px-6 py-3 border-b border-border/50 flex items-center gap-3 flex-wrap">
+            {/* Search */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search competitors…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-border bg-muted/30 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors"
+                className="pl-9 pr-3 py-2 rounded-xl border border-border bg-muted/30 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors w-48"
               />
+            </div>
+
+            <div className="flex-1" />
+
+            {/* Group-by selector (only in classify mode) */}
+            {viewMode === 'classify' && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowGroupMenu(v => !v)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+                  Group by: {GROUP_OPTIONS.find(o => o.value === groupBy)?.label}
+                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                </button>
+                <AnimatePresence>
+                  {showGroupMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      className="absolute right-0 top-full mt-1.5 z-20 bg-background border border-border rounded-xl shadow-xl overflow-hidden min-w-[180px]"
+                    >
+                      {GROUP_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setGroupBy(opt.value); setShowGroupMenu(false) }}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left',
+                            groupBy === opt.value && 'text-primary font-medium bg-primary/5',
+                          )}
+                        >
+                          <span className="text-muted-foreground">{opt.icon}</span>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* View toggle */}
+            <div className="flex items-center rounded-lg border border-border p-0.5 bg-muted/40 gap-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+                className={cn(
+                  'p-1.5 rounded-md transition-colors',
+                  viewMode === 'grid'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('classify')}
+                title="Classify view"
+                className={cn(
+                  'p-1.5 rounded-md transition-colors',
+                  viewMode === 'classify'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         )}
 
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6" onClick={() => showGroupMenu && setShowGroupMenu(false)}>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[1, 2, 3].map(i => (
@@ -940,10 +1174,19 @@ export default function CompetitorProfilesPage() {
             ) : (
               <EmptyState onAdd={() => setShowAddModal(true)} />
             )
+          ) : viewMode === 'classify' ? (
+            <ClassificationView
+              profiles={filtered}
+              groupBy={groupBy}
+              onSelectProfile={setSelectedProfile}
+              onDelete={handleDelete}
+              onRefresh={handleRefresh}
+              deletingIds={deletingIds}
+              refreshingIds={refreshingIds}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
-                {/* In-progress card for newly classifying competitor */}
                 {pendingProfile && (
                   <AnalyzingCard key="pending" name={pendingProfile.name} />
                 )}
