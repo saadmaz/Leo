@@ -118,8 +118,8 @@ Return ONLY valid JSON with this exact structure:
 Be specific. Reference actual phrases from the text. Score honestly — 50 is average."""
 
     response = await client.messages.create(
-        model=settings.LLM_CHAT_MODEL,
-        max_tokens=1024,
+        model=settings.LLM_CLASSIFICATION_MODEL,
+        max_tokens=400,  # small JSON scorecard
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -166,8 +166,8 @@ Return ONLY valid JSON:
 Base predictions on real {platform} algorithm behaviour and audience psychology."""
 
     response = await client.messages.create(
-        model=settings.LLM_CHAT_MODEL,
-        max_tokens=1024,
+        model=settings.LLM_CLASSIFICATION_MODEL,
+        max_tokens=400,  # small JSON scorecard
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -587,7 +587,7 @@ Rules:
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=4000,
+        max_tokens=2000,  # strategy JSON rarely exceeds 1800 tokens
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -922,7 +922,7 @@ Return ONLY a valid JSON object, no markdown. Schema:
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=3500,
+        max_tokens=1500,  # competitor report JSON — bounded schema
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -1059,8 +1059,8 @@ Return ONLY valid JSON:
 }}"""
 
     response = await client.messages.create(
-        model=settings.LLM_CHAT_MODEL,
-        max_tokens=800,
+        model=settings.LLM_CLASSIFICATION_MODEL,
+        max_tokens=400,  # compact drift scorecard
         messages=[{"role": "user", "content": prompt}],
     )
 

@@ -47,10 +47,10 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
-async def _claude_json(prompt: str, system: str = "") -> dict:
+async def _claude_json(prompt: str, system: str = "", max_tokens: int = 800) -> dict:
     """Call Claude and parse the first JSON object in the response."""
     from backend.services.llm_service import call_claude_raw
-    text = await call_claude_raw(prompt, system=system, max_tokens=2048)
+    text = await call_claude_raw(prompt, system=system, max_tokens=max_tokens)
     # Extract JSON block
     match = re.search(r"\{[\s\S]*\}", text)
     if match:
@@ -595,7 +595,7 @@ Return a JSON object:
   }}
 }}"""
 
-    return await _claude_json(synthesis_prompt)
+    return await _claude_json(synthesis_prompt, max_tokens=1500)  # SWOT synthesis — larger schema
 
 
 # ---------------------------------------------------------------------------

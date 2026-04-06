@@ -21,6 +21,8 @@ import logging
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional
 
+from backend.config import settings
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -28,7 +30,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _MAX_SEARCH_RESULTS = 6
-_CLAUDE_MODEL = "claude-sonnet-4-6"
+# Classification is a structured JSON task — Haiku is sufficient and 5× cheaper.
+_CLAUDE_MODEL = settings.LLM_CLASSIFICATION_MODEL
 
 CLASSIFICATION_PROMPT = """\
 You are a competitive intelligence analyst. Based on the data gathered below about a competitor,
@@ -305,7 +308,7 @@ async def classify_competitor(
 
         response = await client.messages.create(
             model=_CLAUDE_MODEL,
-            max_tokens=2000,
+            max_tokens=1500,  # complex JSON but bounded schema — 1500 is sufficient
             messages=[{"role": "user", "content": prompt}],
         )
 

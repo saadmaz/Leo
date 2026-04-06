@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     # --- LLM Runtime Config ---
     # Model used for the conversational chat stream (streamed responses) — Claude.
     LLM_CHAT_MODEL: str = "claude-sonnet-4-6"
+    # Model used for lightweight classification & scoring tasks — Haiku is 5× cheaper.
+    LLM_CLASSIFICATION_MODEL: str = "claude-haiku-4-5-20251001"
     # Model used for one-shot brand extraction and campaign generation — Gemini.
     LLM_EXTRACTION_MODEL: str = "gemini-2.5-flash"
     # Imagen model used for image generation.
