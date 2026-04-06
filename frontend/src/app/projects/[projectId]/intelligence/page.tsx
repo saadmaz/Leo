@@ -248,7 +248,11 @@ export default function IntelligencePage() {
       const result = await api.intelligence.report(params.projectId, snapshot.name)
       setReport(result)
     } catch (err) {
-      toast.error('Could not generate report. Try again.')
+      const msg = err instanceof Error ? err.message : String(err)
+      const userMsg = (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('Failed'))
+        ? 'Report timed out — takes 15–30 seconds. Please try again.'
+        : 'Could not generate report. Try again.'
+      toast.error(userMsg)
       console.error(err)
     } finally {
       setReportLoading(false)
