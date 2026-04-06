@@ -289,16 +289,23 @@ async def classify_competitor(
         yield {"type": "step", "step": "classifying", "message": "Running 5-dimension AI classification"}
 
         client = get_client()
+
+        # Escape curly braces in all user-provided data before calling .format().
+        # Search results frequently contain JSON snippets like {"geographic_scope": ...}
+        # which Python's str.format() misinterprets as format placeholders → KeyError.
+        def _esc(s: str) -> str:
+            return s.replace("{", "{{").replace("}", "}}")
+
         prompt = CLASSIFICATION_PROMPT.format(
-            brand_context=brand_context,
-            competitor_name=name,
-            competitor_website=website_str or "unknown",
-            gathered_data=gathered_data,
+            brand_context=_esc(brand_context),
+            competitor_name=_esc(name),
+            competitor_website=_esc(website_str or "unknown"),
+            gathered_data=_esc(gathered_data),
         )
 
         response = await client.messages.create(
             model=_CLAUDE_MODEL,
-            max_tokens=1500,
+            max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
 
