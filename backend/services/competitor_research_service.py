@@ -604,8 +604,10 @@ Return a JSON object:
 
 async def discover_competitors(project_id: str) -> list[dict]:
     """
-    Auto-discover competitors from brand_core.
-    Returns [{name, domain, reason, confidence}]
+    DEPRECATED — no longer called by any route.
+    The POST /competitors/discover route now calls intelligence_service.discover_competitors
+    (Tavily + Exa + Claude synthesis). This SerpAPI-only version is retained only as a
+    fallback reference and will be removed in a future cleanup.
     """
     from backend.services import firebase_service
 

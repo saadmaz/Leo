@@ -1491,13 +1491,6 @@ export interface MonitorChangeAlert {
   created_at: string
 }
 
-export interface DiscoveredCompetitorSuggestion {
-  name: string
-  domain: string
-  website: string
-  reason: string
-  confidence: 'high' | 'medium' | 'low'
-}
 
 // SSE events from deep research endpoint
 export type DeepResearchEvent =

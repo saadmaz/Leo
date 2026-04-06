@@ -20,7 +20,7 @@ import type {
   DeepResearchEvent,
   DeepResearchReport,
   DeepResearchReportSummary,
-  DiscoveredCompetitorSuggestion,
+  DiscoveredCompetitor,
   CompetitorMonitor,
 } from '@/types'
 
@@ -737,7 +737,7 @@ export default function DeepResearchPage() {
   const [websiteInput, setWebsiteInput] = useState('')
   const [competitors, setCompetitors] = useState<CompetitorInput[]>([])
   const [discovering, setDiscovering] = useState(false)
-  const [suggestions, setSuggestions] = useState<DiscoveredCompetitorSuggestion[]>([])
+  const [suggestions, setSuggestions] = useState<DiscoveredCompetitor[]>([])
 
   // Research state
   const [layers, setLayers] = useState<LayerStatus[]>(INITIAL_LAYERS())
@@ -786,10 +786,12 @@ export default function DeepResearchPage() {
     }
   }
 
-  const addSuggestion = (s: DiscoveredCompetitorSuggestion) => {
+  const addSuggestion = (s: DiscoveredCompetitor) => {
     if (competitors.length >= 5) { toast.error('Maximum 5 competitors'); return }
     if (competitors.some(c => c.name.toLowerCase() === s.name.toLowerCase())) return
-    setCompetitors(prev => [...prev, { name: s.name, website: s.website, domain: s.domain }])
+    let domain = ''
+    try { domain = new URL(s.url).hostname.replace('www.', '') } catch { /* ignore */ }
+    setCompetitors(prev => [...prev, { name: s.name, website: s.url, domain }])
   }
 
   const runResearch = useCallback(async () => {
@@ -973,7 +975,7 @@ export default function DeepResearchPage() {
                           {added && <CheckCircle2 className="w-3 h-3 shrink-0" />}
                           <Globe className="w-3 h-3 shrink-0 text-muted-foreground" />
                           {s.name}
-                          {s.confidence === 'high' && <Star className="w-2.5 h-2.5 text-amber-500" />}
+                          {(s.relevance_score ?? 0) >= 0.85 && <Star className="w-2.5 h-2.5 text-amber-500" />}
                         </button>
                       )
                     })}

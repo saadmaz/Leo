@@ -77,7 +77,7 @@ import type {
   DeepResearchReportSummary,
   CompetitorMonitor,
   MonitorChangeAlert,
-  DiscoveredCompetitorSuggestion,
+  DiscoveredCompetitor,
   CompetitorInput,
   PersonalCore,
   PersonalVoiceProfile,
@@ -1765,9 +1765,9 @@ export const api = {
   },
 
   deepResearch: {
-    /** Auto-discover competitors from brand core using SerpAPI + Claude. */
+    /** Auto-discover competitors via Tavily + Exa + Claude synthesis. */
     discover: (projectId: string) =>
-      get<{ competitors: DiscoveredCompetitorSuggestion[] }>(`/projects/${projectId}/competitors/discover`),
+      post<{ competitors: DiscoveredCompetitor[] }>(`/projects/${projectId}/competitors/discover`, {}),
 
     /**
      * Stream 7-layer deep research for up to 5 competitors.

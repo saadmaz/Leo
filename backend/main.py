@@ -82,7 +82,16 @@ async def lifespan(app: FastAPI):
     if not settings.APIFY_API_KEY:
         logger.warning("APIFY_API_KEY is not set — social scraping (Instagram/TikTok/YouTube/Meta Ads) disabled.")
     else:
-        logger.info("Apify API key loaded — social scraping enabled.")
+        from backend.services.ingestion.apify_client import (
+            INSTAGRAM_ACTOR, TIKTOK_ACTOR, YOUTUBE_ACTOR,
+            FACEBOOK_ACTOR, LINKEDIN_ACTOR, THREADS_ACTOR,
+        )
+        logger.info(
+            "Apify API key loaded — actor IDs in use: instagram=%s tiktok=%s youtube=%s "
+            "facebook=%s linkedin=%s threads=%s",
+            INSTAGRAM_ACTOR, TIKTOK_ACTOR, YOUTUBE_ACTOR,
+            FACEBOOK_ACTOR, LINKEDIN_ACTOR, THREADS_ACTOR,
+        )
 
     if not settings.FIRECRAWL_API_KEY:
         logger.warning("FIRECRAWL_API_KEY is not set — website scraping during competitor discovery disabled.")
