@@ -1,4 +1,4 @@
-# 🧠 Growth Intelligence Engine
+# 🧠 Growth Intelligence Enginee
 
 > **"Boardroom-level market insight in minutes."**
 
