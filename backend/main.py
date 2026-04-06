@@ -75,9 +75,24 @@ async def lifespan(app: FastAPI):
         logger.info("Tavily API key loaded — web search, news monitoring, content enrichment enabled.")
 
     if not settings.SERPAPI_API_KEY:
-        logger.warning("SERPAPI_API_KEY is not set — Deep Search SERP results disabled.")
+        logger.warning("SERPAPI_API_KEY is not set — SEO layer 4 and competitor discovery degraded.")
     else:
-        logger.info("SerpAPI key loaded — Deep Search SERP results enabled.")
+        logger.info("SerpAPI key loaded — SEO intelligence and competitor discovery enabled.")
+
+    if not settings.APIFY_API_KEY:
+        logger.warning("APIFY_API_KEY is not set — social scraping (Instagram/TikTok/YouTube/Meta Ads) disabled.")
+    else:
+        logger.info("Apify API key loaded — social scraping enabled.")
+
+    if not settings.FIRECRAWL_API_KEY:
+        logger.warning("FIRECRAWL_API_KEY is not set — website scraping during competitor discovery disabled.")
+    else:
+        logger.info("Firecrawl API key loaded — website scraping enabled.")
+
+    if not settings.LOGO_DEV_API_KEY:
+        logger.warning("LOGO_DEV_API_KEY is not set — competitor logo images will not be fetched.")
+    else:
+        logger.info("Logo.dev API key loaded — competitor logo fetching enabled.")
 
     if not settings.BRANDFETCH_API_KEY:
         logger.warning("BRANDFETCH_API_KEY is not set — Carousel Studio brand logo/colour extraction disabled.")
@@ -203,14 +218,17 @@ def debug_config():
         "ANTHROPIC_API_KEY": _status(settings.ANTHROPIC_API_KEY),
         "OPENAI_API_KEY": _status(settings.OPENAI_API_KEY),
         "FIREBASE_PROJECT_ID": _status(settings.FIREBASE_PROJECT_ID),
-        "FIRECRAWL_API_KEY": _status(settings.FIRECRAWL_API_KEY),
+        "EXA_API_KEY": _status(settings.EXA_API_KEY),
+        "TAVILY_API_KEY": _status(settings.TAVILY_API_KEY),
+        "SERPAPI_API_KEY": _status(settings.SERPAPI_API_KEY),
         "APIFY_API_KEY": _status(settings.APIFY_API_KEY),
+        "FIRECRAWL_API_KEY": _status(settings.FIRECRAWL_API_KEY),
+        "LOGO_DEV_API_KEY": _status(settings.LOGO_DEV_API_KEY),
         "YOUTUBE_API_KEY": _status(settings.YOUTUBE_API_KEY),
         "RESEND_API_KEY": _status(settings.RESEND_API_KEY),
         "STRIPE_SECRET_KEY": _status(settings.STRIPE_SECRET_KEY),
-        "EXA_API_KEY": _status(settings.EXA_API_KEY),
-        "TAVILY_API_KEY": _status(settings.TAVILY_API_KEY),
         "LLM_CHAT_MODEL": settings.LLM_CHAT_MODEL,
+        "LLM_CLASSIFICATION_MODEL": settings.LLM_CLASSIFICATION_MODEL,
         "LLM_EXTRACTION_MODEL": settings.LLM_EXTRACTION_MODEL,
         "ENVIRONMENT": settings.ENVIRONMENT,
     }

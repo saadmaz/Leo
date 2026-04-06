@@ -59,13 +59,16 @@ class CreateMonitorRequest(BaseModel):
 
 @router.post("/competitors/discover")
 async def discover_competitors(project_id: str, user: CurrentUser):
-    """Auto-discover competitors from brand core using SerpAPI + Claude."""
-    get_project_as_member(project_id, user["uid"])
+    """Auto-discover competitors via Tavily + Exa parallel search + Claude synthesis."""
+    project = get_project_as_member(project_id, user["uid"])
+
+    brand_core = project.get("brandCore") or {}
+    website_url = project.get("websiteUrl") or project.get("website_url") or None
 
     try:
-        from backend.services.competitor_research_service import discover_competitors as _discover
-        competitors = await _discover(project_id)
-        return {"competitors": competitors}
+        from backend.services.intelligence_service import discover_competitors as _discover
+        result = await _discover(project_id, brand_core=brand_core, website_url=website_url)
+        return result
     except Exception as exc:
         logger.error("Competitor discovery failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
