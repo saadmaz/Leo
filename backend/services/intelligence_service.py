@@ -37,14 +37,47 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _parse_json_response(raw: str) -> dict:
-    """Strip markdown code fences and parse JSON from a Claude response."""
+    """
+    Robustly extract and parse JSON from a Claude response.
+
+    Handles:
+    - Bare JSON (no fences)
+    - ```json ... ``` fences
+    - ``` ... ``` fences
+    - JSON embedded anywhere in prose (finds first { or [ block)
+    """
     raw = raw.strip()
-    if raw.startswith("```"):
-        parts = raw.split("```")
-        raw = parts[1] if len(parts) > 1 else raw
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+
+    # 1. Strip markdown code fences if present
+    if "```" in raw:
+        # Extract content between first and last fence pair
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+        if fence_match:
+            raw = fence_match.group(1).strip()
+
+    # 2. Try direct parse first (fastest path)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Find the first { ... } or [ ... ] block (handles leading/trailing prose)
+    for start_char, end_char in [('{', '}'), ('[', ']')]:
+        start = raw.find(start_char)
+        if start == -1:
+            continue
+        # Walk backwards from end to find matching close bracket
+        end = raw.rfind(end_char)
+        if end != -1 and end > start:
+            candidate = raw[start:end + 1]
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                pass
+
+    # 4. Nothing worked — log and raise so callers can handle gracefully
+    logger.error("_parse_json_response failed. Raw (first 500 chars): %s", raw[:500])
+    raise ValueError(f"Could not parse JSON from Claude response (length={len(raw)})")
 
 
 # ---------------------------------------------------------------------------
@@ -421,21 +454,24 @@ Be specific. Use competitor names. Reference actual patterns from the data. Make
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=2000,
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )
 
+    raw_text = response.content[0].text
     try:
-        return _parse_json_response(response.content[0].text)
-    except Exception:
-        return {
-            "executive_summary": "Strategy analysis unavailable.",
-            "brand_position": {"strengths": [], "vulnerabilities": [], "differentiation": ""},
-            "competitor_breakdown": [],
-            "battlegrounds": [],
-            "action_plan": [],
-            "quick_wins": [],
-        }
+        return _parse_json_response(raw_text)
+    except Exception as exc:
+        logger.error(
+            "generate_competitive_strategy JSON parse failed (%s). "
+            "stop_reason=%s raw_text[:600]=%s",
+            exc, response.stop_reason, raw_text[:600],
+        )
+        raise ValueError(
+            f"Strategy generation failed to produce valid JSON (stop_reason={response.stop_reason}). "
+            "This usually means the response was truncated or Claude added prose outside the JSON. "
+            f"Detail: {exc}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1018,6 +1054,51 @@ async def refresh_competitor_intelligence_web(
     return {"web_refreshed": results}
 
 
+async def _background_classify(project_id: str, name: str, website: str) -> None:
+    """
+    Background coroutine: classify a newly-added competitor into the
+    competitor_profiles collection (5-dimension engine).
+
+    Called via asyncio.create_task() after a snapshot is saved so the
+    Profiles tab shows the competitor immediately (status=analyzing)
+    and then updates to 'complete' when classification finishes.
+
+    Skips silently if the competitor is already profiled.
+    """
+    try:
+        from backend.services import firebase_service as _fs
+        import asyncio as _asyncio
+
+        # Skip if already profiled to avoid duplicate entries
+        existing = _fs.get_competitor_profiles(project_id)
+        names_lower = {p.get("competitor_name", "").lower() for p in existing}
+        if name.lower() in names_lower:
+            logger.debug("_background_classify: %s already in profiles, skipping", name)
+            return
+
+        # Load project to get brand context
+        project = await _asyncio.to_thread(_fs.get_project, project_id)
+        if not project:
+            logger.warning("_background_classify: project %s not found", project_id)
+            return
+
+        brand_core  = project.get("brandCore") or {}
+        brand_name  = project.get("name", "")
+
+        from backend.services.competitor_classifier_service import classify_competitor as _classify
+        async for event in _classify(
+            name=name,
+            website=website or None,
+            brand_core=brand_core,
+            brand_name=brand_name,
+            project_id=project_id,
+        ):
+            if event.get("type") == "error":
+                logger.warning("_background_classify error for %s: %s", name, event.get("message"))
+    except Exception as exc:
+        logger.warning("_background_classify failed for %s: %s", name, exc)
+
+
 async def stream_refresh_competitor_intelligence(
     project_id: str,
     competitors: list[dict],
@@ -1246,6 +1327,20 @@ async def stream_refresh_competitor_intelligence(
                     firebase_service.save_competitor_snapshot(project_id, scraped)
                 except Exception as exc:
                     yield _evt(f"Save failed for {name}", "warn", str(exc)[:60], name)
+                    continue
+
+                # Auto-classify into competitor_profiles (5-dimension system) so the
+                # Profiles tab immediately shows this competitor.
+                # Run in background — don't block the stream.
+                try:
+                    import asyncio as _asyncio
+                    _asyncio.create_task(_background_classify(
+                        project_id=project_id,
+                        name=name,
+                        website=scraped.get("website") or "",
+                    ))
+                except Exception as exc:
+                    logger.warning("Could not schedule auto-classify for %s: %s", name, exc)
         except Exception as exc:
             yield _evt("Batch analysis failed", "warn", str(exc)[:80])
 

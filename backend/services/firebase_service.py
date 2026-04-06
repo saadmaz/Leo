@@ -2627,11 +2627,13 @@ def delete_competitor_monitor(project_id: str, monitor_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Competitor Deep Research — Monitor Alerts
+# Competitor Deep Research — Monitor Alerts (per-competitor-monitor subcollection)
+# NOTE: This is DIFFERENT from the brand monitoring alerts (projects/{id}/monitor_alerts).
+#       Renamed to avoid overriding the brand monitoring list_monitor_alerts above.
 # ---------------------------------------------------------------------------
 
-def save_monitor_alert(project_id: str, monitor_id: str, alert: dict) -> dict:
-    """Save a monitor change alert."""
+def save_competitor_monitor_alert(project_id: str, monitor_id: str, alert: dict) -> dict:
+    """Save a change alert for a specific competitor monitor."""
     db = get_db()
     now = _utcnow()
     ref = (
@@ -2644,14 +2646,14 @@ def save_monitor_alert(project_id: str, monitor_id: str, alert: dict) -> dict:
     return payload
 
 
-def list_monitor_alerts(project_id: str, monitor_id: str) -> list[dict]:
-    """Return all alerts for a monitor, newest first."""
+def list_competitor_monitor_alerts(project_id: str, monitor_id: str) -> list[dict]:
+    """Return all alerts for a specific competitor monitor, newest first."""
     db = get_db()
     docs = (
         db.collection("projects").document(project_id)
         .collection("competitor_monitors").document(monitor_id)
         .collection("alerts")
-        .order_by("created_at", direction="DESCENDING")
+        .order_by("created_at", direction=firestore.Query.DESCENDING)
         .limit(30)
         .stream()
     )

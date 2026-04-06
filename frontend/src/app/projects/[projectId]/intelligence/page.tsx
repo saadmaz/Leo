@@ -98,6 +98,7 @@ export default function IntelligencePage() {
   const [tab, setTab] = useState<Tab>('snapshots')
   const [snapshots, setSnapshots] = useState<CompetitorSnapshot[]>([])
   const [strategy, setStrategy] = useState<CompetitiveStrategy | null>(null)
+  const [strategyError, setStrategyError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [discovering, setDiscovering] = useState(false)
@@ -218,18 +219,20 @@ export default function IntelligencePage() {
 
   async function handleGenerateStrategy() {
     setStrategyLoading(true)
+    setStrategyError(null)
     setTab('strategy')
     try {
       const result = await api.intelligence.strategy(params.projectId)
       setStrategy(result)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('400')) {
-        toast.error('Run competitor analysis first before generating a strategy.')
-      } else {
-        toast.error('Strategy generation failed.')
-      }
-      setTab('snapshots')
+      const userMsg = msg.includes('400')
+        ? 'Run competitor analysis first — add at least one competitor and click Analyse.'
+        : msg.includes('500')
+        ? 'The AI could not generate a structured strategy. Try regenerating — it usually works on the second attempt.'
+        : 'Strategy generation failed. Please try again.'
+      setStrategyError(userMsg)
+      toast.error(userMsg)
     } finally {
       setStrategyLoading(false)
     }
@@ -382,8 +385,11 @@ export default function IntelligencePage() {
               <button
                 key={t.key}
                 onClick={() => {
-                  if (t.key === 'strategy' && !strategy && !strategyLoading) handleGenerateStrategy()
-                  else setTab(t.key)
+                  if (t.key === 'strategy' && !strategy && !strategyLoading && !strategyError) {
+                    handleGenerateStrategy()
+                  } else {
+                    setTab(t.key)
+                  }
                 }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px ${
                   tab === t.key
@@ -416,6 +422,7 @@ export default function IntelligencePage() {
           <StrategyPanel
             strategy={strategy}
             loading={strategyLoading}
+            error={strategyError}
             onRegenerate={handleGenerateStrategy}
           />
         )}
@@ -1000,10 +1007,12 @@ function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapsh
 function StrategyPanel({
   strategy,
   loading,
+  error,
   onRegenerate,
 }: {
   strategy: CompetitiveStrategy | null
   loading: boolean
+  error: string | null
   onRegenerate: () => void
 }) {
   if (loading) {
@@ -1016,7 +1025,40 @@ function StrategyPanel({
     )
   }
 
-  if (!strategy) return null
+  if (error) {
+    return (
+      <div className="px-4 sm:px-6 py-10 flex flex-col items-center justify-center gap-4 text-center max-w-lg mx-auto">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6 text-red-500" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold mb-1">Strategy generation failed</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">{error}</p>
+        </div>
+        <button
+          onClick={onRegenerate}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Try Again
+        </button>
+      </div>
+    )
+  }
+
+  if (!strategy) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
+        <Sparkles className="w-8 h-8 text-violet-400/50" />
+        <p className="text-sm text-muted-foreground">Click &ldquo;Strategy Plan&rdquo; to generate your competitive strategy.</p>
+        <button
+          onClick={onRegenerate}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Generate Strategy
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 sm:px-6 py-5 space-y-5 max-w-5xl">

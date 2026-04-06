@@ -220,5 +220,5 @@ async def list_alerts(project_id: str, monitor_id: str, user: CurrentUser):
     monitor = firebase_service.get_competitor_monitor(project_id, monitor_id)
     if not monitor:
         raise HTTPException(status_code=404, detail="Monitor not found")
-    alerts = firebase_service.list_monitor_alerts(project_id, monitor_id)
+    alerts = firebase_service.list_competitor_monitor_alerts(project_id, monitor_id)
     return {"alerts": alerts}

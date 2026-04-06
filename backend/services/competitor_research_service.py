@@ -906,7 +906,7 @@ async def run_monitor_diff(project_id: str, monitor: dict) -> dict:
             },
         )
         for change in changes:
-            firebase_service.save_monitor_alert(project_id, monitor["id"], change)
+            firebase_service.save_competitor_monitor_alert(project_id, monitor["id"], change)
     except Exception as exc:
         logger.warning("Failed to persist monitor update: %s", exc)
 
