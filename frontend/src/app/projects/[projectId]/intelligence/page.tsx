@@ -1060,6 +1060,12 @@ function StrategyPanel({
     )
   }
 
+  const EFFORT_COLOR: Record<string, string> = {
+    low: 'text-emerald-500',
+    medium: 'text-amber-500',
+    high: 'text-red-500',
+  }
+
   return (
     <div className="px-4 sm:px-6 py-5 space-y-5 max-w-5xl">
 
@@ -1067,7 +1073,7 @@ function StrategyPanel({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold">Competitive Strategy Plan</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">AI-generated from competitor analysis</p>
+          <p className="text-xs text-muted-foreground mt-0.5">AI-generated from live competitor data</p>
         </div>
         <button
           onClick={onRegenerate}
@@ -1077,7 +1083,59 @@ function StrategyPanel({
         </button>
       </div>
 
-      {/* Executive Summary */}
+      {/* Market Snapshot */}
+      {strategy.market_snapshot && (
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart2 className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold">Market Snapshot</h3>
+            {strategy.market_snapshot.market_maturity && (
+              <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                {strategy.market_snapshot.market_maturity}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div className="rounded-xl bg-muted/40 border border-border px-3 py-2.5 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Competitors Analysed</p>
+              <p className="text-lg font-bold">{strategy.market_snapshot.total_competitors}</p>
+            </div>
+            {(strategy.market_snapshot.top_channels?.length ?? 0) > 0 && (
+              <div className="rounded-xl bg-muted/40 border border-border px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Top Channels</p>
+                <div className="flex flex-wrap gap-1">
+                  {strategy.market_snapshot.top_channels.map((c, i) => (
+                    <span key={i} className="text-[10px] bg-background px-1.5 py-0.5 rounded-md border border-border capitalize">{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(strategy.market_snapshot.key_trends?.length ?? 0) > 0 && (
+              <div className="rounded-xl bg-muted/40 border border-border px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Key Trends</p>
+                <ul className="space-y-0.5">
+                  {strategy.market_snapshot.key_trends.slice(0, 3).map((t, i) => (
+                    <li key={i} className="text-[10px] text-foreground/80 flex gap-1">
+                      <TrendingUp className="w-2.5 h-2.5 text-primary shrink-0 mt-0.5" />{t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {(strategy.market_snapshot.data_points?.length ?? 0) > 0 && (
+            <div className="rounded-xl bg-muted/20 border border-border px-3 py-2 space-y-1">
+              {strategy.market_snapshot.data_points.map((dp, i) => (
+                <p key={i} className="text-xs text-foreground/70 flex gap-1.5">
+                  <Activity className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />{dp}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Executive Summary + Brand Position */}
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="flex items-center gap-2 mb-3">
           <Target className="w-4 h-4 text-primary" />
@@ -1118,6 +1176,18 @@ function StrategyPanel({
             </div>
           )}
         </div>
+        {(strategy.brand_position?.evidence?.length ?? 0) > 0 && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Supporting Evidence</p>
+            <ul className="space-y-1">
+              {strategy.brand_position.evidence!.map((e, i) => (
+                <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                  <ArrowRight className="w-3 h-3 shrink-0 mt-0.5" />{e}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Quick wins */}
@@ -1127,16 +1197,43 @@ function StrategyPanel({
             <Zap className="w-4 h-4 text-amber-500" />
             <h3 className="text-sm font-semibold text-amber-500">Quick Wins — Do This Week</h3>
           </div>
-          <ul className="space-y-2">
-            {strategy.quick_wins.map((win, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                  {i + 1}
-                </span>
-                {win}
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-3">
+            {strategy.quick_wins.map((win, i) => {
+              if (typeof win === 'string') {
+                return (
+                  <div key={i} className="flex items-start gap-2.5 text-sm text-foreground/80">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    {win}
+                  </div>
+                )
+              }
+              const w = win as { action: string; why_now: string; expected_result: string }
+              return (
+                <div key={i} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                  <div className="flex items-start gap-2.5 mb-2">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm font-medium text-foreground">{w.action}</p>
+                  </div>
+                  <div className="ml-7 space-y-1">
+                    {w.why_now && (
+                      <p className="text-xs text-amber-400/80 flex gap-1.5">
+                        <Zap className="w-3 h-3 shrink-0 mt-0.5" /> {w.why_now}
+                      </p>
+                    )}
+                    {w.expected_result && (
+                      <p className="text-xs text-emerald-400 flex gap-1.5">
+                        <TrendingUp className="w-3 h-3 shrink-0 mt-0.5" /> {w.expected_result}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -1162,6 +1259,27 @@ function StrategyPanel({
                       {threat.icon} {threat.label}
                     </span>
                   </div>
+                  {/* Data snapshot */}
+                  {comp.data_snapshot && (
+                    <div className="rounded-lg bg-background/30 px-3 py-2 mb-3">
+                      {comp.data_snapshot.top_themes && comp.data_snapshot.top_themes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {comp.data_snapshot.top_themes.slice(0, 4).map((t, j) => (
+                            <span key={j} className="text-[9px] px-1.5 py-0.5 rounded-full bg-background/60 border border-border text-foreground/60">{t}</span>
+                          ))}
+                        </div>
+                      )}
+                      {comp.data_snapshot.followers && Object.keys(comp.data_snapshot.followers).length > 0 && (
+                        <div className="flex gap-3 flex-wrap">
+                          {Object.entries(comp.data_snapshot.followers).map(([plt, count]) => (
+                            <span key={plt} className="text-[9px] text-muted-foreground">
+                              <span className="capitalize">{plt}</span>: <span className="font-semibold text-foreground/70">{count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-2.5 text-xs">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">What they do better</p>
@@ -1175,11 +1293,129 @@ function StrategyPanel({
                       <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-1">How to beat them</p>
                       <p className="text-foreground/80">{comp.how_to_beat_them}</p>
                     </div>
+                    {(comp.key_evidence?.length ?? 0) > 0 && (
+                      <div className="pt-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Evidence</p>
+                        <ul className="space-y-0.5">
+                          {comp.key_evidence!.map((ev, j) => (
+                            <li key={j} className="text-[10px] text-muted-foreground flex gap-1">
+                              <ArrowRight className="w-2.5 h-2.5 shrink-0 mt-0.5" />{ev}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Channel Strategy */}
+      {strategy.channel_strategy && Object.keys(strategy.channel_strategy).length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+            <Globe className="w-3.5 h-3.5" /> Channel Strategy
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Object.entries(strategy.channel_strategy).map(([platform, cfg]) => {
+              const priorityColor =
+                cfg.priority === 'primary' ? 'text-emerald-500 bg-emerald-500/10' :
+                cfg.priority === 'secondary' ? 'text-amber-500 bg-amber-500/10' :
+                'text-muted-foreground bg-muted'
+              const PlatIcon = PLATFORM_ICONS[platform.toLowerCase()] ?? <Globe className="w-3.5 h-3.5" />
+              return (
+                <div key={platform} className="rounded-xl border border-border bg-card p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('w-7 h-7 rounded-lg flex items-center justify-center', PLATFORM_COLORS[platform.toLowerCase()] ?? 'text-foreground bg-muted')}>
+                        {PlatIcon}
+                      </span>
+                      <span className="text-sm font-semibold capitalize">{platform}</span>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${priorityColor}`}>
+                      {cfg.priority}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/70 mb-2">{cfg.rationale}</p>
+                  {cfg.posting_frequency && (
+                    <p className="text-[10px] text-muted-foreground mb-2">
+                      <span className="font-semibold text-foreground/60">Frequency:</span> {cfg.posting_frequency}
+                    </p>
+                  )}
+                  {(cfg.recommended_formats?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {cfg.recommended_formats.map((f, j) => (
+                        <span key={j} className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted border border-border text-foreground/60">{f}</span>
+                      ))}
+                    </div>
+                  )}
+                  {(cfg.content_angles?.length ?? 0) > 0 && (
+                    <ul className="space-y-0.5">
+                      {cfg.content_angles.slice(0, 3).map((a, j) => (
+                        <li key={j} className="text-[10px] text-muted-foreground flex gap-1">
+                          <ArrowRight className="w-2.5 h-2.5 shrink-0 mt-0.5" />{a}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Content Strategy */}
+      {strategy.content_strategy && (
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5" /> Content Strategy
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            {(strategy.content_strategy.themes_to_own?.length ?? 0) > 0 && (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-2">Themes to Own</p>
+                <ul className="space-y-1">
+                  {strategy.content_strategy.themes_to_own.map((t, i) => (
+                    <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />{t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(strategy.content_strategy.themes_to_attack?.length ?? 0) > 0 && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-2">Themes to Attack</p>
+                <ul className="space-y-1">
+                  {strategy.content_strategy.themes_to_attack.map((t, i) => (
+                    <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                      <Swords className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />{t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {(strategy.content_strategy.formats?.length ?? 0) > 0 && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Recommended Formats</p>
+              <div className="space-y-2">
+                {strategy.content_strategy.formats.map((f, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted border border-border shrink-0 capitalize">{f.format}</span>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-muted-foreground capitalize mr-1">{f.platform} —</span>
+                      <span className="text-xs text-foreground/80">{f.rationale}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1226,16 +1462,48 @@ function StrategyPanel({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{action.action}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{action.rationale}</p>
-                      {action.expected_impact && (
-                        <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" /> {action.expected_impact}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {action.expected_impact && (
+                          <p className="text-xs text-emerald-500 flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" /> {action.expected_impact}
+                          </p>
+                        )}
+                        {action.timeframe && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Activity className="w-3 h-3" /> {action.timeframe}
+                          </p>
+                        )}
+                        {action.effort && (
+                          <p className={`text-xs flex items-center gap-1 ${EFFORT_COLOR[action.effort] ?? ''}`}>
+                            <Zap className="w-3 h-3" /> {action.effort} effort
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Data Sources */}
+      {(strategy.data_sources?.length ?? 0) > 0 && (
+        <div className="rounded-xl border border-border bg-muted/20 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+            <ExternalLink className="w-3 h-3" /> Data Sources
+          </p>
+          <div className="space-y-1">
+            {strategy.data_sources!.map((src, i) => (
+              <p key={i} className="text-[10px] text-muted-foreground truncate">
+                {src.startsWith('http') ? (
+                  <a href={src} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                    {src}
+                  </a>
+                ) : src}
+              </p>
+            ))}
           </div>
         </div>
       )}

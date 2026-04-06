@@ -379,98 +379,269 @@ async def generate_competitive_strategy(
     competitor_snapshots: list[dict],
 ) -> dict:
     """
-    Compare brand core vs competitor analyses and produce an actionable
-    competitive strategy plan.
+    Generate a comprehensive, evidence-backed competitive strategy plan.
 
-    Returns:
-      executive_summary, brand_position, competitor_breakdown,
-      battlegrounds, action_plan, quick_wins
+    Uses ALL available scraped data (follower counts, engagement, themes,
+    momentum, recent news) plus fresh web research to build a 12-section
+    strategy document with specific, provable claims.
     """
     client = get_client()
     brand_context = build_brand_core_context(brand_core)
 
+    # ── 1. Extract rich competitor data blocks ────────────────────────────────
+    all_sources: list[str] = []
     competitors_text = ""
-    for snap in competitor_snapshots[:5]:
-        analysis = snap.get("analysis") or {}
-        web = snap.get("web_analysis") or {}
-        platforms = list((snap.get("platforms") or {}).keys())
+
+    for snap in competitor_snapshots:
+        name_c      = snap.get("name", "Unknown")
+        analysis    = snap.get("analysis") or {}
+        web         = snap.get("web_analysis") or {}
+        web_raw     = snap.get("web") or {}
+        platforms   = snap.get("platforms") or {}
+
+        # Build real metrics per platform
+        platform_lines: list[str] = []
+        all_followers = 0
+        for plat, pdata in platforms.items():
+            profile  = pdata.get("profile") or {}
+            followers = (
+                profile.get("followers") or
+                pdata.get("followers") or
+                pdata.get("likes") or 0
+            )
+            posts = pdata.get("posts") or pdata.get("videos") or []
+            num_posts = len(posts) or 1
+            total_likes    = sum(p.get("likes", 0) for p in posts)
+            total_comments = sum(p.get("comments", 0) for p in posts)
+            avg_likes    = round(total_likes / num_posts)
+            avg_comments = round(total_comments / num_posts)
+            eng_rate     = round((avg_likes + avg_comments) / max(followers, 1) * 100, 2)
+            all_followers += followers
+            platform_lines.append(
+                f"    {plat}: {followers:,} followers | avg {avg_likes} likes, {avg_comments} comments | "
+                f"~{eng_rate}% engagement | {len(posts)} posts scraped"
+            )
+        platform_block = "\n".join(platform_lines) or "    No platform data scraped"
+
+        # Top hashtags and themes
+        top_tags   = (analysis.get("top_hashtags") or [])[:10]
+        key_themes = (analysis.get("key_themes") or [])[:8]
+        strengths  = (analysis.get("strengths") or [])[:4]
+        weaknesses = (analysis.get("weaknesses") or [])[:4]
+        gaps       = (analysis.get("content_gaps") or [])[:4]
+
+        # Recent news
+        news_items = (web_raw.get("recent_news") or [])[:5]
+        news_block = ""
+        if news_items:
+            news_lines = [f"    • {n.get('title', '')} ({n.get('date', '')[:10]})" for n in news_items]
+            news_block = "  RECENT NEWS:\n" + "\n".join(news_lines)
+
         competitors_text += f"""
-COMPETITOR: {snap.get("name", "?")}
-  Platforms: {", ".join(platforms) or "unknown"}
-  Tone: {analysis.get("tone", "")}
-  Key Themes: {", ".join(analysis.get("key_themes") or [])}
-  Strengths: {", ".join(analysis.get("strengths") or [])}
-  Weaknesses: {", ".join(analysis.get("weaknesses") or [])}
-  Content Gaps They Have: {", ".join(analysis.get("content_gaps") or [])}
-  Top Hashtags: {", ".join((analysis.get("top_hashtags") or [])[:8])}
-  Market Position: {web.get("market_position", "")}
-  Momentum: {web.get("momentum", "")}
+━━━ COMPETITOR: {name_c} ━━━
+  Website: {snap.get("website", "unknown")}
+  Total followers across platforms: {all_followers:,}
+  Active platforms:
+{platform_block}
+  Content tone: {analysis.get("tone", "unknown")}
+  Key content themes: {", ".join(key_themes) or "none detected"}
+  Posting style: {analysis.get("posting_style", "")}
+  Top hashtags: {", ".join(top_tags) or "none"}
+  Strengths: {"; ".join(strengths) or "none"}
+  Weaknesses: {"; ".join(weaknesses) or "none"}
+  Content gaps they have: {"; ".join(gaps) or "none"}
+  Engagement patterns: {analysis.get("engagement_patterns", "")}
+  Market position: {web.get("market_position", "unknown")}
+  Momentum: {web.get("momentum", "unknown")}
+  Recent moves: {"; ".join(web.get("recent_moves") or []) or "none"}
+  Opportunity for us: {web.get("opportunity", "")}
+{news_block}
 """
 
-    prompt = f"""You are a senior brand strategist. Analyse this brand against its competitors and produce an actionable competitive strategy plan.
+    # ── 2. Fresh web research for the strategy ────────────────────────────────
+    # Do targeted searches to fill gaps and get current market context
+    additional_intel = ""
+    try:
+        from backend.services.integrations import tavily_client, exa_client
+        import asyncio as _a
 
-OUR BRAND: {brand_name}
+        search_tasks = []
+        comp_names = [s.get("name", "") for s in competitor_snapshots[:4]]
+        comp_list  = ", ".join(comp_names)
+
+        if settings.TAVILY_API_KEY:
+            search_tasks += [
+                tavily_client.search_advanced(
+                    f"{brand_name} vs {comp_list} market comparison 2024 2025",
+                    max_results=4, include_answer=True, project_id=None,
+                ),
+                tavily_client.search_advanced(
+                    f"{brand_name} competitors industry trends marketing strategy",
+                    max_results=3, include_answer=True, project_id=None,
+                ),
+            ]
+
+        if search_tasks:
+            search_results = await _a.gather(*search_tasks, return_exceptions=True)
+            intel_parts: list[str] = []
+            for sr in search_results:
+                if isinstance(sr, Exception):
+                    continue
+                if isinstance(sr, dict):
+                    if sr.get("answer"):
+                        intel_parts.append(sr["answer"])
+                    for r in (sr.get("results") or [])[:3]:
+                        snip = r.get("content") or r.get("snippet") or ""
+                        url  = r.get("url", "")
+                        if snip:
+                            intel_parts.append(f"• {snip[:300]} ({url})")
+                            if url:
+                                all_sources.append(url)
+            if intel_parts:
+                additional_intel = "\n\nADDITIONAL MARKET INTELLIGENCE (from live web research):\n" + "\n".join(intel_parts[:10])
+    except Exception as exc:
+        logger.warning("Strategy web research failed: %s", exc)
+
+    # ── 3. Build the comprehensive prompt ────────────────────────────────────
+    prompt = f"""You are a senior competitive intelligence strategist — the calibre hired by McKinsey, BCG, and top-tier VCs. You have been given REAL scraped data about competitors. Your job is to produce an EXCEPTIONAL, DETAILED competitive strategy document.
+
+━━━ OUR BRAND ━━━
+Name: {brand_name}
 {brand_context}
 
-COMPETITORS:
+━━━ COMPETITOR INTELLIGENCE (REAL SCRAPED DATA) ━━━
 {competitors_text}
+{additional_intel}
 
-Return ONLY valid JSON with this exact structure:
+━━━ YOUR TASK ━━━
+Produce a comprehensive, evidence-backed competitive strategy. Every recommendation must:
+1. Reference SPECIFIC competitor names and real data points from above
+2. Use ACTUAL numbers (follower counts, engagement rates, etc.) where available
+3. Be CONCRETE — not "improve your content" but "launch weekly educational Reels targeting [competitor]'s weakness in [specific topic]"
+4. Identify REAL competitive gaps with evidence
+5. Prioritise by IMPACT × FEASIBILITY
+
+Return ONLY valid JSON matching this EXACT structure (no markdown, no explanation):
+
 {{
-  "executive_summary": "<2-3 sentence summary of our competitive position>",
-  "brand_position": {{
-    "strengths": [<up to 3 genuine strengths vs competitors>],
-    "vulnerabilities": [<up to 3 real risks or gaps vs competitors>],
-    "differentiation": "<what makes us genuinely different>"
+  "executive_summary": "<4-5 sentences covering: who dominates, where opportunities lie, what our #1 strategic priority should be — cite specific competitor names and real numbers>",
+
+  "market_snapshot": {{
+    "competitive_intensity": "low|medium|high|extreme",
+    "total_competitor_reach": "<sum of all competitor followers e.g. 2.3M across 4 competitors>",
+    "dominant_platform": "<which platform competitors are strongest on>",
+    "biggest_threat": "<name of competitor who poses highest threat and why in 1 sentence>",
+    "biggest_gap": "<the single biggest uncontested opportunity in this market>",
+    "market_trend": "<1-2 sentences on where the competitive landscape is heading>"
   }},
+
+  "brand_position": {{
+    "strengths": [
+      {{"point": "<strength>", "evidence": "<what in the competitor data supports this as a strength for us>"}},
+      {{"point": "<strength>", "evidence": "..."}}
+    ],
+    "vulnerabilities": [
+      {{"point": "<vulnerability>", "evidence": "<what competitor is exploiting this gap>"}},
+      {{"point": "<vulnerability>", "evidence": "..."}}
+    ],
+    "differentiation": "<what makes us genuinely different from ALL listed competitors — be specific>",
+    "unique_angle": "<the ONE thing we can own that no competitor currently owns>"
+  }},
+
   "competitor_breakdown": [
     {{
-      "name": "<competitor name>",
+      "name": "<competitor name — MUST match one from the data above>",
       "threat_level": "high|medium|low",
-      "what_they_do_better": "<1-2 sentences>",
-      "their_weakness": "<1-2 sentences>",
-      "how_to_beat_them": "<1-2 sentences specific tactic>"
+      "total_followers": "<total across platforms>",
+      "strongest_platform": "<their best-performing platform with follower count>",
+      "avg_engagement": "<their approximate engagement rate>",
+      "momentum": "growing|stable|declining",
+      "what_they_do_better": "<2-3 specific things with evidence from the data>",
+      "their_weakness": "<specific exploitable weakness backed by data>",
+      "how_to_beat_them": "<concrete, specific tactic — include platform, content type, and theme>",
+      "key_evidence": ["<specific data point e.g. '12,400 avg likes on educational Reels'>", "<another data point>"]
     }}
   ],
+
+  "channel_strategy": [
+    {{
+      "channel": "<Instagram|TikTok|LinkedIn|YouTube|Facebook|Web>",
+      "competitor_presence": "<who is strong here and their follower count>",
+      "gap_level": "wide|moderate|narrow",
+      "our_recommended_position": "<attack|defend|ignore|dominate>",
+      "specific_tactic": "<exact content strategy for this channel>",
+      "priority": "high|medium|low",
+      "rationale": "<why this channel priority — cite competitor data>"
+    }}
+  ],
+
+  "content_strategy": {{
+    "themes_to_own": [
+      {{"theme": "<content theme>", "reason": "<why this is an opportunity — what gap exists in competitor content>", "format": "<recommended format>"}}
+    ],
+    "themes_to_attack": [
+      {{"theme": "<competitor's theme>", "competitor": "<who owns this>", "attack_angle": "<how to create superior content on this theme>"}}
+    ],
+    "posting_cadence": "<specific recommendation per platform e.g. Instagram 5x/week Reels + 2x Stories, LinkedIn 3x/week>",
+    "content_pillars": ["<pillar 1>", "<pillar 2>", "<pillar 3>", "<pillar 4>"],
+    "formats_to_prioritise": ["<format 1 with reason>", "<format 2 with reason>"],
+    "hashtag_strategy": "<specific hashtag recommendations based on competitor data>"
+  }},
+
   "battlegrounds": [
     {{
-      "area": "<e.g. Short-form video, Educational content, Community>",
+      "area": "<e.g. Short-form educational video, B2B LinkedIn thought leadership>",
       "our_position": "winning|competitive|losing|untapped",
-      "recommendation": "<specific action>"
+      "competitor_leaders": ["<name>"],
+      "recommendation": "<specific, detailed action with expected outcome>"
     }}
   ],
+
   "action_plan": [
     {{
       "priority": "immediate|short_term|long_term",
-      "action": "<specific action>",
-      "rationale": "<why this matters>",
-      "expected_impact": "<what this achieves>"
+      "timeframe": "<e.g. This week, Next 30 days, 60-90 days>",
+      "action": "<specific action — what exactly to do>",
+      "rationale": "<why this — which competitor weakness does this exploit or which gap does this fill>",
+      "expected_impact": "<measurable expected outcome e.g. +15% engagement, beat [competitor] on [platform]>",
+      "effort": "low|medium|high"
     }}
   ],
-  "quick_wins": [<up to 3 things we can do THIS WEEK to gain competitive edge>]
+
+  "quick_wins": [
+    {{
+      "win": "<action that can be done THIS WEEK>",
+      "why_now": "<why this is urgent — competitor context>",
+      "expected_result": "<specific expected outcome in 7 days>"
+    }}
+  ],
+
+  "data_sources": {json.dumps(all_sources[:15])}
 }}
 
-Be specific. Use competitor names. Reference actual patterns from the data. Make the plan genuinely actionable."""
+CRITICAL: Be exhaustively specific. A strategy document that says "create better content" is worthless. Every single recommendation must name competitors, cite data, specify platforms, content formats, and expected outcomes. The action_plan must have at least 6 items. The battlegrounds must have at least 5 areas. channel_strategy must cover every platform where competitors are active."""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=4096,
+        max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
 
     raw_text = response.content[0].text
     try:
-        return _parse_json_response(raw_text)
+        result = _parse_json_response(raw_text)
+        # Ensure backward-compatible fields always present
+        if "quick_wins" in result and result["quick_wins"] and isinstance(result["quick_wins"][0], dict):
+            # New format has objects — also expose flat list for backward compat
+            result["quick_wins_flat"] = [q.get("win", "") for q in result["quick_wins"]]
+        return result
     except Exception as exc:
         logger.error(
-            "generate_competitive_strategy JSON parse failed (%s). "
-            "stop_reason=%s raw_text[:600]=%s",
-            exc, response.stop_reason, raw_text[:600],
+            "generate_competitive_strategy parse failed (%s). stop=%s raw[:800]=%s",
+            exc, response.stop_reason, raw_text[:800],
         )
         raise ValueError(
-            f"Strategy generation failed to produce valid JSON (stop_reason={response.stop_reason}). "
-            "This usually means the response was truncated or Claude added prose outside the JSON. "
-            f"Detail: {exc}"
+            f"Strategy JSON parse failed (stop_reason={response.stop_reason}). Detail: {exc}"
         )
 
 
@@ -485,196 +656,368 @@ async def generate_competitor_report(
 ) -> dict:
     """
     Generate a comprehensive deep-dive report on a single competitor.
-    Combines scraped social data with Claude's analysis.
+
+    Performs FRESH web research (firmographics, funding, reviews, pricing,
+    recent news) on top of the stored snapshot data so every claim is
+    backed by a real source URL.
     """
+    import asyncio as _a
     client = get_client()
     brand_context = build_brand_core_context(brand_core)
 
-    name = competitor_snapshot.get("name", "Unknown")
+    name        = competitor_snapshot.get("name", "Unknown")
+    website     = competitor_snapshot.get("website", "")
+    analysis    = competitor_snapshot.get("analysis") or {}
+    web         = competitor_snapshot.get("web_analysis") or {}
+    web_raw     = competitor_snapshot.get("web") or {}
     platforms_data = competitor_snapshot.get("platforms") or {}
-    analysis = competitor_snapshot.get("analysis") or {}
-    web = competitor_snapshot.get("web_analysis") or {}
-    web_raw = competitor_snapshot.get("web") or {}
 
-    # Build real follower data from scraped data
+    # ── A. Extract real metrics from stored platform data ─────────────────────
     real_metrics: list[dict] = []
-    for platform, data in platforms_data.items():
-        profile = data.get("profile") or {}
+    detailed_posts_block = ""
+    for platform, pdata in platforms_data.items():
+        profile   = pdata.get("profile") or {}
         followers = (
             profile.get("followers") or
-            data.get("followers") or
-            data.get("likes") or  # facebook page likes
-            0
+            pdata.get("followers") or
+            pdata.get("likes") or 0
         )
-        posts = data.get("posts") or data.get("videos") or []
+        posts = pdata.get("posts") or pdata.get("videos") or []
+        num_posts   = len(posts) or 1
         total_likes = sum(p.get("likes", 0) for p in posts)
         total_comments = sum(p.get("comments", 0) for p in posts)
-        num_posts = len(posts) if posts else 1
-        avg_likes = total_likes / num_posts
-        avg_comments = total_comments / num_posts
+        avg_likes    = round(total_likes / num_posts)
+        avg_comments = round(total_comments / num_posts)
+        eng_rate     = round((avg_likes + avg_comments) / max(followers, 1) * 100, 3)
+
         real_metrics.append({
             "platform": platform,
             "followers": followers,
-            "avg_likes": round(avg_likes),
-            "avg_comments": round(avg_comments),
+            "avg_likes": avg_likes,
+            "avg_comments": avg_comments,
+            "engagement_rate": eng_rate,
+            "num_posts": len(posts),
         })
 
+        # Sample top posts for the prompt
+        top_posts = sorted(posts, key=lambda p: p.get("likes", 0), reverse=True)[:3]
+        if top_posts:
+            post_lines = []
+            for p in top_posts:
+                caption = (p.get("caption") or p.get("text") or p.get("title") or "")[:120]
+                likes   = p.get("likes", 0)
+                post_lines.append(f"      [{likes:,} likes] {caption}")
+            detailed_posts_block += f"\n  {platform.upper()} TOP POSTS:\n" + "\n".join(post_lines)
+
     platform_summary = "\n".join(
-        f"  {m['platform']}: {m['followers']:,} followers, avg {m['avg_likes']} likes, avg {m['avg_comments']} comments"
+        f"  {m['platform'].capitalize()}: {m['followers']:,} followers | "
+        f"avg {m['avg_likes']} likes, {m['avg_comments']} comments | "
+        f"{m['engagement_rate']}% engagement | {m['num_posts']} posts analyzed"
         for m in real_metrics
-    )
+    ) or "  No platform data"
 
-    prompt = f"""You are a senior competitive intelligence analyst. Generate a comprehensive deep-dive report on this competitor for the brand "{brand_name}".
+    # ── B. Fresh research — parallel web searches ─────────────────────────────
+    sources: list[str] = []
+    research_blocks: list[str] = []
 
-OUR BRAND:
+    try:
+        from backend.services.integrations import tavily_client, exa_client
+
+        research_queries = [
+            f'"{name}" company employees headcount linkedin OR crunchbase',
+            f'"{name}" funding investment revenue ARR 2024 2025',
+            f'"{name}" pricing plans cost subscription',
+            f'"{name}" reviews G2 Capterra Trustpilot customers',
+            f'"{name}" news announcement product launch 2024 2025',
+        ]
+
+        tasks = []
+        if settings.TAVILY_API_KEY:
+            for q in research_queries:
+                tasks.append(
+                    tavily_client.search_advanced(
+                        q, max_results=3, include_answer=False, project_id=None,
+                    )
+                )
+        elif settings.EXA_API_KEY:
+            for q in research_queries[:3]:
+                tasks.append(
+                    exa_client.search(q, num_results=3, include_highlights=True, project_id=None)
+                )
+
+        if tasks:
+            search_results = await _a.gather(*tasks, return_exceptions=True)
+            labels = ["EMPLOYEES/SIZE", "FUNDING/REVENUE", "PRICING", "REVIEWS", "RECENT NEWS"]
+            for i, (label, sr) in enumerate(zip(labels, search_results)):
+                if isinstance(sr, Exception):
+                    continue
+                results_list = []
+                if isinstance(sr, dict):
+                    results_list = sr.get("results", [])
+                elif isinstance(sr, list):
+                    results_list = sr
+
+                if not results_list:
+                    continue
+
+                lines = [f"\n=== {label} ==="]
+                for r in results_list[:3]:
+                    url    = r.get("url", "")
+                    title  = r.get("title", "")
+                    snip   = (
+                        r.get("content") or
+                        r.get("snippet") or
+                        (r.get("highlights") or [""])[0]
+                    )[:400]
+                    lines.append(f"Source: {url}\nTitle: {title}\n{snip}")
+                    if url:
+                        sources.append(url)
+                research_blocks.append("\n".join(lines))
+    except Exception as exc:
+        logger.warning("Report research failed for %s: %s", name, exc)
+
+    fresh_research = "\n".join(research_blocks) or "Web research unavailable."
+
+    # ── C. Also pull from existing web_raw data (news saved during refresh) ───
+    existing_news = web_raw.get("recent_news") or []
+    existing_news_block = ""
+    if existing_news:
+        lines = ["=== PREVIOUSLY CAPTURED NEWS ==="]
+        for n in existing_news[:5]:
+            lines.append(f"• [{n.get('date', '')[:10]}] {n.get('title', '')} — {n.get('url', '')}")
+            if n.get("url"):
+                sources.append(n["url"])
+        existing_news_block = "\n".join(lines)
+
+    # ── D. Build the full report prompt ──────────────────────────────────────
+    prompt = f"""You are an elite competitive intelligence analyst. Generate a COMPREHENSIVE, EVIDENCE-BACKED deep-dive report on "{name}" for the brand "{brand_name}".
+
+CRITICAL RULES:
+1. ONLY state facts you can derive from the data below — never fabricate specifics
+2. When you must estimate something, explicitly mark it as "Estimated" and explain your reasoning
+3. Cite specific numbers from the platform data (exact follower counts, engagement rates, post counts)
+4. Reference specific review quotes or news headlines from the research when they exist
+5. Every "what they do better" and "opportunity" must name a SPECIFIC content example or tactic
+6. Revenue and funding must come from the research data — mark "Unverified" if not found
+
+━━━ OUR BRAND: {brand_name} ━━━
 {brand_context}
 
-COMPETITOR: {name}
-Website: {competitor_snapshot.get("website", "unknown")}
+━━━ COMPETITOR: {name} ━━━
+Website: {website or "unknown"}
 
-SCRAPED PLATFORM DATA:
-{platform_summary or "No platform data available"}
+REAL SCRAPED PLATFORM METRICS:
+{platform_summary}
+{detailed_posts_block}
 
-CONTENT ANALYSIS:
-- Tone: {analysis.get("tone", "")}
-- Key themes: {", ".join(analysis.get("key_themes") or [])}
+CONTENT ANALYSIS (from scraped posts):
+- Brand tone: {analysis.get("tone", "unknown")}
+- Key content themes: {", ".join(analysis.get("key_themes") or [])}
 - Posting style: {analysis.get("posting_style", "")}
-- Strengths: {", ".join(analysis.get("strengths") or [])}
-- Weaknesses: {", ".join(analysis.get("weaknesses") or [])}
-- Content gaps: {", ".join(analysis.get("content_gaps") or [])}
-- Top hashtags: {", ".join((analysis.get("top_hashtags") or [])[:10])}
-- Engagement patterns: {analysis.get("engagement_patterns", "")}
+- Identified strengths: {"; ".join(analysis.get("strengths") or [])}
+- Identified weaknesses: {"; ".join(analysis.get("weaknesses") or [])}
+- Content gaps they have: {"; ".join(analysis.get("content_gaps") or [])}
+- Top hashtags: {", ".join((analysis.get("top_hashtags") or [])[:15])}
+- What gets most engagement: {analysis.get("engagement_patterns", "")}
 
-WEB INTELLIGENCE:
-- Market position: {web.get("market_position", "")}
-- Momentum: {web.get("momentum", "stable")}
-- Recent moves: {", ".join(web.get("recent_moves") or [])}
-- Company summary: {web_raw.get("company_summary", "")}
+EXISTING WEB INTELLIGENCE:
+- Market position: {web.get("market_position", "unknown")}
+- Business momentum: {web.get("momentum", "unknown")}
+- Recent strategic moves: {"; ".join(web.get("recent_moves") or [])}
+- Opportunity noted: {web.get("opportunity", "")}
 
-Return ONLY valid JSON with this exact structure:
+{existing_news_block}
+
+FRESH WEB RESEARCH (just retrieved):
+{fresh_research}
+
+Return ONLY valid JSON matching this EXACT structure:
+
 {{
   "company_profile": {{
-    "description": "<2-3 sentence company overview>",
-    "industry": "<industry/sector>",
-    "estimated_size": "<e.g. 11-50 employees>",
-    "founded_estimate": "<e.g. 2018-2020>",
-    "hq_location": "<city, country if knowable>",
-    "funding_stage": "<bootstrapped|pre-seed|seed|series-a|series-b|public|unknown>",
-    "revenue_range": "<e.g. $1M-$5M estimated ARR>",
-    "business_model": "<SaaS|ecommerce|services|marketplace|etc>"
+    "description": "<3-4 sentence company overview using actual data from research>",
+    "industry": "<specific industry/sector>",
+    "estimated_size": "<e.g. 50-200 employees — source: LinkedIn 2024>",
+    "size_source": "<where this came from e.g. LinkedIn, Crunchbase, or Estimated>",
+    "founded_estimate": "<year if found, else estimated range>",
+    "hq_location": "<city, country — from website or research>",
+    "funding_stage": "bootstrapped|pre-seed|seed|series-a|series-b|public|unknown",
+    "funding_amount": "<actual amount from research or Unverified>",
+    "funding_source": "<source URL or Unverified>",
+    "revenue_range": "<actual range from research or Estimated + reasoning>",
+    "revenue_source": "<source URL or Estimated>",
+    "business_model": "<SaaS|ecommerce|services|marketplace|etc>",
+    "pricing_insight": "<pricing tiers/plans found from research or Not available>"
   }},
+
   "platform_metrics": [
     {{
       "platform": "<platform name>",
-      "followers": <integer — use real data if available, otherwise estimate>,
-      "is_estimated": <true if you estimated it, false if from real data>,
-      "engagement_rate": <float 0-20 — realistic engagement rate %>,
-      "posts_per_week": <integer>,
-      "avg_likes": <integer>,
-      "avg_comments": <integer>,
-      "top_content_type": "<e.g. reels, carousels, shorts>"
+      "followers": <integer from REAL scraped data — use exact number>,
+      "is_estimated": false,
+      "engagement_rate": <float from real data>,
+      "posts_per_week": <estimate from post count and dates if available>,
+      "avg_likes": <from real data>,
+      "avg_comments": <from real data>,
+      "top_content_type": "<e.g. educational Reels, customer testimonials>",
+      "top_performing_post": "<description of their best post from the scraped data>"
     }}
   ],
+
   "growth_trajectory": [
-    {{"month": "Oct 2024", "followers_total": <integer>, "engagement_index": <float 1-10>}},
-    {{"month": "Nov 2024", "followers_total": <integer>, "engagement_index": <float 1-10>}},
-    {{"month": "Dec 2024", "followers_total": <integer>, "engagement_index": <float 1-10>}},
-    {{"month": "Jan 2025", "followers_total": <integer>, "engagement_index": <float 1-10>}},
-    {{"month": "Feb 2025", "followers_total": <integer>, "engagement_index": <float 1-10>}},
-    {{"month": "Mar 2025", "followers_total": <integer>, "engagement_index": <float 1-10>}}
+    {{"month": "Oct 2024", "followers_total": <integer>, "engagement_index": <float 1-10>, "is_estimated": true}},
+    {{"month": "Nov 2024", "followers_total": <integer>, "engagement_index": <float 1-10>, "is_estimated": true}},
+    {{"month": "Dec 2024", "followers_total": <integer>, "engagement_index": <float 1-10>, "is_estimated": true}},
+    {{"month": "Jan 2025", "followers_total": <integer>, "engagement_index": <float 1-10>, "is_estimated": true}},
+    {{"month": "Feb 2025", "followers_total": <integer>, "engagement_index": <float 1-10>, "is_estimated": true}},
+    {{"month": "Mar 2025", "followers_total": <real if available else estimated>, "engagement_index": <float 1-10>, "is_estimated": <true|false>}}
   ],
+
   "revenue_trajectory": [
-    {{"period": "Q2 2024", "value": <integer — estimated monthly revenue in USD>}},
-    {{"period": "Q3 2024", "value": <integer>}},
-    {{"period": "Q4 2024", "value": <integer>}},
-    {{"period": "Q1 2025", "value": <integer>}},
-    {{"period": "Q2 2025", "value": <integer — projected>}}
+    {{"period": "Q2 2024", "value": <integer USD or null if truly unknown>, "is_estimated": true, "basis": "<your estimation reasoning>"}},
+    {{"period": "Q3 2024", "value": <integer or null>, "is_estimated": true, "basis": "..."}},
+    {{"period": "Q4 2024", "value": <integer or null>, "is_estimated": true, "basis": "..."}},
+    {{"period": "Q1 2025", "value": <integer or null>, "is_estimated": true, "basis": "..."}},
+    {{"period": "Q2 2025 (projected)", "value": <integer or null>, "is_estimated": true, "basis": "projected based on growth"}}
   ],
+
   "content_mix": [
-    {{"type": "<content type>", "percentage": <integer 0-100>}}
+    {{"type": "<content type from real data>", "percentage": <integer 0-100>}}
   ],
+
   "vs_brand_scorecard": [
-    {{"dimension": "Content Quality",      "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "Posting Frequency",    "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "Audience Engagement",  "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "Brand Consistency",    "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "Visual Identity",      "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "SEO & Web Presence",   "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "Community Building",   "competitor": <1-10>, "brand": <1-10>}},
-    {{"dimension": "Innovation / Trends",  "competitor": <1-10>, "brand": <1-10>}}
+    {{"dimension": "Content Quality",       "competitor": <1-10>, "brand": <1-10>, "evidence": "<specific reason for each score>"}},
+    {{"dimension": "Posting Frequency",     "competitor": <1-10>, "brand": <1-10>, "evidence": "..."}},
+    {{"dimension": "Audience Engagement",   "competitor": <1-10>, "brand": <1-10>, "evidence": "<cite actual engagement rate>"}},
+    {{"dimension": "Brand Consistency",     "competitor": <1-10>, "brand": <1-10>, "evidence": "..."}},
+    {{"dimension": "Visual Identity",       "competitor": <1-10>, "brand": <1-10>, "evidence": "..."}},
+    {{"dimension": "SEO & Web Presence",    "competitor": <1-10>, "brand": <1-10>, "evidence": "..."}},
+    {{"dimension": "Community Building",    "competitor": <1-10>, "brand": <1-10>, "evidence": "..."}},
+    {{"dimension": "Innovation / Trends",   "competitor": <1-10>, "brand": <1-10>, "evidence": "..."}}
   ],
+
   "what_they_do_better": [
     {{
       "area": "<specific area>",
-      "detail": "<detailed explanation with specifics>",
-      "impact": "<business/marketing impact>",
-      "how_to_respond": "<specific tactical response for our brand>"
+      "detail": "<detailed explanation citing SPECIFIC posts, numbers, or research findings>",
+      "impact": "<why this matters — business or marketing impact>",
+      "evidence": "<direct quote, stat, or source that proves this>",
+      "how_to_respond": "<specific tactic for our brand — include format, platform, and theme>"
     }}
   ],
+
   "their_strategy": {{
-    "core_message": "<their brand's central message/positioning>",
-    "content_pillars": ["<pillar 1>", "<pillar 2>", "<pillar 3>"],
-    "posting_cadence": "<e.g. Daily on Instagram, 3x/week on LinkedIn>",
-    "cta_strategy": "<how they drive action>",
-    "audience_focus": "<who they primarily target>"
+    "core_message": "<their brand's central positioning — inferred from content and research>",
+    "content_pillars": ["<pillar 1 from actual posts>", "<pillar 2>", "<pillar 3>"],
+    "posting_cadence": "<inferred from scraped post data>",
+    "cta_strategy": "<how they drive action — from actual posts>",
+    "audience_focus": "<who they primarily target — from research and content>",
+    "notable_tactics": ["<specific tactic 1 with example>", "<specific tactic 2>"]
   }},
+
   "opportunities": [
     {{
-      "opportunity": "<specific opportunity for our brand vs this competitor>",
-      "rationale": "<why this is an opening>",
-      "action": "<concrete action to take>",
+      "opportunity": "<specific, concrete opportunity — cite the gap with evidence>",
+      "rationale": "<why this gap exists — what competitor is failing to do>",
+      "action": "<EXACT action — platform + format + topic + frequency>",
       "difficulty": "easy|medium|hard",
-      "time_to_impact": "<e.g. 2-4 weeks>"
+      "time_to_impact": "<realistic timeframe>",
+      "expected_outcome": "<specific measurable result>"
     }}
   ],
+
   "threat_assessment": {{
     "overall_threat": "high|medium|low",
-    "threat_rationale": "<why this threat level>",
-    "areas_of_direct_competition": ["<area 1>", "<area 2>"],
-    "areas_of_no_overlap": ["<area 1>", "<area 2>"]
-  }}
-}}
+    "threat_rationale": "<evidence-backed explanation citing their strengths and our overlaps>",
+    "areas_of_direct_competition": ["<specific area with evidence>"],
+    "areas_of_no_overlap": ["<area where they are not competing with us>"],
+    "watch_signals": ["<specific thing to monitor — e.g. 'if they launch on TikTok'>"]
+  }},
 
-IMPORTANT:
-- For platform_metrics, only include platforms where we have data OR reasonable estimates
-- For revenue_trajectory, label Q2 2025 as projected
-- Be realistic with follower estimates based on the industry and company size
-- The vs_brand_scorecard brand scores should reflect the brand core honestly
-- Make what_they_do_better specific and actionable, at least 3 items
-- Make opportunities actionable with concrete next steps, at least 3 items
-- Label all estimates clearly with is_estimated: true"""
+  "recent_news_highlights": [
+    {{"date": "<date>", "headline": "<headline>", "source": "<url>", "implication": "<what this means for us>"}}
+  ],
+
+  "data_sources": {json.dumps(list(dict.fromkeys(sources))[:20])}
+}}"""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=3000,
+        max_tokens=6000,
         messages=[{"role": "user", "content": prompt}],
     )
 
     try:
         result = _parse_json_response(response.content[0].text)
-        # Inject real metrics where available
+        # Inject verified real metrics — override any AI estimates with ground truth
         for rm in real_metrics:
             for pm in result.get("platform_metrics", []):
-                if pm.get("platform") == rm["platform"] and rm["followers"]:
-                    pm["followers"] = rm["followers"]
-                    pm["is_estimated"] = False
-                    if rm["avg_likes"]:
-                        pm["avg_likes"] = rm["avg_likes"]
-                    if rm["avg_comments"]:
-                        pm["avg_comments"] = rm["avg_comments"]
+                if pm.get("platform", "").lower() == rm["platform"].lower():
+                    pm["followers"]       = rm["followers"]
+                    pm["avg_likes"]       = rm["avg_likes"]
+                    pm["avg_comments"]    = rm["avg_comments"]
+                    pm["engagement_rate"] = rm["engagement_rate"]
+                    pm["is_estimated"]    = False
+                    break
+            else:
+                # Platform in real data but not in AI result — add it
+                if rm["followers"] > 0:
+                    result.setdefault("platform_metrics", []).append({
+                        "platform":        rm["platform"],
+                        "followers":       rm["followers"],
+                        "avg_likes":       rm["avg_likes"],
+                        "avg_comments":    rm["avg_comments"],
+                        "engagement_rate": rm["engagement_rate"],
+                        "is_estimated":    False,
+                        "posts_per_week":  None,
+                        "top_content_type": "",
+                        "top_performing_post": "",
+                    })
         return result
-    except Exception:
+    except Exception as exc:
+        logger.error("generate_competitor_report parse failed for %s: %s", name, exc)
+        # Return a minimal but truthful structure using only real scraped data
         return {
-            "company_profile": {"description": "", "industry": "", "estimated_size": "", "founded_estimate": "", "hq_location": "", "funding_stage": "unknown", "revenue_range": "Unknown", "business_model": ""},
-            "platform_metrics": [],
+            "company_profile": {
+                "description": f"{name} — full analysis could not be generated. Raw data is available below.",
+                "industry": "", "estimated_size": "Unknown", "size_source": "N/A",
+                "founded_estimate": "Unknown", "hq_location": "Unknown",
+                "funding_stage": "unknown", "funding_amount": "Unverified",
+                "funding_source": "N/A", "revenue_range": "Unverified",
+                "revenue_source": "N/A", "business_model": "Unknown",
+                "pricing_insight": "Not available",
+            },
+            "platform_metrics": [
+                {
+                    "platform":        rm["platform"],
+                    "followers":       rm["followers"],
+                    "is_estimated":    False,
+                    "engagement_rate": rm["engagement_rate"],
+                    "avg_likes":       rm["avg_likes"],
+                    "avg_comments":    rm["avg_comments"],
+                    "posts_per_week":  None,
+                    "top_content_type": "",
+                    "top_performing_post": "",
+                }
+                for rm in real_metrics
+            ],
             "growth_trajectory": [],
             "revenue_trajectory": [],
             "content_mix": [],
             "vs_brand_scorecard": [],
             "what_they_do_better": [],
-            "their_strategy": {"core_message": "", "content_pillars": [], "posting_cadence": "", "cta_strategy": "", "audience_focus": ""},
+            "their_strategy": {
+                "core_message": "", "content_pillars": [], "posting_cadence": "",
+                "cta_strategy": "", "audience_focus": "", "notable_tactics": [],
+            },
             "opportunities": [],
-            "threat_assessment": {"overall_threat": "medium", "threat_rationale": "", "areas_of_direct_competition": [], "areas_of_no_overlap": []},
+            "threat_assessment": {
+                "overall_threat": "medium", "threat_rationale": "Analysis unavailable",
+                "areas_of_direct_competition": [], "areas_of_no_overlap": [],
+                "watch_signals": [],
+            },
+            "recent_news_highlights": [],
+            "data_sources": sources[:10],
         }
 
 
@@ -1327,20 +1670,6 @@ async def stream_refresh_competitor_intelligence(
                     firebase_service.save_competitor_snapshot(project_id, scraped)
                 except Exception as exc:
                     yield _evt(f"Save failed for {name}", "warn", str(exc)[:60], name)
-                    continue
-
-                # Auto-classify into competitor_profiles (5-dimension system) so the
-                # Profiles tab immediately shows this competitor.
-                # Run in background — don't block the stream.
-                try:
-                    import asyncio as _asyncio
-                    _asyncio.create_task(_background_classify(
-                        project_id=project_id,
-                        name=name,
-                        website=scraped.get("website") or "",
-                    ))
-                except Exception as exc:
-                    logger.warning("Could not schedule auto-classify for %s: %s", name, exc)
         except Exception as exc:
             yield _evt("Batch analysis failed", "warn", str(exc)[:80])
 
@@ -2113,59 +2442,154 @@ async def stream_add_discovered_competitor(
     project_id: str,
     competitor: dict,
     brand_core: dict,
+    brand_name: str = "",
 ):
     """
     Add a single discovered competitor automatically:
-    1. Scrape their website for social media links
-    2. Merge with any social_hints from discovery
-    3. Run the full intelligence refresh stream
+    1. Scrape their website for social media links (Firecrawl + regex extraction)
+    2. Merge with social_hints from discovery
+    3. Run the full intelligence refresh (saves to competitor_snapshots)
+    4. Run the 5-dimension classifier (saves to competitor_profiles)
+
+    Yields SSE-style event dicts for live frontend progress.
     """
     from backend.config import settings as _settings
 
-    name = competitor.get("name") or "Unknown"
-    url  = competitor.get("url") or ""
+    name  = competitor.get("name") or "Unknown"
+    url   = competitor.get("url") or ""
     hints = competitor.get("social_hints") or {}
 
     def _evt(message: str, icon: str = "activity", detail: str = "") -> dict:
         return {"type": "step", "message": message, "icon": icon, "detail": detail, "competitor": name}
 
-    # ── Step 1: scrape website for social links ──────────────────────────────
+    # ── Step 1: Deep website scrape for social links ──────────────────────────
+    # Strategy: try Firecrawl first (full markdown), fallback to Tavily site search.
     scraped_social: dict = {}
-    if url and _settings.FIRECRAWL_API_KEY:
-        yield _evt(f"Scraping {name}'s website for social media links…", "globe", url)
-        try:
-            from backend.services.ingestion.firecrawl_client import scrape_url
-            scraped = await scrape_url(url, _settings.FIRECRAWL_API_KEY)
-            content = scraped.get("markdown") or scraped.get("content") or ""
-            if content:
-                scraped_social = extract_social_links(content)
-                found_platforms = list(scraped_social.keys())
-                yield _evt(
-                    f"Found {len(found_platforms)} social profiles on website" if found_platforms else "No social links on website",
-                    "check",
-                    ", ".join(found_platforms) if found_platforms else "",
-                )
-        except Exception as exc:
-            yield _evt(f"Website scrape skipped", "warn", str(exc)[:80])
+    website_text: str = ""
 
-    # ── Step 2: merge scraped + discovery hints ──────────────────────────────
+    if url:
+        yield _evt(f"Scanning {name}'s website for social media profiles…", "globe", url)
+        # Attempt 1: Firecrawl (gets full rendered markdown of the page)
+        if _settings.FIRECRAWL_API_KEY:
+            try:
+                from backend.services.ingestion.firecrawl_client import scrape_url
+                scraped = await scrape_url(url, _settings.FIRECRAWL_API_KEY)
+                content = scraped.get("markdown") or scraped.get("content") or ""
+                if content:
+                    website_text = content
+                    scraped_social = extract_social_links(content)
+            except Exception as exc:
+                logger.warning("Firecrawl scrape failed for %s: %s", name, exc)
+
+        # Attempt 2: Tavily site: search as fallback
+        if not scraped_social and (_settings.TAVILY_API_KEY or _settings.EXA_API_KEY):
+            try:
+                from backend.services.integrations import tavily_client
+                resp = await tavily_client.search_advanced(
+                    query=f"site:{url} instagram facebook linkedin tiktok youtube twitter",
+                    max_results=5, include_raw_content=True, project_id=project_id,
+                )
+                combined = " ".join(
+                    (r.get("raw_content") or r.get("content") or "") for r in resp.get("results", [])
+                )
+                if combined:
+                    website_text = combined
+                    scraped_social = extract_social_links(combined)
+            except Exception as exc:
+                logger.warning("Tavily site search failed for %s: %s", name, exc)
+
+        found_platforms = list(scraped_social.keys())
+        if found_platforms:
+            yield _evt(
+                f"Found {len(found_platforms)} social profiles: {', '.join(found_platforms)}",
+                "check", url,
+            )
+        else:
+            yield _evt("No social links found on website — will rely on search hints", "warn", url)
+
+    # ── Step 2: Merge scraped links + discovery hints ────────────────────────
+    def _clean_hint(hint: str | None, base_url: str) -> str | None:
+        if not hint:
+            return None
+        hint = hint.strip()
+        if hint.startswith("http"):
+            return hint
+        # Bare handle → construct full URL
+        handle = hint.lstrip("@").strip("/")
+        if handle:
+            return f"{base_url}/{handle}"
+        return None
+
     merged_competitor = {
         "name":      name,
         "website":   url or None,
-        "instagram": scraped_social.get("instagram") or _instagram_hint_to_url(hints.get("instagram")),
-        "facebook":  scraped_social.get("facebook")  or hints.get("facebook") or None,
-        "tiktok":    scraped_social.get("tiktok")    or hints.get("tiktok") or None,
-        "linkedin":  scraped_social.get("linkedin")  or hints.get("linkedin") or None,
-        "youtube":   scraped_social.get("youtube")   or hints.get("youtube") or None,
+        "instagram": (
+            scraped_social.get("instagram")
+            or _instagram_hint_to_url(hints.get("instagram"))
+            or _clean_hint(hints.get("instagram"), "https://instagram.com")
+        ),
+        "facebook":  (
+            scraped_social.get("facebook")
+            or hints.get("facebook")
+            or _clean_hint(hints.get("facebook"), "https://facebook.com")
+        ),
+        "tiktok":    (
+            scraped_social.get("tiktok")
+            or hints.get("tiktok")
+            or _clean_hint(hints.get("tiktok"), "https://tiktok.com/@")
+        ),
+        "linkedin":  (
+            scraped_social.get("linkedin")
+            or hints.get("linkedin")
+            or _clean_hint(hints.get("linkedin"), "https://linkedin.com/company")
+        ),
+        "youtube":   (
+            scraped_social.get("youtube")
+            or hints.get("youtube")
+            or _clean_hint(hints.get("youtube"), "https://youtube.com")
+        ),
+        "twitter":   scraped_social.get("twitter") or hints.get("twitter"),
     }
 
-    platforms_found = [p for p in ["instagram", "facebook", "tiktok", "linkedin", "youtube"] if merged_competitor.get(p)]
+    active_platforms = [p for p in ["instagram", "facebook", "tiktok", "linkedin", "youtube"] if merged_competitor.get(p)]
     yield _evt(
-        f"Starting full analysis — {len(platforms_found)} platforms to scrape" if platforms_found else "Starting analysis (website only)",
+        f"Starting social analysis — {len(active_platforms)} platform(s)" if active_platforms else "Starting analysis (website only)",
         "zap",
-        ", ".join(platforms_found),
+        ", ".join(active_platforms) if active_platforms else "website",
     )
 
-    # ── Step 3: run full intelligence refresh ────────────────────────────────
+    # ── Step 3: Intelligence refresh (saves to competitor_snapshots) ──────────
+    yield _evt("Running full social media intelligence refresh…", "activity")
     async for event in stream_refresh_competitor_intelligence(project_id, [merged_competitor]):
         yield event
+
+    # ── Step 4: 5-Dimension classification (saves to competitor_profiles) ─────
+    # This is what populates the Profiles tab. Run synchronously in the same
+    # SSE stream so the user sees live progress and the profile is guaranteed
+    # to be saved before the stream ends.
+    yield _evt(f"Classifying {name} into Competitor Profiles…", "crosshair", "5-dimension classification")
+    try:
+        from backend.services.competitor_classifier_service import classify_competitor as _classify
+        from backend.services import firebase_service as _fs
+
+        # Skip if already profiled
+        existing_profiles = _fs.get_competitor_profiles(project_id)
+        already_exists = any(
+            p.get("competitor_name", "").lower() == name.lower()
+            for p in existing_profiles
+        )
+        if already_exists:
+            yield _evt(f"{name} already in Profiles — skipping re-classification", "check")
+        else:
+            effective_brand_name = brand_name or brand_core.get("brandName") or brand_core.get("name") or ""
+            async for evt in _classify(
+                name=name,
+                website=url or None,
+                brand_core=brand_core,
+                brand_name=effective_brand_name,
+                project_id=project_id,
+            ):
+                yield evt
+    except Exception as exc:
+        logger.error("Competitor classification failed for %s: %s", name, exc)
+        yield _evt(f"Profile classification failed — {exc}", "warn", str(exc)[:120])

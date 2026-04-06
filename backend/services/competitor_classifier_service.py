@@ -304,14 +304,29 @@ async def classify_competitor(
 
         raw_text = response.content[0].text.strip()
 
-        # Strip markdown code fences if Claude wrapped the JSON
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("```")[1]
-            if raw_text.startswith("json"):
-                raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
+        # Robust JSON extraction — handles fences, prose before/after, truncation
+        def _extract_json(text: str) -> dict:
+            import re as _re
+            # Strip markdown code fences
+            fence = _re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if fence:
+                text = fence.group(1).strip()
+            # Try direct parse
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                pass
+            # Find outermost { ... }
+            start = text.find("{")
+            end   = text.rfind("}")
+            if start != -1 and end > start:
+                try:
+                    return json.loads(text[start:end + 1])
+                except json.JSONDecodeError:
+                    pass
+            raise ValueError(f"No valid JSON found in classifier response (len={len(text)})")
 
-        classification = json.loads(raw_text)
+        classification = _extract_json(raw_text)
 
         # ------------------------------------------------------------------
         # 5. Persist the final profile

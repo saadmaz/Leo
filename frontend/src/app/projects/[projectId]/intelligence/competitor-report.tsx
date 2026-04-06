@@ -6,7 +6,7 @@ import {
   Zap, Target, AlertTriangle, CheckCircle2, ArrowRight, RefreshCw,
   Flame, Shield, BarChart3, PieChart, Activity, Linkedin,
   Instagram, Youtube, Facebook, Clock, DollarSign, MapPin, Calendar,
-  ChevronDown, ChevronUp, Lightbulb,
+  ChevronDown, ChevronUp, Lightbulb, Newspaper, ExternalLink,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -152,18 +152,23 @@ export function CompetitorReportPanel({
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { icon: <Building2 className="w-3.5 h-3.5" />, label: 'Size',     val: report.company_profile.estimated_size },
-                    { icon: <Calendar  className="w-3.5 h-3.5" />, label: 'Founded',  val: report.company_profile.founded_estimate },
-                    { icon: <MapPin    className="w-3.5 h-3.5" />, label: 'HQ',       val: report.company_profile.hq_location },
-                    { icon: <DollarSign className="w-3.5 h-3.5" />, label: 'Revenue', val: report.company_profile.revenue_range },
-                    { icon: <Zap       className="w-3.5 h-3.5" />, label: 'Stage',    val: report.company_profile.funding_stage },
-                    { icon: <Globe     className="w-3.5 h-3.5" />, label: 'Model',    val: report.company_profile.business_model },
+                    { icon: <Building2 className="w-3.5 h-3.5" />, label: 'Size',     val: report.company_profile.estimated_size,  src: report.company_profile.size_source },
+                    { icon: <Calendar  className="w-3.5 h-3.5" />, label: 'Founded',  val: report.company_profile.founded_estimate, src: report.company_profile.founded_source },
+                    { icon: <MapPin    className="w-3.5 h-3.5" />, label: 'HQ',       val: report.company_profile.hq_location,      src: report.company_profile.location_source },
+                    { icon: <DollarSign className="w-3.5 h-3.5" />, label: 'Revenue', val: report.company_profile.revenue_range,    src: report.company_profile.revenue_source },
+                    { icon: <Zap       className="w-3.5 h-3.5" />, label: 'Stage',    val: report.company_profile.funding_stage,    src: report.company_profile.funding_source },
+                    { icon: <Globe     className="w-3.5 h-3.5" />, label: 'Model',    val: report.company_profile.business_model,   src: undefined },
                   ].filter(r => r.val).map((row, i) => (
                     <div key={i} className="rounded-xl bg-muted/40 border border-border px-3 py-2.5">
                       <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
                         {row.icon} {row.label}
                       </div>
                       <p className="text-xs font-medium capitalize">{row.val}</p>
+                      {row.src && (
+                        <p className="text-[9px] text-muted-foreground/60 mt-0.5 truncate" title={row.src}>
+                          via {row.src.length > 30 ? row.src.slice(0, 30) + '…' : row.src}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -335,6 +340,18 @@ export function CompetitorReportPanel({
                             <p className="text-xs text-foreground/80">{report.their_strategy.audience_focus}</p>
                           </div>
                         )}
+                        {(report.their_strategy.notable_tactics?.length ?? 0) > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Notable Tactics</p>
+                            <ul className="space-y-0.5">
+                              {report.their_strategy.notable_tactics!.map((t, i) => (
+                                <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                                  <Zap className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />{t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -368,6 +385,9 @@ export function CompetitorReportPanel({
                             <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${row.brand * 10}%` }} />
                           </div>
                         </div>
+                        {row.evidence && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 pl-1 italic">{row.evidence}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -399,6 +419,12 @@ export function CompetitorReportPanel({
                         <p className="text-xs text-foreground/80 mb-2">{item.detail}</p>
                         {item.impact && (
                           <p className="text-[10px] text-red-400/80 mb-2">Impact: {item.impact}</p>
+                        )}
+                        {item.evidence && (
+                          <div className="rounded-lg bg-background/30 px-3 py-2 mb-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Evidence</p>
+                            <p className="text-[10px] text-muted-foreground italic">{item.evidence}</p>
+                          </div>
                         )}
                         <div className="pt-2 border-t border-red-500/15">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-1">Your response</p>
@@ -485,6 +511,56 @@ export function CompetitorReportPanel({
                         </ul>
                       </div>
                     )}
+                  </div>
+                </Section>
+              )}
+
+              {/* ── Recent News ── */}
+              {(report.recent_news_highlights?.length ?? 0) > 0 && (
+                <Section id="news" title="Recent News & Moves" icon={<Newspaper className="w-4 h-4" />} open={section} toggle={toggle} defaultOpen>
+                  <div className="space-y-3">
+                    {report.recent_news_highlights!.map((item, i) => (
+                      <div key={i} className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <p className="text-sm font-medium text-foreground leading-snug">{item.headline}</p>
+                          <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">{item.date}</span>
+                        </div>
+                        {item.implication && (
+                          <p className="text-xs text-amber-400/90 mb-1.5 flex gap-1.5">
+                            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> {item.implication}
+                          </p>
+                        )}
+                        {item.url && (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-primary/70 hover:text-primary transition-colors flex items-center gap-1"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                            {item.url.length > 60 ? item.url.slice(0, 60) + '…' : item.url}
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* ── Data Sources ── */}
+              {(report.data_sources?.length ?? 0) > 0 && (
+                <Section id="sources" title="Data Sources" icon={<ExternalLink className="w-4 h-4" />} open={section} toggle={toggle}>
+                  <p className="text-[10px] text-muted-foreground mb-3">All URLs and sources consulted to generate this report.</p>
+                  <div className="space-y-1">
+                    {report.data_sources!.map((src, i) => (
+                      <p key={i} className="text-[10px] text-muted-foreground truncate">
+                        {src.startsWith('http') ? (
+                          <a href={src} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                            {src}
+                          </a>
+                        ) : src}
+                      </p>
+                    ))}
                   </div>
                 </Section>
               )}

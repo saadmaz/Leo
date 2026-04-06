@@ -186,10 +186,11 @@ async def add_discovered_competitor(
 
     project = get_project_as_editor(project_id, user["uid"])
     brand_core = project.get("brandCore") or {}
+    brand_name = project.get("name", "")
 
     async def event_stream():
         try:
-            async for event in _stream(project_id, body.competitor, brand_core):
+            async for event in _stream(project_id, body.competitor, brand_core, brand_name):
                 yield f"data: {_json.dumps(event)}\n\n"
         except Exception as exc:
             yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"

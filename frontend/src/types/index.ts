@@ -430,6 +430,13 @@ export interface CompetitorStrategyBreakdown {
   what_they_do_better: string
   their_weakness: string
   how_to_beat_them: string
+  // Enriched fields
+  data_snapshot?: {
+    followers?: Record<string, number>
+    avg_engagement?: Record<string, number>
+    top_themes?: string[]
+  }
+  key_evidence?: string[]
 }
 
 export interface StrategyBattleground {
@@ -443,19 +450,50 @@ export interface StrategyAction {
   action: string
   rationale: string
   expected_impact: string
+  timeframe?: string
+  effort?: 'low' | 'medium' | 'high'
+}
+
+export interface StrategyQuickWin {
+  action: string
+  why_now: string
+  expected_result: string
+}
+
+export interface StrategyChannelPlatform {
+  priority: 'primary' | 'secondary' | 'deprioritize'
+  rationale: string
+  recommended_formats: string[]
+  posting_frequency: string
+  content_angles: string[]
 }
 
 export interface CompetitiveStrategy {
   executive_summary: string
+  market_snapshot?: {
+    total_competitors: number
+    market_maturity: string
+    top_channels: string[]
+    key_trends: string[]
+    data_points: string[]
+  }
   brand_position: {
     strengths: string[]
     vulnerabilities: string[]
     differentiation: string
+    evidence?: string[]
   }
   competitor_breakdown: CompetitorStrategyBreakdown[]
+  channel_strategy?: Record<string, StrategyChannelPlatform>
+  content_strategy?: {
+    themes_to_own: string[]
+    themes_to_attack: string[]
+    formats: Array<{ format: string; platform: string; rationale: string }>
+  }
   battlegrounds: StrategyBattleground[]
   action_plan: StrategyAction[]
-  quick_wins: string[]
+  quick_wins: StrategyQuickWin[] | string[]
+  data_sources?: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,6 +1038,7 @@ export interface CompetitorReportScorecard {
   dimension: string
   competitor: number
   brand: number
+  evidence?: string
 }
 
 export interface CompetitorReport {
@@ -1012,10 +1051,17 @@ export interface CompetitorReport {
     funding_stage: string
     revenue_range: string
     business_model: string
+    // Source companion fields
+    description_source?: string
+    size_source?: string
+    founded_source?: string
+    location_source?: string
+    revenue_source?: string
+    funding_source?: string
   }
   platform_metrics: CompetitorReportPlatformMetric[]
   growth_trajectory: Array<{ month: string; followers_total: number; engagement_index: number }>
-  revenue_trajectory: Array<{ period: string; value: number }>
+  revenue_trajectory: Array<{ period: string; value: number; basis?: string }>
   content_mix: Array<{ type: string; percentage: number }>
   vs_brand_scorecard: CompetitorReportScorecard[]
   what_they_do_better: Array<{
@@ -1023,6 +1069,7 @@ export interface CompetitorReport {
     detail: string
     impact: string
     how_to_respond: string
+    evidence?: string
   }>
   their_strategy: {
     core_message: string
@@ -1030,6 +1077,7 @@ export interface CompetitorReport {
     posting_cadence: string
     cta_strategy: string
     audience_focus: string
+    notable_tactics?: string[]
   }
   opportunities: Array<{
     opportunity: string
@@ -1044,6 +1092,13 @@ export interface CompetitorReport {
     areas_of_direct_competition: string[]
     areas_of_no_overlap: string[]
   }
+  recent_news_highlights?: Array<{
+    headline: string
+    date: string
+    url: string
+    implication: string
+  }>
+  data_sources?: string[]
 }
 
 // ---------------------------------------------------------------------------
