@@ -89,6 +89,11 @@ import type {
   ConnectedPlatform,
   AyrsharePostResult,
   PublishedPost,
+  Pillar1Doc,
+  Pillar1Message,
+  Pillar1SSEEvent,
+  Pillar1StreamCallbacks,
+  ICPGenerateBody,
 } from '@/types'
 
 // All backend requests are proxied through Next.js rewrites defined in
@@ -277,6 +282,41 @@ async function streamGet<TEvent>(
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}: ${await res.text()}`)
   if (!res.body) { onDone(); return }
   await readSSEStream(res.body.getReader(), onEvent, onDone)
+}
+
+// ---------------------------------------------------------------------------
+// Pillar 1 SSE handler factory
+// ---------------------------------------------------------------------------
+
+function makePillar1Handler(callbacks: Pillar1StreamCallbacks) {
+  return (event: Pillar1SSEEvent) => {
+    switch (event.type) {
+      case 'research_step':
+        callbacks.onStep?.(event.step ?? '', event.label ?? '', event.status ?? '')
+        break
+      case 'delta':
+        callbacks.onDelta?.(event.content ?? '')
+        break
+      case 'stage_advance':
+        callbacks.onStageAdvance?.(event.new_stage ?? 0, event.label ?? '')
+        break
+      case 'icp_saved':
+      case 'gtm_saved':
+      case 'okr_saved':
+      case 'budget_saved':
+      case 'personas_saved':
+      case 'market_sizing_saved':
+      case 'positioning_saved':
+      case 'comp_map_saved':
+      case 'launch_saved':
+      case 'risk_scan_saved':
+        callbacks.onSaved?.(event.doc_id ?? '', event.payload ?? {})
+        break
+      case 'error':
+        callbacks.onError?.(event.message ?? 'Unknown error')
+        break
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2215,5 +2255,170 @@ export const api = {
 
     getPublishHistory: (projectId: string): Promise<{ posts: PublishedPost[] }> =>
       get(`/projects/${projectId}/persona/publishing/history`),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Pillar 1 — Strategy & Planning
+  // ---------------------------------------------------------------------------
+  pillar1: {
+    /** List saved documents of a given type ('icp' | 'gtm' | 'okr' | etc.) */
+    listDocs: (projectId: string, docType?: string): Promise<{ docs: Pillar1Doc[] }> =>
+      get(`/projects/${projectId}/strategy/pillar1/${docType ?? 'icp'}/list`),
+
+    /** Generate ICP segments — SSE stream */
+    streamICP: (
+      projectId: string,
+      body: ICPGenerateBody,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/icp/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate GTM strategy — SSE stream */
+    streamGTM: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/gtm/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate OKRs — returns JSON directly (non-streaming) */
+    generateOKR: (projectId: string, body: Record<string, unknown>): Promise<Pillar1Doc> =>
+      post(`/projects/${projectId}/strategy/pillar1/okr/generate`, body),
+
+    /** Generate budget model — SSE stream */
+    streamBudget: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/budget/model`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate personas — SSE stream */
+    streamPersonas: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/personas/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate market sizing (TAM/SAM/SOM) — SSE stream */
+    streamMarketSize: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/market-size/analyze`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Start a Positioning Workshop session */
+    startPositioning: (projectId: string, body: Record<string, unknown>): Promise<{ doc_id: string; stage: number; stage_label: string }> =>
+      post(`/projects/${projectId}/strategy/pillar1/positioning/start`, body),
+
+    /** Send a message in a Positioning Workshop session — SSE stream */
+    streamPositioningMessage: (
+      projectId: string,
+      docId: string,
+      message: string,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/positioning/${docId}/message`,
+        { message },
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Get a positioning session with its message history */
+    getPositioningSession: (projectId: string, docId: string): Promise<{ doc: Pillar1Doc; messages: Pillar1Message[] }> =>
+      get(`/projects/${projectId}/strategy/pillar1/positioning/${docId}`),
+
+    /** Generate competitive positioning map — SSE stream */
+    streamCompMap: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/comp-map/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate launch plan — SSE stream */
+    streamLaunch: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/launch/plan`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Run risk scan — SSE stream */
+    streamRiskScan: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar1/risk/scan`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** List risk alerts (list of risk_flag docs) */
+    listRiskAlerts: (projectId: string): Promise<{ docs: Pillar1Doc[] }> =>
+      get(`/projects/${projectId}/strategy/pillar1/risk/alerts`),
+
+    /** Dismiss a specific risk alert */
+    dismissRiskAlert: (projectId: string, docId: string, riskId: string): Promise<{ status: string }> =>
+      post(`/projects/${projectId}/strategy/pillar1/risk/alerts/${docId}/dismiss/${riskId}`, {}),
   },
 }

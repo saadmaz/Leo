@@ -1698,3 +1698,236 @@ export interface AyrsharePostResult {
   postIds?: Record<string, string>
   errors?: Record<string, string>
 }
+
+// ---------------------------------------------------------------------------
+// Pillar 1 — Strategy & Planning
+// ---------------------------------------------------------------------------
+
+export interface ProgressStep {
+  step: string
+  label: string
+  status: 'pending' | 'running' | 'done' | 'skipped' | 'error'
+}
+
+export type Pillar1DocType =
+  | 'icp'
+  | 'gtm'
+  | 'okr'
+  | 'budget'
+  | 'persona'
+  | 'market_sizing'
+  | 'positioning'
+  | 'comp_map'
+  | 'launch'
+  | 'risk_flag'
+
+export interface Pillar1Doc {
+  id: string
+  doc_type: Pillar1DocType
+  title: string
+  status: 'draft' | 'complete' | 'error'
+  owner_uid: string
+  created_at: string
+  updated_at: string
+  credits_spent: number
+  payload: Record<string, unknown>
+  research_cache?: Record<string, unknown>
+}
+
+export interface Pillar1Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
+
+// --- Payload shapes ---
+
+export interface ICPSegment {
+  name: string
+  firmographics: Record<string, string>
+  psychographics: { goals: string[]; pain_points: string[]; motivators: string[]; objections: string[] }
+  buying_signals: string[]
+  preferred_channels: string[]
+  decision_maker_titles: string[]
+  apollo_companies_found?: number
+  apollo_contacts_found?: number
+}
+
+export interface ICPPayload {
+  segments: ICPSegment[]
+  go_to_market_priority?: string
+  outreach_angle?: string
+  summary?: string
+}
+
+export interface OKRKeyResult {
+  metric: string
+  owner?: string
+  tracking?: string
+}
+
+export interface OKRObjective {
+  title: string
+  description?: string
+  key_results: OKRKeyResult[]
+}
+
+export interface OKRPayload {
+  quarter: string
+  objectives: OKRObjective[]
+  summary?: string
+}
+
+export interface BudgetAllocation {
+  channel: string
+  amount: number
+  percentage: number
+  rationale: string
+  expected_roas?: string
+  expected_reach?: string
+  kpis?: string[]
+}
+
+export interface BudgetPayload {
+  total_budget: number
+  currency: string
+  duration_months: number
+  allocations: BudgetAllocation[]
+  monthly_breakdown?: { month: number; theme: string; spend: number; focus: string }[]
+  organic_complement?: string
+  risk_scenarios?: Record<string, string>
+  benchmark_notes?: string
+  summary?: string
+}
+
+export interface PersonaProfile {
+  name: string
+  archetype?: string
+  demographics: Record<string, string>
+  a_day_in_their_life?: string
+  goals: string[]
+  challenges: string[]
+  how_they_find_us?: string[]
+  what_they_say?: string
+  content_preferences?: { formats: string[]; tone: string; trusted_sources: string[] }
+  buying_trigger?: string
+  messaging_angle?: string
+}
+
+export interface PersonaPayload {
+  personas: PersonaProfile[]
+  summary?: string
+}
+
+export interface MarketSizingPayload {
+  market_description: string
+  geography: string
+  tam: { value: string; methodology: string; sources: string[]; cagr?: string; key_drivers?: string[] }
+  sam: { value: string; methodology: string; assumptions: string[]; sources: string[] }
+  som: { value: string; year_1_target?: string; methodology: string; market_share_pct?: string; assumptions: string[] }
+  key_trends?: string[]
+  competitive_density?: string
+  go_to_market_implications?: string[]
+  confidence?: string
+}
+
+export interface PositioningPayload {
+  workshop_stage: number
+  draft_statement?: string | null
+  final_statement?: string | null
+  taglines?: string[]
+  context?: string
+}
+
+export interface CompMapCompetitor {
+  name: string
+  x: number
+  y: number
+  quadrant?: string
+  summary?: string
+  evidence?: string
+  threat_level?: string
+}
+
+export interface CompMapPayload {
+  x_axis: string
+  y_axis: string
+  x_description?: string
+  y_description?: string
+  competitors: CompMapCompetitor[]
+  your_brand?: CompMapCompetitor & { positioning_opportunity?: string }
+  white_space?: string
+  strategic_recommendation?: string
+  summary?: string
+}
+
+export interface LaunchPhase {
+  phase: string
+  weeks?: string
+  goal?: string
+  milestones: string[]
+  content_calendar?: { week: number; channel: string; content_type: string; copy_hook: string }[]
+  metrics?: string[]
+}
+
+export interface LaunchPayload {
+  product_name: string
+  launch_date?: string
+  phases: LaunchPhase[]
+  budget_guidance?: string
+  risk_flags?: string[]
+  summary?: string
+}
+
+export interface RiskAlert {
+  risk_id: string
+  category: 'competitor_aggression' | 'market_signal' | 'sentiment_decline' | 'regulatory'
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  title: string
+  description: string
+  trigger_source: string
+  evidence_urls: string[]
+  detected_at: string
+  recommended_action: string
+  dismissed: boolean
+}
+
+export interface RiskPayload {
+  risks: RiskAlert[]
+  scan_summary: { total_risks: number; critical: number; high: number; scanned_at: string }
+}
+
+// --- SSE event types ---
+
+export interface Pillar1SSEEvent {
+  type: string
+  content?: string
+  step?: string
+  label?: string
+  status?: string
+  doc_id?: string
+  payload?: Record<string, unknown>
+  new_stage?: number
+  message?: string
+}
+
+// --- Stream callback helpers ---
+
+export interface Pillar1StreamCallbacks {
+  onStep?: (step: string, label: string, status: string) => void
+  onDelta?: (text: string) => void
+  onSaved?: (docId: string, payload: Record<string, unknown>) => void
+  onStageAdvance?: (newStage: number, label: string) => void
+  onError?: (message: string) => void
+  onDone?: () => void
+}
+
+// ICP form body
+export interface ICPGenerateBody {
+  target_region?: string
+  use_apollo?: boolean
+  manual_segments?: string[]
+  industry_tags?: string[]
+  employee_ranges?: string[]
+}
