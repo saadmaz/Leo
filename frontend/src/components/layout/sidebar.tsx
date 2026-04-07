@@ -433,6 +433,10 @@ export function Sidebar() {
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}            label="Email CRM Engine" onClick={() => { router.push(`/projects/${activeProject.id}/email-crm`); setSidebarOpen(false) }} />
               </NavGroup>
 
+              <NavGroup label="Social Media" storageKey="nav_social">
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Social Engine"    onClick={() => { router.push(`/projects/${activeProject.id}/social`); setSidebarOpen(false) }} />
+              </NavGroup>
+
               <NavGroup label="Studio" storageKey="nav_studio">
                 <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/seo`); setSidebarOpen(false) }} />
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => { router.push(`/projects/${activeProject.id}/emails`); setSidebarOpen(false) }} />

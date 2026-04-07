@@ -79,6 +79,10 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar5_churn_risk":         20,
     "pillar5_lead_scoring":       20,
     "pillar5_winloss":            15,
+    # --- Pillar 6: Social Media (gap features) ---
+    "pillar6_community_management": 10,
+    "pillar6_social_proof":         15,
+    "pillar6_employee_advocacy":    10,
 }
 
 # ---------------------------------------------------------------------------

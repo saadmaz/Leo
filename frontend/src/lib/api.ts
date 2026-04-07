@@ -2745,4 +2745,18 @@ export const api = {
     validateEmails: (projectId: string, emails: string[]) =>
       post<{ results: unknown[]; validated?: number }>(`/projects/${projectId}/strategy/pillar5/list-hygiene/validate`, { emails }),
   },
+
+  // -------------------------------------------------------------------------
+  // Pillar 6 — Social Media (gap features)
+  // -------------------------------------------------------------------------
+  pillar6: {
+    streamCommunityManagement: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar6/community/manage`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamSocialProof: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar6/social-proof/harvest`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamEmployeeAdvocacy: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar6/employee-advocacy/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+  },
 }

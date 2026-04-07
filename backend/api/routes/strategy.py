@@ -113,6 +113,11 @@ from backend.schemas.pillar5 import (
     LeadScoringRequest,
     WinLossRequest,
 )
+from backend.schemas.pillar6 import (
+    CommunityManagementRequest,
+    SocialProofRequest,
+    EmployeeAdvocacyRequest,
+)
 from backend.services.pillar4 import (
     ad_brief_service,
     ad_copy_service,
@@ -127,6 +132,11 @@ from backend.services.pillar5 import (
     churn_risk_service,
     lead_scoring_service,
     winloss_service,
+)
+from backend.services.pillar6 import (
+    community_management_service,
+    social_proof_service,
+    employee_advocacy_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -1252,3 +1262,80 @@ async def validate_emails(project_id: str, body: dict, user: CurrentUser):
         return {"results": [result]}
     results = await zerobounce_client.validate_batch(emails[:100])
     return {"results": results, "validated": len(results)}
+
+
+# ===========================================================================
+# Pillar 6 — Social Media (gap features)
+# Already built: Scheduling, Listening, Trends, Hashtags, Analytics, Ad Creative
+# New here: Community Management, Social Proof Harvesting, Employee Advocacy
+# ===========================================================================
+
+def _p6_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar6 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 6 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# Community Management
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar6/community/manage")
+async def manage_community(project_id: str, body: CommunityManagementRequest, user: CurrentUser):
+    """Draft brand-aligned replies to social comments (Ayrshare pull or manual). Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar6_community_management")
+    return _p6_stream(community_management_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar6/community/list")
+async def list_community_sessions(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "community_management")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Social Proof Harvesting
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar6/social-proof/harvest")
+async def harvest_social_proof(project_id: str, body: SocialProofRequest, user: CurrentUser):
+    """Search for brand mentions + surface top testimonials & UGC via Tavily + Claude. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar6_social_proof")
+    return _p6_stream(social_proof_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar6/social-proof/list")
+async def list_social_proof_harvests(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "social_proof")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Employee Advocacy
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar6/employee-advocacy/generate")
+async def generate_employee_advocacy(project_id: str, body: EmployeeAdvocacyRequest, user: CurrentUser):
+    """Generate pre-approved employee-voice posts per platform. Optionally push to Ayrshare. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar6_employee_advocacy")
+    return _p6_stream(employee_advocacy_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar6/employee-advocacy/list")
+async def list_employee_advocacy_sessions(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "employee_advocacy")
+    return {"docs": docs}
