@@ -39,6 +39,17 @@ CREDIT_COSTS: dict[str, int] = {
     "style_guide":        10,
     "seo_analysis":        8,
     "website_copy":        6,
+    # --- Pillar 1: Strategy & Planning ---
+    "pillar1_icp":             40,
+    "pillar1_gtm":             35,
+    "pillar1_okr":             10,
+    "pillar1_budget":          30,
+    "pillar1_persona":         25,
+    "pillar1_market_sizing":   40,
+    "pillar1_positioning_msg":  5,
+    "pillar1_comp_map":        35,
+    "pillar1_launch":          20,
+    "pillar1_risk_scan":       30,
 }
 
 # ---------------------------------------------------------------------------

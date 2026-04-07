@@ -36,7 +36,32 @@ from backend.schemas.strategy import (
     StrategyRefineRequest,
     StrategyStartRequest,
 )
-from backend.services import firebase_service, strategy_service
+from backend.schemas.pillar1 import (
+    ICPGenerateRequest,
+    GTMGenerateRequest,
+    OKRGenerateRequest,
+    BudgetModelRequest,
+    PersonaGenerateRequest,
+    MarketSizingRequest,
+    PositioningStartRequest,
+    PositioningMessageRequest,
+    CompMapGenerateRequest,
+    LaunchPlanRequest,
+    RiskScanRequest,
+)
+from backend.services import firebase_service, strategy_service, credits_service
+from backend.services.pillar1 import (
+    icp_service,
+    gtm_service,
+    okr_service,
+    budget_service,
+    persona_service,
+    market_sizing_service,
+    positioning_service,
+    comp_positioning_service,
+    launch_service,
+    risk_service,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects/{project_id}/strategy", tags=["strategy"])
@@ -270,3 +295,322 @@ async def refine_strategy(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ===========================================================================
+# Pillar 1 — Strategy & Planning features
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# ICP Builder
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/icp/generate")
+async def generate_icp(project_id: str, body: ICPGenerateRequest, user: CurrentUser):
+    """Generate Ideal Customer Profile segments. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_icp")
+
+    async def event_stream():
+        try:
+            gen = await icp_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("ICP generation error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/icp/list")
+async def list_icps(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "icp")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# GTM Strategy
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/gtm/generate")
+async def generate_gtm(project_id: str, body: GTMGenerateRequest, user: CurrentUser):
+    """Generate GTM strategy. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_gtm")
+
+    async def event_stream():
+        try:
+            gen = await gtm_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("GTM generation error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/gtm/list")
+async def list_gtms(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "gtm")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Quarterly OKR Drafting
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/okr/generate")
+async def generate_okr(project_id: str, body: OKRGenerateRequest, user: CurrentUser):
+    """Generate quarterly OKRs (fast, non-streaming)."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_okr")
+    doc = await okr_service.generate(project, body, project_id, user["uid"])
+    return doc
+
+
+@router.get("/pillar1/okr/list")
+async def list_okrs(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "okr")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Budget Modelling
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/budget/model")
+async def model_budget(project_id: str, body: BudgetModelRequest, user: CurrentUser):
+    """Generate budget model. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_budget")
+
+    async def event_stream():
+        try:
+            gen = await budget_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Budget model error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/budget/list")
+async def list_budgets(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "budget")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Persona Generation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/personas/generate")
+async def generate_personas(project_id: str, body: PersonaGenerateRequest, user: CurrentUser):
+    """Generate buyer personas. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_persona")
+
+    async def event_stream():
+        try:
+            gen = await persona_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Persona generation error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/personas/list")
+async def list_personas(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "persona")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Market Sizing
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/market-size/analyze")
+async def analyze_market_size(project_id: str, body: MarketSizingRequest, user: CurrentUser):
+    """Generate TAM/SAM/SOM analysis. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_market_sizing")
+
+    async def event_stream():
+        try:
+            gen = await market_sizing_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Market sizing error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/market-size/list")
+async def list_market_sizes(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "market_sizing")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Positioning Workshop
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/positioning/start")
+async def start_positioning(project_id: str, body: PositioningStartRequest, user: CurrentUser):
+    """Start a new Positioning Workshop session. Returns doc_id."""
+    get_project_as_member(project_id, user["uid"])
+    doc = await asyncio.to_thread(
+        positioning_service.start_session, project_id, user["uid"], body
+    )
+    return {"doc_id": doc["id"], "stage": 0, "stage_label": "Who are you for?"}
+
+
+@router.post("/pillar1/positioning/{doc_id}/message")
+async def positioning_message(
+    project_id: str,
+    doc_id: str,
+    body: PositioningMessageRequest,
+    user: CurrentUser,
+):
+    """Send a message in the Positioning Workshop. Streams SSE events. 5 credits/message."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_positioning_msg")
+
+    async def event_stream():
+        try:
+            gen = await positioning_service.send_message(project, doc_id, body, project_id)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Positioning workshop error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/positioning/{doc_id}")
+async def get_positioning_session(project_id: str, doc_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    doc = await asyncio.to_thread(firebase_service.get_pillar1_doc, project_id, doc_id)
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    messages = await asyncio.to_thread(firebase_service.list_pillar1_messages, project_id, doc_id)
+    return {"doc": doc, "messages": messages}
+
+
+# ---------------------------------------------------------------------------
+# Competitive Positioning Map
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/comp-map/generate")
+async def generate_comp_map(project_id: str, body: CompMapGenerateRequest, user: CurrentUser):
+    """Generate competitive positioning map. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_comp_map")
+
+    async def event_stream():
+        try:
+            gen = await comp_positioning_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Comp map generation error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/comp-map/list")
+async def list_comp_maps(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "comp_map")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Launch Planning
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/launch/plan")
+async def plan_launch(project_id: str, body: LaunchPlanRequest, user: CurrentUser):
+    """Generate launch plan. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_launch")
+
+    async def event_stream():
+        try:
+            gen = await launch_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Launch plan error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/launch/list")
+async def list_launches(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "launch")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Risk Flagging
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar1/risk/scan")
+async def scan_risks(project_id: str, body: RiskScanRequest, user: CurrentUser):
+    """Run risk scan. Streams SSE events."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_risk_scan")
+
+    async def event_stream():
+        try:
+            gen = await risk_service.generate(project, body, project_id, user["uid"])
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Risk scan error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/pillar1/risk/alerts")
+async def list_risk_alerts(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "risk_flag")
+    return {"docs": docs}
+
+
+@router.post("/pillar1/risk/alerts/{doc_id}/dismiss/{risk_id}")
+async def dismiss_risk_alert(project_id: str, doc_id: str, risk_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(firebase_service.dismiss_risk_alert, project_id, doc_id, risk_id)
+    return {"status": "dismissed"}

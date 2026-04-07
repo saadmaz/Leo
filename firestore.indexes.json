@@ -26,6 +26,24 @@
         { "fieldPath": "chatId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "_comment": "pillar1_docs — list by type newest-first. Used by list_pillar1_docs().",
+      "collectionGroup": "pillar1_docs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doc_type", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "pillar1_docs — list by status newest-first (e.g. show all complete docs).",
+      "collectionGroup": "pillar1_docs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

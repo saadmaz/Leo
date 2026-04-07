@@ -2745,3 +2745,137 @@ def save_interview_answer(project_id: str, question_key: str, answer: str) -> di
         "updatedAt": now,
     })
     return get_personal_core(project_id)
+
+
+# ---------------------------------------------------------------------------
+# Pillar 1 — Strategy & Planning documents
+# ---------------------------------------------------------------------------
+
+def create_pillar1_doc(
+    project_id: str,
+    doc_type: str,
+    owner_uid: str,
+    title: str,
+) -> dict:
+    """Create a new Pillar 1 strategy document and return it with its generated id."""
+    db = get_db()
+    now = _utcnow()
+    ref = db.collection("projects").document(project_id).collection("pillar1_docs").document()
+    data = {
+        "id": ref.id,
+        "doc_type": doc_type,
+        "title": title,
+        "status": "draft",
+        "owner_uid": owner_uid,
+        "created_at": now,
+        "updated_at": now,
+        "credits_spent": 0,
+        "payload": {},
+        "research_cache": {},
+    }
+    ref.set(data)
+    return data
+
+
+def get_pillar1_doc(project_id: str, doc_id: str) -> dict | None:
+    """Fetch a single Pillar 1 document by id."""
+    db = get_db()
+    snap = (
+        db.collection("projects")
+        .document(project_id)
+        .collection("pillar1_docs")
+        .document(doc_id)
+        .get()
+    )
+    return snap.to_dict() if snap.exists else None
+
+
+def update_pillar1_doc(project_id: str, doc_id: str, updates: dict) -> None:
+    """Partial-update a Pillar 1 document. Always stamps updated_at."""
+    db = get_db()
+    updates["updated_at"] = _utcnow()
+    (
+        db.collection("projects")
+        .document(project_id)
+        .collection("pillar1_docs")
+        .document(doc_id)
+        .update(updates)
+    )
+
+
+def list_pillar1_docs(
+    project_id: str,
+    doc_type: str | None = None,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    List Pillar 1 documents for a project, newest first.
+    Optionally filter by doc_type (icp, gtm, okr, etc.).
+    """
+    db = get_db()
+    query = db.collection("projects").document(project_id).collection("pillar1_docs")
+    if doc_type:
+        query = query.where("doc_type", "==", doc_type)
+    query = query.order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit)
+    return [snap.to_dict() for snap in query.stream()]
+
+
+def save_pillar1_message(
+    project_id: str,
+    doc_id: str,
+    role: str,
+    content: str,
+) -> dict:
+    """Save a chat message to a Positioning Workshop document's messages sub-collection."""
+    db = get_db()
+    now = _utcnow()
+    ref = (
+        db.collection("projects")
+        .document(project_id)
+        .collection("pillar1_docs")
+        .document(doc_id)
+        .collection("messages")
+        .document()
+    )
+    data = {"id": ref.id, "role": role, "content": content, "created_at": now}
+    ref.set(data)
+    return data
+
+
+def list_pillar1_messages(project_id: str, doc_id: str) -> list[dict]:
+    """Return all messages for a Positioning Workshop session, oldest first."""
+    db = get_db()
+    snaps = (
+        db.collection("projects")
+        .document(project_id)
+        .collection("pillar1_docs")
+        .document(doc_id)
+        .collection("messages")
+        .order_by("created_at", direction=firestore.Query.ASCENDING)
+        .stream()
+    )
+    return [snap.to_dict() for snap in snaps]
+
+
+def dismiss_risk_alert(project_id: str, doc_id: str, risk_id: str) -> None:
+    """
+    Mark a specific risk alert as dismissed within a risk_flag document.
+    Updates the risks list element matching risk_id.
+    """
+    db = get_db()
+    doc_ref = (
+        db.collection("projects")
+        .document(project_id)
+        .collection("pillar1_docs")
+        .document(doc_id)
+    )
+    snap = doc_ref.get()
+    if not snap.exists:
+        return
+    doc_data = snap.to_dict()
+    risks: list = doc_data.get("payload", {}).get("risks", [])
+    for risk in risks:
+        if risk.get("risk_id") == risk_id:
+            risk["dismissed"] = True
+            break
+    doc_ref.update({"payload.risks": risks, "updated_at": _utcnow()})

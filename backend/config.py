@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     X_CLIENT_ID: Optional[str] = None
     X_CLIENT_SECRET: Optional[str] = None
 
+    # --- CRM & Enrichment ---
+    APOLLO_API_KEY: Optional[str] = None
+
+    # --- Ad Platforms ---
+    GOOGLE_ADS_DEVELOPER_TOKEN: Optional[str] = None
+    GOOGLE_ADS_CUSTOMER_ID: Optional[str] = None
+
     # --- Brand Intelligence ---
     LOGO_DEV_API_KEY: Optional[str] = None
     BRANDFETCH_API_KEY: Optional[str] = None
