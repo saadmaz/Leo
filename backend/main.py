@@ -145,9 +145,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # CORS
 # ---------------------------------------------------------------------------
 
-# Allow the configured frontend origin plus localhost variants in development.
+# Allow the configured frontend origin plus any extra alias domains.
 # In production, FRONTEND_URL should be the exact deployed origin.
 _origins = [settings.FRONTEND_URL]
+if settings.EXTRA_FRONTEND_URLS:
+    _origins += [u.strip() for u in settings.EXTRA_FRONTEND_URLS.split(",") if u.strip()]
 if settings.ENVIRONMENT == "development":
     _origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
 

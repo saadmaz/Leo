@@ -116,6 +116,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     FRONTEND_URL: str = "http://localhost:3000"
+    # Comma-separated list of additional allowed CORS origins (e.g. alias domains)
+    EXTRA_FRONTEND_URLS: str = ""
 
     model_config = SettingsConfigDict(
         # Absolute path — works regardless of launch CWD.
