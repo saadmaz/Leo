@@ -413,6 +413,10 @@ export function Sidebar() {
                 <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"  onClick={() => { router.push(`/projects/${activeProject.id}/intelligence/deep-research`); setSidebarOpen(false) }} />
               </NavGroup>
 
+              <NavGroup label="Strategy" storageKey="nav_strategy">
+                <NavItem icon={<Map className="w-3.5 h-3.5" />} label="Strategy Hub" onClick={() => { router.push(`/projects/${activeProject.id}/strategy`); setSidebarOpen(false) }} />
+              </NavGroup>
+
               <NavGroup label="Studio" storageKey="nav_studio">
                 <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/seo`); setSidebarOpen(false) }} />
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => { router.push(`/projects/${activeProject.id}/emails`); setSidebarOpen(false) }} />
