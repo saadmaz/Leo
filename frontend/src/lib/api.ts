@@ -319,6 +319,13 @@ function makePillar1Handler(callbacks: Pillar1StreamCallbacks) {
       case 'translate_saved':
       case 'case_study_saved':
       case 'content_gap_saved':
+      // Pillar 3 saved events
+      case 'keyword_research_saved':
+      case 'serp_intent_saved':
+      case 'on_page_seo_saved':
+      case 'featured_snippet_saved':
+      case 'content_freshness_saved':
+      case 'technical_seo_saved':
         callbacks.onSaved?.(event.doc_id ?? '', event.payload ?? {})
         break
       case 'error':
@@ -2553,6 +2560,95 @@ export const api = {
     ) =>
       streamPost<Pillar1SSEEvent>(
         `/projects/${projectId}/strategy/pillar2/content-gap/analyze`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+  },
+
+  // -------------------------------------------------------------------------
+  // Pillar 3 — SEO & Organic Search
+  // -------------------------------------------------------------------------
+  pillar3: {
+    streamKeywordResearch: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar3/keywords/research`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamSerpIntent: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar3/serp-intent/map`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamOnPageAudit: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar3/on-page/audit`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamFeaturedSnippet: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar3/featured-snippet/optimize`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamFreshnessCheck: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar3/freshness/check`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamTechnicalAudit: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar3/technical/audit`,
         body,
         makePillar1Handler(callbacks),
         () => callbacks.onDone?.(),

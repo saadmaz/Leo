@@ -59,6 +59,13 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar2_translate":       15,
     "pillar2_case_study":      15,
     "pillar2_content_gap":     40,
+    # --- Pillar 3: SEO & Organic Search ---
+    "pillar3_keyword_research":  10,
+    "pillar3_serp_intent":       10,
+    "pillar3_on_page_seo":       15,
+    "pillar3_featured_snippet":  10,
+    "pillar3_content_freshness": 10,
+    "pillar3_technical_seo":     20,
 }
 
 # ---------------------------------------------------------------------------

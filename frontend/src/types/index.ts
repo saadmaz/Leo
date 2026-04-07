@@ -2089,3 +2089,153 @@ export interface ContentGapPayload {
   dataforseo_used: boolean
   keywords_analysed: number
 }
+
+// ---------------------------------------------------------------------------
+// Pillar 3 — SEO & Organic Search
+// ---------------------------------------------------------------------------
+
+export interface KeywordIdea {
+  keyword: string
+  search_volume: number | null
+  difficulty: number | null
+  cpc: number | null
+  competition: string | null
+  intent: string
+  content_idea: string
+}
+
+export interface KeywordCluster {
+  cluster: string
+  keywords: string[]
+}
+
+export interface KeywordResearchPayload {
+  seed_keywords: string[]
+  location: string
+  language: string
+  total_found: number
+  keywords: KeywordIdea[]
+  priority_picks: string[]
+  cluster_suggestions: KeywordCluster[]
+  strategy_note: string
+  dataforseo_used: boolean
+}
+
+export interface SerpResult {
+  position: number
+  title: string
+  url: string
+  description: string | null
+  intent: string
+}
+
+export interface SerpIntentPayload {
+  keyword: string
+  overall_intent: string
+  intent_confidence: number
+  intent_breakdown: {
+    informational: number
+    navigational: number
+    transactional: number
+    commercial: number
+  }
+  serp_results: SerpResult[]
+  has_featured_snippet: boolean
+  has_people_also_ask: boolean
+  content_recommendation: string
+  content_type_to_create: string
+  ideal_word_count: number
+  angle: string
+  competing_domains: string[]
+  difficulty_assessment: string
+  ranking_timeline: string
+  dataforseo_used: boolean
+}
+
+export interface OnPageIssue {
+  type: string
+  severity: 'critical' | 'warning' | 'info'
+  description: string
+  fix: string
+}
+
+export interface OnPageSeoPayload {
+  url: string
+  overall_score: number
+  grade: string
+  title_tag: string | null
+  meta_description: string | null
+  word_count: number | null
+  load_time_ms: number | null
+  issues: OnPageIssue[]
+  strengths: string[]
+  priority_fixes: string[]
+  quick_wins: string[]
+  optimised_title: string | null
+  optimised_description: string | null
+  estimated_impact: string
+  dataforseo_used: boolean
+}
+
+export interface FeaturedSnippetPayload {
+  keyword: string
+  has_snippet: boolean
+  current_snippet_owner: string | null
+  snippet_type: string | null
+  opportunity_assessment: string
+  optimised_heading: string
+  optimised_answer: string
+  optimised_list: string[]
+  schema_markup_suggestion: string | null
+  content_tips: string[]
+  page_requirements: string
+  estimated_time_to_win: string
+  dataforseo_used: boolean
+}
+
+export interface FreshnessSignal {
+  signal: string
+  status: 'good' | 'warning' | 'critical'
+  note: string
+}
+
+export interface ContentFreshnessPayload {
+  url: string
+  keyword: string
+  current_position: number | null
+  position_trend: string
+  freshness_score: number
+  signals: FreshnessSignal[]
+  last_modified: string | null
+  recommended_updates: string[]
+  update_priority: 'low' | 'medium' | 'high'
+  estimated_effort: string
+  estimated_traffic_recovery: string
+  refresh_checklist: string[]
+  competitive_threat: string
+  dataforseo_used: boolean
+}
+
+export interface TechnicalIssue {
+  category: string
+  severity: 'critical' | 'warning' | 'info'
+  description: string
+  affected_elements: string[]
+  fix: string
+}
+
+export interface TechnicalSeoPayload {
+  url: string
+  crawl_score: number
+  page_load_time: number | null
+  mobile_friendly: boolean | null
+  https_enabled: boolean | null
+  canonical_url: string | null
+  structured_data: string[]
+  issues: TechnicalIssue[]
+  performance_metrics: Record<string, string | number>
+  recommendations: string[]
+  quick_technical_wins: string[]
+  technical_score_breakdown: Record<string, number>
+  dataforseo_used: boolean
+}

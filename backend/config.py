@@ -29,8 +29,12 @@ class Settings(BaseSettings):
 
     # --- Pillar 2: Content Creation & Management ---
     DEEPL_API_KEY: Optional[str] = None          # Multilingual adaptation (free 500k/mo)
-    DATAFORSEO_LOGIN: Optional[str] = None        # Content gap analysis
-    DATAFORSEO_PASSWORD: Optional[str] = None     # Content gap analysis
+    DATAFORSEO_LOGIN: Optional[str] = None        # Content gap + Pillar 3 SEO
+    DATAFORSEO_PASSWORD: Optional[str] = None     # Content gap + Pillar 3 SEO
+
+    # --- Pillar 3: SEO & Organic Search ---
+    GOOGLE_SEARCH_CONSOLE_CLIENT_ID: Optional[str] = None     # GSC API (free, OAuth2)
+    GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET: Optional[str] = None # GSC API (free, OAuth2)
 
     # --- Search Cost Controls ---
     EXA_DAILY_SEARCH_LIMIT: int = 100

@@ -59,6 +59,14 @@ from backend.schemas.pillar2 import (
     CaseStudyRequest,
     ContentGapRequest,
 )
+from backend.schemas.pillar3 import (
+    KeywordResearchRequest,
+    SerpIntentRequest,
+    OnPageSeoRequest,
+    FeaturedSnippetRequest,
+    ContentFreshnessRequest,
+    TechnicalSeoRequest,
+)
 from backend.services import firebase_service, strategy_service, credits_service
 from backend.services.pillar1 import (
     icp_service,
@@ -81,6 +89,14 @@ from backend.services.pillar2 import (
     translate_service,
     case_study_service,
     content_gap_service,
+)
+from backend.services.pillar3 import (
+    keyword_research_service,
+    serp_intent_service,
+    on_page_service,
+    featured_snippet_service,
+    content_freshness_service,
+    technical_seo_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -803,4 +819,136 @@ async def analyze_content_gap(project_id: str, body: ContentGapRequest, user: Cu
 async def list_content_gaps(project_id: str, user: CurrentUser):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "content_gap")
+    return {"docs": docs}
+
+
+# ===========================================================================
+# Pillar 3 — SEO & Organic Search
+# ===========================================================================
+
+def _p3_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar3 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 3 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# Keyword Research Engine
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar3/keywords/research")
+async def research_keywords(project_id: str, body: KeywordResearchRequest, user: CurrentUser):
+    """Keyword research via DataForSEO + Claude. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_keyword_research")
+    return _p3_stream(keyword_research_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar3/keywords/list")
+async def list_keyword_research(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "keyword_research")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# SERP Intent Mapping
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar3/serp-intent/map")
+async def map_serp_intent(project_id: str, body: SerpIntentRequest, user: CurrentUser):
+    """SERP intent mapping via DataForSEO + Claude. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_serp_intent")
+    return _p3_stream(serp_intent_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar3/serp-intent/list")
+async def list_serp_intents(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "serp_intent")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# On-Page SEO Optimisation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar3/on-page/audit")
+async def audit_on_page(project_id: str, body: OnPageSeoRequest, user: CurrentUser):
+    """On-page SEO audit via DataForSEO + Claude. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_on_page_seo")
+    return _p3_stream(on_page_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar3/on-page/list")
+async def list_on_page_audits(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "on_page_seo")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Featured Snippet Optimisation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar3/featured-snippet/optimize")
+async def optimize_featured_snippet(project_id: str, body: FeaturedSnippetRequest, user: CurrentUser):
+    """Featured snippet optimisation via DataForSEO + Claude. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_featured_snippet")
+    return _p3_stream(featured_snippet_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar3/featured-snippet/list")
+async def list_featured_snippets(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "featured_snippet")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Content Freshness Management
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar3/freshness/check")
+async def check_content_freshness(project_id: str, body: ContentFreshnessRequest, user: CurrentUser):
+    """Content freshness check via DataForSEO + Claude. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_content_freshness")
+    return _p3_stream(content_freshness_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar3/freshness/list")
+async def list_freshness_checks(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "content_freshness")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Technical SEO Monitor
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar3/technical/audit")
+async def audit_technical_seo(project_id: str, body: TechnicalSeoRequest, user: CurrentUser):
+    """Technical SEO audit via DataForSEO + Claude. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_technical_seo")
+    return _p3_stream(technical_seo_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar3/technical/list")
+async def list_technical_audits(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "technical_seo")
     return {"docs": docs}
