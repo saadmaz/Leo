@@ -104,11 +104,29 @@ from backend.services.pillar3 import (
     content_freshness_service,
     technical_seo_service,
 )
+from backend.schemas.pillar5 import (
+    EmailSequenceRequest,
+    SubjectLineRequest,
+    SendTimeRequest,
+    NewsletterRequest,
+    ChurnRiskRequest,
+    LeadScoringRequest,
+    WinLossRequest,
+)
 from backend.services.pillar4 import (
     ad_brief_service,
     ad_copy_service,
     retargeting_service,
     attribution_service,
+)
+from backend.services.pillar5 import (
+    email_sequence_service,
+    subject_line_service,
+    send_time_service,
+    newsletter_service,
+    churn_risk_service,
+    lead_scoring_service,
+    winloss_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -1058,3 +1076,179 @@ async def list_attribution_reports(project_id: str, user: CurrentUser):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "attribution")
     return {"docs": docs}
+
+
+# ===========================================================================
+# Pillar 5 — Email Marketing & CRM
+# ===========================================================================
+
+def _p5_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar5 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 5 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# Email Sequence Builder
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/email-sequence/build")
+async def build_email_sequence(project_id: str, body: EmailSequenceRequest, user: CurrentUser):
+    """Write a full email sequence + optionally push to Loops.so. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_email_sequence")
+    return _p5_stream(email_sequence_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/email-sequence/list")
+async def list_email_sequences(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "email_sequence")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Subject Line Optimiser
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/subject-lines/optimise")
+async def optimise_subject_lines(project_id: str, body: SubjectLineRequest, user: CurrentUser):
+    """Generate subject line variants with open-rate scores. Streams SSE. 5 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_subject_lines")
+    return _p5_stream(subject_line_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/subject-lines/list")
+async def list_subject_line_results(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "subject_lines")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Send Time Optimiser
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/send-time/optimise")
+async def optimise_send_time(project_id: str, body: SendTimeRequest, user: CurrentUser):
+    """Recommend optimal email send windows from audience data. Streams SSE. 5 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_send_time")
+    return _p5_stream(send_time_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/send-time/list")
+async def list_send_time_results(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "send_time")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Newsletter Production
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/newsletter/produce")
+async def produce_newsletter(project_id: str, body: NewsletterRequest, user: CurrentUser):
+    """Write a full newsletter edition + optionally push to Loops.so. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_newsletter")
+    return _p5_stream(newsletter_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/newsletter/list")
+async def list_newsletters(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "newsletter")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Churn Risk Detection
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/churn-risk/analyse")
+async def analyse_churn_risk(project_id: str, body: ChurnRiskRequest, user: CurrentUser):
+    """Score contact churn risk + generate win-back emails. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_churn_risk")
+    return _p5_stream(churn_risk_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/churn-risk/list")
+async def list_churn_risk_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "churn_risk")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Lead Scoring
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/lead-scoring/score")
+async def score_leads(project_id: str, body: LeadScoringRequest, user: CurrentUser):
+    """Score leads against ICP + optionally sync to HubSpot. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_lead_scoring")
+    return _p5_stream(lead_scoring_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/lead-scoring/list")
+async def list_lead_scoring_results(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "lead_scoring")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Win/Loss Analysis
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/winloss/analyse")
+async def analyse_winloss(project_id: str, body: WinLossRequest, user: CurrentUser):
+    """Synthesise deal outcomes into competitive intelligence. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_winloss")
+    return _p5_stream(winloss_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar5/winloss/list")
+async def list_winloss_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "winloss")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# ZeroBounce — Email Validation (utility endpoint, no credit cost)
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar5/list-hygiene/validate")
+async def validate_emails(project_id: str, body: dict, user: CurrentUser):
+    """
+    Validate up to 100 email addresses via ZeroBounce.
+    Body: { "emails": ["a@b.com", ...] }
+    Returns ZeroBounce result list. No credit charge (free tier 100/mo).
+    """
+    get_project_as_member(project_id, user["uid"])
+    emails: list[str] = body.get("emails", [])
+    if not emails:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="emails list is required.")
+
+    from backend.services.pillar5 import zerobounce_client
+    if len(emails) == 1:
+        result = await zerobounce_client.validate_single(emails[0])
+        return {"results": [result]}
+    results = await zerobounce_client.validate_batch(emails[:100])
+    return {"results": results, "validated": len(results)}

@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     GA4_PROPERTY_ID: Optional[str] = None               # Numeric property ID (e.g. "123456789")
     GA4_SERVICE_ACCOUNT_KEY: Optional[str] = None       # Full service account JSON as a string
 
+    # --- Pillar 5: Email Marketing & CRM ---
+    # Loops.so — loops.so → Settings → API (free tier available)
+    LOOPS_API_KEY: Optional[str] = None
+    # ZeroBounce — zerobounce.net → Dashboard → API (100 free validations/mo)
+    ZEROBOUNCE_API_KEY: Optional[str] = None
+    # HubSpot — app.hubspot.com → Settings → Integrations → Private Apps (free CRM)
+    HUBSPOT_ACCESS_TOKEN: Optional[str] = None
+
     # --- Brand Intelligence ---
     LOGO_DEV_API_KEY: Optional[str] = None
     BRANDFETCH_API_KEY: Optional[str] = None

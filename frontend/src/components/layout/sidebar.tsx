@@ -429,6 +429,10 @@ export function Sidebar() {
                 <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}      label="Paid Ads Engine"  onClick={() => { router.push(`/projects/${activeProject.id}/paid-ads`); setSidebarOpen(false) }} />
               </NavGroup>
 
+              <NavGroup label="Email &amp; CRM" storageKey="nav_email_crm">
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}            label="Email CRM Engine" onClick={() => { router.push(`/projects/${activeProject.id}/email-crm`); setSidebarOpen(false) }} />
+              </NavGroup>
+
               <NavGroup label="Studio" storageKey="nav_studio">
                 <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/seo`); setSidebarOpen(false) }} />
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => { router.push(`/projects/${activeProject.id}/emails`); setSidebarOpen(false) }} />

@@ -66,6 +66,19 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar3_featured_snippet":  10,
     "pillar3_content_freshness": 10,
     "pillar3_technical_seo":     20,
+    # --- Pillar 4: Paid Advertising ---
+    "pillar4_ad_brief":      15,
+    "pillar4_ad_copy":       10,
+    "pillar4_retargeting":   20,
+    "pillar4_attribution":   20,
+    # --- Pillar 5: Email Marketing & CRM ---
+    "pillar5_email_sequence":     15,
+    "pillar5_subject_lines":       5,
+    "pillar5_send_time":           5,
+    "pillar5_newsletter":         15,
+    "pillar5_churn_risk":         20,
+    "pillar5_lead_scoring":       20,
+    "pillar5_winloss":            15,
 }
 
 # ---------------------------------------------------------------------------

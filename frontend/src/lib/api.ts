@@ -2716,4 +2716,33 @@ export const api = {
         signal,
       ),
   },
+
+  // -------------------------------------------------------------------------
+  // Pillar 5 — Email Marketing & CRM
+  // -------------------------------------------------------------------------
+  pillar5: {
+    streamEmailSequence: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/email-sequence/build`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamSubjectLines: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/subject-lines/optimise`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamSendTime: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/send-time/optimise`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamNewsletter: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/newsletter/produce`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamChurnRisk: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/churn-risk/analyse`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamLeadScoring: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/lead-scoring/score`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamWinLoss: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar5/winloss/analyse`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    validateEmails: (projectId: string, emails: string[]) =>
+      post<{ results: unknown[]; validated?: number }>(`/projects/${projectId}/strategy/pillar5/list-hygiene/validate`, { emails }),
+  },
 }
