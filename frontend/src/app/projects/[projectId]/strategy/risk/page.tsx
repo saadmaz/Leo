@@ -40,7 +40,7 @@ export default function RiskPage() {
         },
         {
           onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
-          onSaved: (_id, payload) => { setResult(payload as RiskPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Risk scan complete!') },
+          onSaved: (_id, payload) => { setResult(payload as unknown as RiskPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Risk scan complete!') },
           onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
           onDone: () => store.setIsStreaming(false),
         },

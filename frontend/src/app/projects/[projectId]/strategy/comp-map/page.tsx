@@ -33,7 +33,7 @@ export default function CompMapPage() {
         {
           onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
           onDelta: (text) => store.appendStreamText(text),
-          onSaved: (_id, payload) => { setResult(payload as CompMapPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Positioning map ready!') },
+          onSaved: (_id, payload) => { setResult(payload as unknown as CompMapPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Positioning map ready!') },
           onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
           onDone: () => store.setIsStreaming(false),
         },

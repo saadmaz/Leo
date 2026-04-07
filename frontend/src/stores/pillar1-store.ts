@@ -40,7 +40,7 @@ interface Pillar1State {
   clearPositioningStreamText: () => void
 }
 
-export const usePillar1Store = create<Pillar1State>((set, get) => ({
+export const usePillar1Store = create<Pillar1State>((set) => ({
   activeDocs: {},
   setActiveDoc: (docType, doc) =>
     set((s) => ({ activeDocs: { ...s.activeDocs, [docType]: doc } })),

@@ -31,7 +31,7 @@ export default function MarketSizePage() {
         {
           onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
           onDelta: (text) => store.appendStreamText(text),
-          onSaved: (_id, payload) => { setResult(payload as MarketSizingPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Market sizing ready!') },
+          onSaved: (_id, payload) => { setResult(payload as unknown as MarketSizingPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Market sizing ready!') },
           onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
           onDone: () => store.setIsStreaming(false),
         },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { MessageSquare, ChevronLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'

@@ -38,7 +38,7 @@ export default function LaunchPage() {
         {
           onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
           onDelta: (text) => store.appendStreamText(text),
-          onSaved: (_id, payload) => { setResult(payload as LaunchPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Launch plan ready!') },
+          onSaved: (_id, payload) => { setResult(payload as unknown as LaunchPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Launch plan ready!') },
           onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
           onDone: () => store.setIsStreaming(false),
         },

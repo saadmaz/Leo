@@ -38,7 +38,7 @@ export default function BudgetPage() {
         {
           onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
           onDelta: (text) => store.appendStreamText(text),
-          onSaved: (_id, payload) => { setResult(payload as BudgetPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Budget model ready!') },
+          onSaved: (_id, payload) => { setResult(payload as unknown as BudgetPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Budget model ready!') },
           onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
           onDone: () => store.setIsStreaming(false),
         },

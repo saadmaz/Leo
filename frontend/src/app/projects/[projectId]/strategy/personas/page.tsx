@@ -32,7 +32,7 @@ export default function PersonasPage() {
         {
           onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
           onDelta: (text) => store.appendStreamText(text),
-          onSaved: (_id, payload) => { setResult(payload as PersonaPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Personas ready!') },
+          onSaved: (_id, payload) => { setResult(payload as unknown as PersonaPayload); store.clearStreamText(); store.setIsStreaming(false); toast.success('Personas ready!') },
           onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
           onDone: () => store.setIsStreaming(false),
         },

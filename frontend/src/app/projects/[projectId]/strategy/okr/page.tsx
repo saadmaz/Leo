@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { Target, Loader2, ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
-import { DocumentCard } from '@/components/pillar1/DocumentCard'
 import { api } from '@/lib/api'
 import type { Pillar1Doc, OKRPayload } from '@/types'
 

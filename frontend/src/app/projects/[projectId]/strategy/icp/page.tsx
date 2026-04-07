@@ -40,7 +40,7 @@ export default function ICPPage() {
             store.upsertStep(step, label, status as ProgressStep['status']),
           onDelta: (text) => store.appendStreamText(text),
           onSaved: (_docId, payload) => {
-            setResult(payload as ICPPayload)
+            setResult(payload as unknown as ICPPayload)
             store.clearStreamText()
             store.setIsStreaming(false)
             toast.success('ICP segments ready!')
