@@ -417,6 +417,10 @@ export function Sidebar() {
                 <NavItem icon={<Map className="w-3.5 h-3.5" />} label="Strategy Hub" onClick={() => { router.push(`/projects/${activeProject.id}/strategy`); setSidebarOpen(false) }} />
               </NavGroup>
 
+              <NavGroup label="Content Studio" storageKey="nav_content_studio">
+                <NavItem icon={<Layers className="w-3.5 h-3.5" />}         label="Content Studio"   onClick={() => { router.push(`/projects/${activeProject.id}/content`); setSidebarOpen(false) }} />
+              </NavGroup>
+
               <NavGroup label="Studio" storageKey="nav_studio">
                 <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/seo`); setSidebarOpen(false) }} />
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => { router.push(`/projects/${activeProject.id}/emails`); setSidebarOpen(false) }} />

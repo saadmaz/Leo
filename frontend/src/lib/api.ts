@@ -310,6 +310,15 @@ function makePillar1Handler(callbacks: Pillar1StreamCallbacks) {
       case 'comp_map_saved':
       case 'launch_saved':
       case 'risk_scan_saved':
+      // Pillar 2 saved events
+      case 'headline_saved':
+      case 'visual_brief_saved':
+      case 'video_script_saved':
+      case 'podcast_saved':
+      case 'quality_saved':
+      case 'translate_saved':
+      case 'case_study_saved':
+      case 'content_gap_saved':
         callbacks.onSaved?.(event.doc_id ?? '', event.payload ?? {})
         break
       case 'error':
@@ -2420,5 +2429,134 @@ export const api = {
     /** Dismiss a specific risk alert */
     dismissRiskAlert: (projectId: string, docId: string, riskId: string): Promise<{ status: string }> =>
       post(`/projects/${projectId}/strategy/pillar1/risk/alerts/${docId}/dismiss/${riskId}`, {}),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Pillar 2 — Content Creation & Management
+  // ---------------------------------------------------------------------------
+  pillar2: {
+    /** List saved Pillar 2 documents */
+    listDocs: (projectId: string, docType: string): Promise<{ docs: Pillar1Doc[] }> =>
+      get(`/projects/${projectId}/strategy/pillar2/${docType}/list`),
+
+    /** Generate headline A/B variants — SSE stream */
+    streamHeadlines: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/headline/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate visual brief — SSE stream */
+    streamVisualBrief: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/visual-brief/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate video script — SSE stream */
+    streamVideoScript: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/video-script/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Process podcast audio/transcript — SSE stream */
+    streamPodcast: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/podcast/process`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Score content quality — SSE stream */
+    streamQualityScore: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/quality/score`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Translate and adapt content — SSE stream */
+    streamTranslate: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/translate/adapt`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Generate case study — SSE stream */
+    streamCaseStudy: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/case-study/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    /** Analyse content gaps — SSE stream */
+    streamContentGap: (
+      projectId: string,
+      body: Record<string, unknown>,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar2/content-gap/analyze`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
   },
 }

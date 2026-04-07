@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: Optional[str] = None
     SERPAPI_API_KEY: Optional[str] = None
 
+    # --- Pillar 2: Content Creation & Management ---
+    DEEPL_API_KEY: Optional[str] = None          # Multilingual adaptation (free 500k/mo)
+    DATAFORSEO_LOGIN: Optional[str] = None        # Content gap analysis
+    DATAFORSEO_PASSWORD: Optional[str] = None     # Content gap analysis
+
     # --- Search Cost Controls ---
     EXA_DAILY_SEARCH_LIMIT: int = 100
     TAVILY_DAILY_SEARCH_LIMIT: int = 200

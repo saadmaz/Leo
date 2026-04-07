@@ -49,6 +49,16 @@ from backend.schemas.pillar1 import (
     LaunchPlanRequest,
     RiskScanRequest,
 )
+from backend.schemas.pillar2 import (
+    HeadlineGenerateRequest,
+    VisualBriefRequest,
+    VideoScriptRequest,
+    PodcastNotesRequest,
+    QualityScoreRequest,
+    TranslateRequest,
+    CaseStudyRequest,
+    ContentGapRequest,
+)
 from backend.services import firebase_service, strategy_service, credits_service
 from backend.services.pillar1 import (
     icp_service,
@@ -61,6 +71,16 @@ from backend.services.pillar1 import (
     comp_positioning_service,
     launch_service,
     risk_service,
+)
+from backend.services.pillar2 import (
+    headline_service,
+    visual_brief_service,
+    video_script_service,
+    podcast_service,
+    quality_service,
+    translate_service,
+    case_study_service,
+    content_gap_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -614,3 +634,173 @@ async def dismiss_risk_alert(project_id: str, doc_id: str, risk_id: str, user: C
     get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(firebase_service.dismiss_risk_alert, project_id, doc_id, risk_id)
     return {"status": "dismissed"}
+
+
+# ===========================================================================
+# Pillar 2 — Content Creation & Management
+# ===========================================================================
+
+def _p2_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar2 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 2 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# Headline A/B Variants
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/headline/generate")
+async def generate_headlines(project_id: str, body: HeadlineGenerateRequest, user: CurrentUser):
+    """Generate headline A/B variants. Streams SSE events. 5 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_headline")
+    return _p2_stream(headline_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/headline/list")
+async def list_headlines(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "headline")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Visual Brief Generation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/visual-brief/generate")
+async def generate_visual_brief(project_id: str, body: VisualBriefRequest, user: CurrentUser):
+    """Generate a visual creative brief. Streams SSE events. 5 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_visual_brief")
+    return _p2_stream(visual_brief_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/visual-brief/list")
+async def list_visual_briefs(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "visual_brief")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Video Script Writing
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/video-script/generate")
+async def generate_video_script(project_id: str, body: VideoScriptRequest, user: CurrentUser):
+    """Generate a full video script. Streams SSE events. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_video_script")
+    return _p2_stream(video_script_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/video-script/list")
+async def list_video_scripts(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "video_script")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Podcast Show Notes
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/podcast/process")
+async def process_podcast(project_id: str, body: PodcastNotesRequest, user: CurrentUser):
+    """Transcribe and generate podcast show notes. Streams SSE events. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_podcast")
+    return _p2_stream(podcast_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/podcast/list")
+async def list_podcasts(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "podcast")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Content Quality Scoring
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/quality/score")
+async def score_content_quality(project_id: str, body: QualityScoreRequest, user: CurrentUser):
+    """Score content quality across 6 dimensions. Streams SSE events. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_quality")
+    return _p2_stream(quality_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/quality/list")
+async def list_quality_scores(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "quality_score")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Multilingual Adaptation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/translate/adapt")
+async def adapt_translation(project_id: str, body: TranslateRequest, user: CurrentUser):
+    """Translate and adapt content via DeepL + Claude. Streams SSE events. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_translate")
+    return _p2_stream(translate_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/translate/list")
+async def list_translations(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "translation")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Case Study Production
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/case-study/generate")
+async def generate_case_study(project_id: str, body: CaseStudyRequest, user: CurrentUser):
+    """Generate a publication-ready case study. Streams SSE events. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_case_study")
+    return _p2_stream(case_study_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/case-study/list")
+async def list_case_studies(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "case_study")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Content Gap Analysis
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar2/content-gap/analyze")
+async def analyze_content_gap(project_id: str, body: ContentGapRequest, user: CurrentUser):
+    """Analyse content gaps via DataForSEO + Claude. Streams SSE events. 40 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_content_gap")
+    return _p2_stream(content_gap_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar2/content-gap/list")
+async def list_content_gaps(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "content_gap")
+    return {"docs": docs}

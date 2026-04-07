@@ -50,6 +50,15 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar1_comp_map":        35,
     "pillar1_launch":          20,
     "pillar1_risk_scan":       30,
+    # --- Pillar 2: Content Creation & Management ---
+    "pillar2_headline":         5,
+    "pillar2_visual_brief":     5,
+    "pillar2_video_script":    15,
+    "pillar2_podcast":         20,
+    "pillar2_quality":         10,
+    "pillar2_translate":       15,
+    "pillar2_case_study":      15,
+    "pillar2_content_gap":     40,
 }
 
 # ---------------------------------------------------------------------------

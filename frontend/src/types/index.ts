@@ -1931,3 +1931,161 @@ export interface ICPGenerateBody {
   industry_tags?: string[]
   employee_ranges?: string[]
 }
+
+// ===========================================================================
+// Pillar 2 — Content Creation & Management
+// ===========================================================================
+
+export interface HeadlineVariant {
+  text: string
+  angle: string
+  psychology: string
+  character_count: number
+}
+
+export interface HeadlinePayload {
+  platform: string
+  topic: string
+  variants: HeadlineVariant[]
+  recommendation?: string
+}
+
+export interface VisualBriefColorPalette {
+  primary: string
+  secondary: string
+  accent: string
+  background: string
+  rationale: string
+}
+
+export interface VisualBriefPayload {
+  content_type: string
+  platform?: string
+  dimensions?: string
+  concept: string
+  mood: string
+  color_palette: VisualBriefColorPalette
+  typography: { headline_font: string; body_font: string; hierarchy: string }
+  layout: string
+  imagery: { style: string; subject: string; lighting: string; negative_space: string }
+  copy_suggestions: { headline: string; subheadline?: string; cta?: string }
+  midjourney_prompt: string
+  do: string[]
+  dont: string[]
+}
+
+export interface VideoScriptSection {
+  timestamp: string
+  section_title: string
+  script: string
+  broll?: string
+  notes?: string
+}
+
+export interface VideoScriptPayload {
+  title: string
+  platform: string
+  estimated_duration: string
+  hook: string
+  sections: VideoScriptSection[]
+  cta: string
+  thumbnail_concept?: string
+  tags?: string[]
+  description_snippet?: string
+}
+
+export interface PodcastTimestamp {
+  time: string
+  topic: string
+}
+
+export interface PodcastQuote {
+  speaker: string
+  quote: string
+}
+
+export interface PodcastPayload {
+  episode_title: string
+  summary: string
+  key_takeaways: string[]
+  timestamps: PodcastTimestamp[]
+  notable_quotes: PodcastQuote[]
+  platform_description: string
+  linkedin_post?: string
+  tags: string[]
+  chapter_markers?: string
+}
+
+export interface QualityDimension {
+  name: string
+  score: number
+  feedback: string
+  examples?: string
+}
+
+export interface QualityPayload {
+  overall_score: number
+  grade: string
+  verdict: string
+  platform: string
+  content_type: string
+  dimensions: QualityDimension[]
+  top_3_improvements: string[]
+  rewrite_suggestion?: string
+  publish_ready: boolean
+}
+
+export interface TranslationItem {
+  lang: string
+  lang_name: string
+  translated_content: string
+  cultural_notes?: string
+  tone_notes?: string
+  parse_error?: boolean
+}
+
+export interface TranslatePayload {
+  source_lang: string
+  source_content: string
+  translations: TranslationItem[]
+  deepl_used: boolean
+}
+
+export interface CaseStudySection {
+  title: string
+  content: string
+  pull_quote?: string | null
+}
+
+export interface CaseStudyPayload {
+  headline: string
+  subheadline?: string
+  client_snapshot: { company: string; industry: string; size?: string; use_case?: string }
+  sections: CaseStudySection[]
+  key_stats: { metric: string; label: string }[]
+  testimonial_formatted?: string
+  cta: string
+  meta_description?: string
+  social_proof_snippet?: string
+}
+
+export interface ContentGapItem {
+  keyword: string
+  search_volume: string
+  difficulty: string
+  opportunity_score: number
+  content_angle: string
+  content_type: string
+  estimated_traffic_potential: string
+}
+
+export interface ContentGapPayload {
+  domain: string
+  summary: string
+  gaps: ContentGapItem[]
+  quick_wins: string[]
+  long_term_plays: string[]
+  content_calendar_suggestion?: string
+  dataforseo_used: boolean
+  keywords_analysed: number
+}
