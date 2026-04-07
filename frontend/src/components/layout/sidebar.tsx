@@ -10,7 +10,7 @@ import {
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
-  Mic2, Shield,
+  Mic2, Shield, DollarSign,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -423,6 +423,10 @@ export function Sidebar() {
 
               <NavGroup label="SEO &amp; Organic" storageKey="nav_seo_organic">
                 <NavItem icon={<Search className="w-3.5 h-3.5" />}          label="SEO Engine"       onClick={() => { router.push(`/projects/${activeProject.id}/seo-pro`); setSidebarOpen(false) }} />
+              </NavGroup>
+
+              <NavGroup label="Paid Advertising" storageKey="nav_paid_ads">
+                <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}      label="Paid Ads Engine"  onClick={() => { router.push(`/projects/${activeProject.id}/paid-ads`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Studio" storageKey="nav_studio">

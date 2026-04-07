@@ -23,6 +23,7 @@ interface SSEFeaturePageProps {
   submitLabel: string
   canSubmit: boolean
   className?: string
+  backPath?: string
 }
 
 export function SSEFeaturePage({
@@ -40,6 +41,7 @@ export function SSEFeaturePage({
   submitLabel,
   canSubmit,
   className,
+  backPath,
 }: SSEFeaturePageProps) {
   const router = useRouter()
 
@@ -49,7 +51,7 @@ export function SSEFeaturePage({
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
         <SidebarToggle />
         <button
-          onClick={() => router.push(`/projects/${projectId}/strategy`)}
+          onClick={() => router.push(backPath ?? `/projects/${projectId}/strategy`)}
           className="text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="w-4 h-4" />

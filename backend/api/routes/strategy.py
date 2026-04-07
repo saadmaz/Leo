@@ -67,6 +67,12 @@ from backend.schemas.pillar3 import (
     ContentFreshnessRequest,
     TechnicalSeoRequest,
 )
+from backend.schemas.pillar4 import (
+    AdBriefRequest,
+    AdCopyRequest,
+    RetargetingRequest,
+    AttributionRequest,
+)
 from backend.services import firebase_service, strategy_service, credits_service
 from backend.services.pillar1 import (
     icp_service,
@@ -97,6 +103,12 @@ from backend.services.pillar3 import (
     featured_snippet_service,
     content_freshness_service,
     technical_seo_service,
+)
+from backend.services.pillar4 import (
+    ad_brief_service,
+    ad_copy_service,
+    retargeting_service,
+    attribution_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -951,4 +963,98 @@ async def audit_technical_seo(project_id: str, body: TechnicalSeoRequest, user: 
 async def list_technical_audits(project_id: str, user: CurrentUser):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "technical_seo")
+    return {"docs": docs}
+
+
+# ===========================================================================
+# Pillar 4 — Paid Advertising
+# ===========================================================================
+
+def _p4_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar4 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 4 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# Ad Campaign Brief Generator
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar4/ad-brief/generate")
+async def generate_ad_brief(project_id: str, body: AdBriefRequest, user: CurrentUser):
+    """Generate a comprehensive paid ad campaign brief. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_ad_brief")
+    return _p4_stream(ad_brief_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar4/ad-brief/list")
+async def list_ad_briefs(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "ad_brief")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Ad Copy Generator
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar4/ad-copy/generate")
+async def generate_ad_copy(project_id: str, body: AdCopyRequest, user: CurrentUser):
+    """Generate multi-variant platform-specific ad copy. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_ad_copy")
+    return _p4_stream(ad_copy_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar4/ad-copy/list")
+async def list_ad_copies(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "ad_copy")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Retargeting Sequence Builder
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar4/retargeting/build")
+async def build_retargeting_sequence(project_id: str, body: RetargetingRequest, user: CurrentUser):
+    """Build a full retargeting funnel sequence. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_retargeting")
+    return _p4_stream(retargeting_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar4/retargeting/list")
+async def list_retargeting_sequences(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "retargeting_sequence")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Cross-Channel Attribution
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar4/attribution/analyse")
+async def analyse_attribution(project_id: str, body: AttributionRequest, user: CurrentUser):
+    """Cross-channel attribution analysis via GA4 + Claude. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_attribution")
+    return _p4_stream(attribution_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar4/attribution/list")
+async def list_attribution_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "attribution")
     return {"docs": docs}

@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     GOOGLE_ADS_DEVELOPER_TOKEN: Optional[str] = None
     GOOGLE_ADS_CUSTOMER_ID: Optional[str] = None
 
+    # --- Pillar 4: Paid Advertising ---
+    # GA4 Data API (free) — ads.google.com → Tools → API Centre for Ads keys
+    # GA4: Google Cloud Console → Google Analytics Data API
+    GA4_PROPERTY_ID: Optional[str] = None               # Numeric property ID (e.g. "123456789")
+    GA4_SERVICE_ACCOUNT_KEY: Optional[str] = None       # Full service account JSON as a string
+
     # --- Brand Intelligence ---
     LOGO_DEV_API_KEY: Optional[str] = None
     BRANDFETCH_API_KEY: Optional[str] = None

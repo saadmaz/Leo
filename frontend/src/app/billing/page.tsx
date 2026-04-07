@@ -107,7 +107,7 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 
 export default function BillingPage() {
   const router = useRouter()
-  const { user } = useAppStore()
+  const {user} = useAppStore()
   const [status, setStatus] = useState<BillingStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [upgrading, setUpgrading] = useState<string | null>(null)
@@ -161,6 +161,7 @@ export default function BillingPage() {
     )
   }
 
+// Determine current plan (default to 'free' if not found)
   const currentPlan = status?.plan ?? 'free'
 
   return (

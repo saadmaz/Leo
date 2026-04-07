@@ -34,7 +34,7 @@ export default function AdminDashboardPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Platform-wide overview — all metrics are live from Firestore.
+          Platform-wide overview - all metrics are live from Firestore.
         </p>
       </div>
 

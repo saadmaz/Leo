@@ -2655,4 +2655,65 @@ export const api = {
         signal,
       ),
   },
+
+  // -------------------------------------------------------------------------
+  // Pillar 4 — Paid Advertising
+  // -------------------------------------------------------------------------
+  pillar4: {
+    streamAdBrief: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar4/ad-brief/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamAdCopy: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar4/ad-copy/generate`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamRetargeting: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar4/retargeting/build`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+
+    streamAttribution: (
+      projectId: string,
+      body: unknown,
+      callbacks: Pillar1StreamCallbacks,
+      signal?: AbortSignal,
+    ) =>
+      streamPost<Pillar1SSEEvent>(
+        `/projects/${projectId}/strategy/pillar4/attribution/analyse`,
+        body,
+        makePillar1Handler(callbacks),
+        () => callbacks.onDone?.(),
+        signal,
+      ),
+  },
 }
