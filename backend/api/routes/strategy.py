@@ -118,6 +118,15 @@ from backend.schemas.pillar6 import (
     SocialProofRequest,
     EmployeeAdvocacyRequest,
 )
+from backend.schemas.pillar7 import (
+    UnifiedDashboardRequest,
+    CohortAnalysisRequest,
+    FunnelAnalysisRequest,
+    AnomalyDetectionRequest,
+    ForecastingRequest,
+    CacLtvRequest,
+    BoardReportRequest,
+)
 from backend.services.pillar4 import (
     ad_brief_service,
     ad_copy_service,
@@ -137,6 +146,15 @@ from backend.services.pillar6 import (
     community_management_service,
     social_proof_service,
     employee_advocacy_service,
+)
+from backend.services.pillar7 import (
+    unified_dashboard_service,
+    cohort_analysis_service,
+    funnel_analysis_service,
+    anomaly_detection_service,
+    forecasting_service,
+    cac_ltv_service,
+    board_report_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -1338,4 +1356,130 @@ async def generate_employee_advocacy(project_id: str, body: EmployeeAdvocacyRequ
 async def list_employee_advocacy_sessions(project_id: str, user: CurrentUser):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "employee_advocacy")
+    return {"docs": docs}
+
+
+# ===========================================================================
+# Pillar 7 — Analytics & Reporting
+# Already built: Weekly Digest, Research Reports, Content Analytics, Competitive Intel
+# New here: Unified Dashboard, Cohort Analysis, Funnel Analysis, Anomaly Detection,
+#           Forecasting, CAC+LTV, Board-Ready Reporting
+# ===========================================================================
+
+def _p7_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar7 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 7 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.post("/pillar7/unified-dashboard/generate")
+async def generate_unified_dashboard(project_id: str, body: UnifiedDashboardRequest, user: CurrentUser):
+    """Unified GA4 + Meta + manual channel dashboard with Claude narrative. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_unified_dashboard")
+    return _p7_stream(unified_dashboard_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/unified-dashboard/list")
+async def list_unified_dashboards(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "unified_dashboard")
+    return {"docs": docs}
+
+
+@router.post("/pillar7/cohort/analyse")
+async def analyse_cohorts(project_id: str, body: CohortAnalysisRequest, user: CurrentUser):
+    """Interpret cohort retention/activation data with Claude. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_cohort_analysis")
+    return _p7_stream(cohort_analysis_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/cohort/list")
+async def list_cohort_analyses(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "cohort_analysis")
+    return {"docs": docs}
+
+
+@router.post("/pillar7/funnel/analyse")
+async def analyse_funnel(project_id: str, body: FunnelAnalysisRequest, user: CurrentUser):
+    """Diagnose funnel drop-offs and prescribe CRO fixes. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_funnel_analysis")
+    return _p7_stream(funnel_analysis_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/funnel/list")
+async def list_funnel_analyses(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "funnel_analysis")
+    return {"docs": docs}
+
+
+@router.post("/pillar7/anomaly/detect")
+async def detect_anomalies(project_id: str, body: AnomalyDetectionRequest, user: CurrentUser):
+    """Statistical + Claude anomaly detection across metric time series. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_anomaly_detection")
+    return _p7_stream(anomaly_detection_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/anomaly/list")
+async def list_anomaly_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "anomaly_detection")
+    return {"docs": docs}
+
+
+@router.post("/pillar7/forecast/generate")
+async def generate_forecast(project_id: str, body: ForecastingRequest, user: CurrentUser):
+    """Claude-driven metric forecasting with base/optimistic/pessimistic scenarios. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_forecasting")
+    return _p7_stream(forecasting_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/forecast/list")
+async def list_forecasts(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "forecast")
+    return {"docs": docs}
+
+
+@router.post("/pillar7/cac-ltv/calculate")
+async def calculate_cac_ltv(project_id: str, body: CacLtvRequest, user: CurrentUser):
+    """Calculate CAC, LTV, payback period from Stripe/HubSpot/manual data. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_cac_ltv")
+    return _p7_stream(cac_ltv_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/cac-ltv/list")
+async def list_cac_ltv_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "cac_ltv")
+    return {"docs": docs}
+
+
+@router.post("/pillar7/board-report/generate")
+async def generate_board_report(project_id: str, body: BoardReportRequest, user: CurrentUser):
+    """Write a board/investor-ready report with narrative, KPI table, and appendix. Streams SSE. 25 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_board_report")
+    return _p7_stream(board_report_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar7/board-report/list")
+async def list_board_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "board_report")
     return {"docs": docs}

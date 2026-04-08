@@ -83,6 +83,14 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar6_community_management": 10,
     "pillar6_social_proof":         15,
     "pillar6_employee_advocacy":    10,
+    # --- Pillar 7: Analytics & Reporting ---
+    "pillar7_unified_dashboard":    15,
+    "pillar7_cohort_analysis":      20,
+    "pillar7_funnel_analysis":      15,
+    "pillar7_anomaly_detection":    10,
+    "pillar7_forecasting":          15,
+    "pillar7_cac_ltv":              20,
+    "pillar7_board_report":         25,
 }
 
 # ---------------------------------------------------------------------------

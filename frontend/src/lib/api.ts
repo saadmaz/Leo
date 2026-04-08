@@ -2759,4 +2759,30 @@ export const api = {
     streamEmployeeAdvocacy: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
       streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar6/employee-advocacy/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
   },
+
+  // -------------------------------------------------------------------------
+  // Pillar 7 — Analytics & Reporting
+  // -------------------------------------------------------------------------
+  pillar7: {
+    streamUnifiedDashboard: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/unified-dashboard/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamCohortAnalysis: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/cohort/analyse`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamFunnelAnalysis: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/funnel/analyse`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamAnomalyDetection: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/anomaly/detect`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamForecast: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/forecast/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamCacLtv: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/cac-ltv/calculate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamBoardReport: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/board-report/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+  },
 }
