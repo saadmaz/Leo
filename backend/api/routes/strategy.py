@@ -127,6 +127,16 @@ from backend.schemas.pillar7 import (
     CacLtvRequest,
     BoardReportRequest,
 )
+from backend.schemas.pillar8 import (
+    PressReleaseRequest,
+    MediaListRequest,
+    PitchEmailRequest,
+    CoverageMonitoringRequest,
+    CrisisCommsRequest,
+    AwardSubmissionRequest,
+    AnalystRelationsRequest,
+    PartnershipCommsRequest,
+)
 from backend.services.pillar4 import (
     ad_brief_service,
     ad_copy_service,
@@ -155,6 +165,16 @@ from backend.services.pillar7 import (
     forecasting_service,
     cac_ltv_service,
     board_report_service,
+)
+from backend.services.pillar8 import (
+    press_release_service,
+    media_list_service,
+    pitch_email_service,
+    coverage_monitoring_service,
+    crisis_comms_service,
+    award_submissions_service,
+    analyst_relations_service,
+    partnership_comms_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -1482,4 +1502,176 @@ async def generate_board_report(project_id: str, body: BoardReportRequest, user:
 async def list_board_reports(project_id: str, user: CurrentUser):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "board_report")
+    return {"docs": docs}
+
+
+# ===========================================================================
+# Pillar 8 — PR & Communications
+# Features: Press Release, Media List, Pitch Email, Coverage Monitoring,
+#           Crisis Comms, Award Submissions, Analyst Relations, Partnership Comms
+# ===========================================================================
+
+def _p8_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar8 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 8 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# Press Release Writing
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/press-release/write")
+async def write_press_release(project_id: str, body: PressReleaseRequest, user: CurrentUser):
+    """Draft a brand-aligned press release. Pure Claude. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_press_release")
+    return _p8_stream(press_release_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/press-release/list")
+async def list_press_releases(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "press_release")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Media List Building
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/media-list/build")
+async def build_media_list(project_id: str, body: MediaListRequest, user: CurrentUser):
+    """Build a prioritised journalist media list via Hunter.io + Claude. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_media_list")
+    return _p8_stream(media_list_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/media-list/list")
+async def list_media_lists(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "media_list")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Pitch Email Generation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/pitch-email/generate")
+async def generate_pitch_email(project_id: str, body: PitchEmailRequest, user: CurrentUser):
+    """Write a personalised journalist pitch email with subject line variants. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_pitch_email")
+    return _p8_stream(pitch_email_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/pitch-email/list")
+async def list_pitch_emails(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "pitch_email")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Coverage Monitoring
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/coverage/monitor")
+async def monitor_coverage(project_id: str, body: CoverageMonitoringRequest, user: CurrentUser):
+    """Scan news and Reddit for brand coverage, synthesise sentiment report. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_coverage_monitoring")
+    return _p8_stream(coverage_monitoring_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/coverage/list")
+async def list_coverage_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "coverage_monitoring")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Crisis Communications
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/crisis/respond")
+async def respond_to_crisis(project_id: str, body: CrisisCommsRequest, user: CurrentUser):
+    """Generate a crisis communications playbook with stakeholder statements. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_crisis_comms")
+    return _p8_stream(crisis_comms_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/crisis/list")
+async def list_crisis_responses(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "crisis_comms")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Award Submissions
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/awards/submit")
+async def write_award_submission(project_id: str, body: AwardSubmissionRequest, user: CurrentUser):
+    """Draft an award submission aligned to the award criteria. Firecrawl + Claude. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_award_submission")
+    return _p8_stream(award_submissions_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/awards/list")
+async def list_award_submissions(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "award_submission")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Analyst Relations
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/analyst/brief")
+async def brief_analyst(project_id: str, body: AnalystRelationsRequest, user: CurrentUser):
+    """Prepare an analyst briefing document with positioning & Q&A. Firecrawl + Claude. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_analyst_relations")
+    return _p8_stream(analyst_relations_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/analyst/list")
+async def list_analyst_briefings(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "analyst_relations")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Partnership Communications
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar8/partnership/draft")
+async def draft_partnership_comms(project_id: str, body: PartnershipCommsRequest, user: CurrentUser):
+    """Draft partnership outreach, proposals, or joint press releases. Pure Claude. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_partnership_comms")
+    return _p8_stream(partnership_comms_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar8/partnership/list")
+async def list_partnership_comms(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "partnership_comms")
     return {"docs": docs}

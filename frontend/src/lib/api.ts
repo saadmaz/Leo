@@ -2785,4 +2785,33 @@ export const api = {
     streamBoardReport: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
       streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar7/board-report/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
   },
+
+  // -------------------------------------------------------------------------
+  // Pillar 8 — PR & Communications
+  // -------------------------------------------------------------------------
+  pillar8: {
+    streamPressRelease: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/press-release/write`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamMediaList: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/media-list/build`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamPitchEmail: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/pitch-email/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamCoverageMonitor: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/coverage/monitor`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamCrisisComms: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/crisis/respond`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamAwardSubmission: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/awards/submit`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamAnalystBriefing: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/analyst/brief`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamPartnershipComms: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/partnership/draft`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+  },
 }

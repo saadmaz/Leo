@@ -10,7 +10,7 @@ import {
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
-  Mic2, Shield, DollarSign,
+  Mic2, Shield, DollarSign, Newspaper,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -439,6 +439,10 @@ export function Sidebar() {
 
               <NavGroup label="Analytics & Reporting" storageKey="nav_analytics_pro">
                 <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}      label="Analytics Pro"    onClick={() => { router.push(`/projects/${activeProject.id}/analytics-pro`); setSidebarOpen(false) }} />
+              </NavGroup>
+
+              <NavGroup label="PR & Communications" storageKey="nav_pr_comms">
+                <NavItem icon={<Newspaper className="w-3.5 h-3.5" />}      label="PR & Comms Engine" onClick={() => { router.push(`/projects/${activeProject.id}/pr-comms`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Studio" storageKey="nav_studio">

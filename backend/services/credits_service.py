@@ -91,6 +91,15 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar7_forecasting":          15,
     "pillar7_cac_ltv":              20,
     "pillar7_board_report":         25,
+    # --- Pillar 8: PR & Communications ---
+    "pillar8_press_release":        10,
+    "pillar8_media_list":           20,
+    "pillar8_pitch_email":          10,
+    "pillar8_coverage_monitoring":  15,
+    "pillar8_crisis_comms":         20,
+    "pillar8_award_submission":     15,
+    "pillar8_analyst_relations":    20,
+    "pillar8_partnership_comms":    10,
 }
 
 # ---------------------------------------------------------------------------

@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     X_CLIENT_ID: Optional[str] = None
     X_CLIENT_SECRET: Optional[str] = None
 
+    # --- PR & Communications ---
+    HUNTER_API_KEY: Optional[str] = None   # Hunter.io — media list building & email verification ($49/mo)
+
     # --- CRM & Enrichment ---
     APOLLO_API_KEY: Optional[str] = None
 
