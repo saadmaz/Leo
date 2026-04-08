@@ -149,3 +149,75 @@ class WinLossRequest(BaseModel):
     deals: List[DealOutcome] = Field(..., min_length=1, max_length=100)
     product_name: str = Field(..., min_length=1, max_length=120)
     date_range: Optional[str] = Field(None, description="e.g. 'Q1 2026' or 'Last 90 days'")
+
+
+# ---------------------------------------------------------------------------
+# Behavioral Trigger Automation
+# ---------------------------------------------------------------------------
+
+class BehavioralTriggerRequest(BaseModel):
+    product_name: str = Field(..., min_length=1, max_length=120)
+    trigger_event: str = Field(..., description="e.g. 'visited pricing page', 'opened email 3x without clicking', 'went inactive for 30 days', 'trial day 7'")
+    audience_context: str = Field(..., min_length=10, max_length=300, description="Who triggers this — segment, lifecycle stage, product usage")
+    email_platform: str = Field("generic", description="loops | hubspot | mailchimp | klaviyo | generic")
+    sequence_length: int = Field(3, ge=1, le=7, description="Number of emails in the sequence")
+    conversion_goal: str = Field(..., description="What action should the recipient take: upgrade, book demo, re-engage, etc.")
+    tone: str = Field("helpful and personal")
+
+
+# ---------------------------------------------------------------------------
+# Segmentation Engine
+# ---------------------------------------------------------------------------
+
+class SegmentationRequest(BaseModel):
+    product_name: str = Field(..., min_length=1, max_length=120)
+    total_contacts: Optional[int] = Field(None, description="Total contacts in database")
+    available_data: list[str] = Field(..., min_length=1, description="Data fields available: e.g. ['industry', 'company_size', 'signup_date', 'last_active', 'plan_type', 'country']")
+    segmentation_goal: str = Field(..., description="e.g. 'identify expansion revenue candidates', 'find churn risks', 'personalise onboarding by role'")
+    crm_platform: str = Field("generic", description="hubspot | salesforce | pipedrive | attio | generic")
+    existing_segments: Optional[list[str]] = Field(None, max_length=10, description="Existing segments if any")
+
+
+# ---------------------------------------------------------------------------
+# List Hygiene Management
+# ---------------------------------------------------------------------------
+
+class ListHygieneRequest(BaseModel):
+    list_size: int = Field(..., ge=1, description="Total number of contacts in your list")
+    bounce_rate_pct: Optional[float] = Field(None, ge=0, le=100, description="Current bounce rate %")
+    open_rate_pct: Optional[float] = Field(None, ge=0, le=100, description="Average open rate %")
+    inactive_threshold_days: int = Field(180, ge=30, le=730, description="Days without engagement to flag as inactive")
+    email_platform: str = Field("generic", description="loops | hubspot | mailchimp | klaviyo | generic")
+    emails_to_verify: Optional[list[str]] = Field(None, max_length=100, description="Specific email addresses to verify via ZeroBounce")
+    run_verification: bool = Field(False, description="Run ZeroBounce verification on provided emails")
+
+
+# ---------------------------------------------------------------------------
+# Deliverability Monitoring
+# ---------------------------------------------------------------------------
+
+class DeliverabilityRequest(BaseModel):
+    domain: str = Field(..., min_length=2, max_length=120, description="Your sending domain")
+    sending_volume_monthly: Optional[int] = Field(None, description="Monthly send volume")
+    current_metrics: Optional[str] = Field(None, max_length=1000, description="Paste current metrics: open rate, bounce rate, spam complaints, inbox placement rate, etc.")
+    email_platform: str = Field("generic", description="loops | hubspot | sendgrid | postmark | ses | generic")
+    known_issues: Optional[list[str]] = Field(None, max_length=5, description="Known issues: high spam complaints, low inbox placement, SPF/DKIM failures, etc.")
+    authentication_status: Optional[str] = Field(None, description="SPF/DKIM/DMARC status if known")
+
+
+# ---------------------------------------------------------------------------
+# CRM Enrichment
+# ---------------------------------------------------------------------------
+
+class CrmEnrichmentRequest(BaseModel):
+    crm_platform: str = Field(..., description="hubspot | salesforce | pipedrive | attio | generic")
+    record_type: str = Field("contact", description="contact | company | deal")
+    sample_records: list[dict] = Field(..., min_length=1, max_length=20, description="Sample CRM records with known fields — Claude will identify what's missing and suggest enrichment")
+    enrichment_goals: list[str] = Field(
+        default_factory=lambda: ["company_size", "industry", "tech_stack", "funding_status", "decision_maker_title"],
+        description="Data fields to enrich",
+    )
+    enrichment_sources: list[str] = Field(
+        default_factory=lambda: ["Apollo", "Clearbit", "LinkedIn", "Crunchbase"],
+        description="Preferred enrichment sources",
+    )

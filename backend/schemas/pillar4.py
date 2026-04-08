@@ -63,3 +63,64 @@ class AttributionRequest(BaseModel):
     )
     conversion_goal: str = Field("purchase", description="The primary conversion event to attribute")
     currency: str = Field("USD", max_length=3)
+
+
+# ---------------------------------------------------------------------------
+# Audience Building
+# ---------------------------------------------------------------------------
+
+class AudienceBuildingRequest(BaseModel):
+    product_name: str = Field(..., min_length=1, max_length=120)
+    target_description: str = Field(..., min_length=20, max_length=500, description="Who you're trying to reach")
+    platform: str = Field(..., description="meta | google | linkedin | tiktok | pinterest")
+    audience_type: str = Field("custom", description="custom | lookalike | interest | retargeting | crm_upload")
+    crm_data_summary: Optional[str] = Field(None, max_length=500, description="Summary of your CRM data (size, industry breakdown, job titles, etc.)")
+    existing_audience_size: Optional[int] = Field(None, description="Size of your seed audience for lookalike")
+    budget: Optional[str] = Field(None, description="e.g. '$5,000/month' — used to size audience appropriately")
+
+
+class BidStrategyRequest(BaseModel):
+    campaign_name: str = Field(..., min_length=1, max_length=120)
+    platform: str = Field(..., description="google | meta | linkedin | tiktok")
+    objective: str = Field(..., description="leads | sales | traffic | brand_awareness | app_installs")
+    current_bid_strategy: Optional[str] = Field(None, description="Current bidding approach (e.g. 'manual CPC', 'target CPA $45')")
+    current_metrics: Optional[str] = Field(None, max_length=500, description="Paste current performance: CPA, ROAS, CTR, CPC, conversion rate")
+    target_cpa: Optional[float] = Field(None, description="Target cost per acquisition in $")
+    target_roas: Optional[float] = Field(None, description="Target return on ad spend (e.g. 3.5 = 350%)")
+    monthly_budget: Optional[float] = Field(None, description="Monthly budget in $")
+    campaign_maturity: str = Field("established", description="new | learning | established | mature")
+
+
+class BudgetPacingRequest(BaseModel):
+    campaigns: list[dict] = Field(..., min_length=1, max_length=20, description="List of {name, platform, monthly_budget, spent_to_date, days_elapsed, days_total, conversions, spend} dicts")
+    pacing_period: str = Field("month", description="week | month | quarter")
+    optimization_goal: str = Field("conversions", description="conversions | roas | cpa | impressions")
+    reallocation_threshold_pct: int = Field(20, ge=5, le=50, description="Min % over/under pace to trigger reallocation")
+
+
+class NegativeKeywordsRequest(BaseModel):
+    campaign_name: str = Field(..., min_length=1, max_length=120)
+    platform: str = Field("google", description="google | microsoft")
+    campaign_type: str = Field("search", description="search | shopping | display")
+    product_name: str = Field(..., min_length=1, max_length=120)
+    product_description: str = Field(..., min_length=20, max_length=500)
+    search_terms_report: Optional[str] = Field(None, max_length=5000, description="Paste your search terms report (terms + clicks + cost + conversions)")
+    industry: Optional[str] = Field(None, max_length=100)
+    existing_negatives: Optional[list[str]] = Field(None, max_length=50, description="Your current negative keyword list")
+
+
+class CreativePerformanceRequest(BaseModel):
+    platform: str = Field(..., description="meta | google | tiktok | linkedin | youtube")
+    creatives: list[dict] = Field(..., min_length=2, max_length=30, description="List of {name, format, headline, ctr, cvr, spend, conversions, roas, impressions, age_days} dicts")
+    optimization_goal: str = Field("conversions", description="conversions | roas | cpa | ctr | brand_awareness")
+    budget_to_reallocate: Optional[float] = Field(None, description="Budget freed by pausing losers ($)")
+
+
+class CompetitorAdMonitoringRequest(BaseModel):
+    competitors: list[str] = Field(..., min_length=1, max_length=10, description="Competitor brand names")
+    platforms: list[str] = Field(default_factory=lambda: ["meta", "google"], description="Platforms to monitor: meta | google | tiktok | linkedin")
+    your_product_category: str = Field(..., min_length=5, max_length=200, description="Your product category to find relevant ads")
+    alert_on: list[str] = Field(
+        default_factory=lambda: ["new_offer", "price_change", "new_creative_angle", "new_platform"],
+        description="What signals to flag",
+    )

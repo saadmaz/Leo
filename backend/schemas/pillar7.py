@@ -206,3 +206,20 @@ class BoardReportRequest(BaseModel):
     )
     tone: str = Field("confident and data-driven", description="Report tone")
     include_appendix: bool = Field(True, description="Include detailed metrics appendix")
+
+
+# ---------------------------------------------------------------------------
+# Competitive Benchmarking
+# ---------------------------------------------------------------------------
+
+class CompetitiveBenchmarkingRequest(BaseModel):
+    your_brand: str = Field(..., min_length=1, max_length=120)
+    your_domain: str = Field(..., min_length=2, max_length=120)
+    competitors: list[str] = Field(..., min_length=1, max_length=8, description="Competitor brand names")
+    competitor_domains: Optional[list[str]] = Field(None, max_length=8, description="Competitor domains for traffic estimation")
+    metrics_to_compare: list[str] = Field(
+        default_factory=lambda: ["share_of_voice", "traffic_estimate", "keyword_overlap", "social_following", "domain_authority"],
+        description="Metrics to include in the benchmark",
+    )
+    manual_data: Optional[str] = Field(None, max_length=2000, description="Paste any data you already have (follower counts, Semrush estimates, etc.)")
+    benchmark_period: str = Field("last_quarter", description="Time period: last_month | last_quarter | last_year")
