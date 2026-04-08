@@ -2879,3 +2879,75 @@ def dismiss_risk_alert(project_id: str, doc_id: str, risk_id: str) -> None:
             risk["dismissed"] = True
             break
     doc_ref.update({"payload.risks": risks, "updated_at": _utcnow()})
+
+
+# ===========================================================================
+# Pillar 10 — Experiment Log (native Firestore table)
+# ===========================================================================
+
+def create_experiment(project_id: str, owner_uid: str, data: dict) -> dict:
+    """Create a new experiment log entry."""
+    db = get_db()
+    now = _utcnow()
+    ref = db.collection("projects").document(project_id).collection("experiments").document()
+    entry = {
+        "id": ref.id,
+        "owner_uid": owner_uid,
+        "created_at": now,
+        "updated_at": now,
+        **data,
+    }
+    ref.set(entry)
+    return entry
+
+
+def get_experiment(project_id: str, experiment_id: str) -> dict | None:
+    """Fetch a single experiment by ID."""
+    db = get_db()
+    snap = (
+        db.collection("projects")
+        .document(project_id)
+        .collection("experiments")
+        .document(experiment_id)
+        .get()
+    )
+    return snap.to_dict() if snap.exists else None
+
+
+def update_experiment(project_id: str, experiment_id: str, updates: dict) -> None:
+    """Partial-update an experiment. Stamps updated_at."""
+    db = get_db()
+    updates["updated_at"] = _utcnow()
+    (
+        db.collection("projects")
+        .document(project_id)
+        .collection("experiments")
+        .document(experiment_id)
+        .update(updates)
+    )
+
+
+def delete_experiment(project_id: str, experiment_id: str) -> None:
+    """Delete an experiment log entry."""
+    db = get_db()
+    (
+        db.collection("projects")
+        .document(project_id)
+        .collection("experiments")
+        .document(experiment_id)
+        .delete()
+    )
+
+
+def list_experiments(
+    project_id: str,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    """List experiments for a project, newest first. Optionally filter by status."""
+    db = get_db()
+    query = db.collection("projects").document(project_id).collection("experiments")
+    if status:
+        query = query.where("status", "==", status)
+    query = query.order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit)
+    return [snap.to_dict() for snap in query.stream()]

@@ -10,7 +10,7 @@ import {
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
-  Mic2, Shield, DollarSign, Newspaper,
+  Mic2, Shield, DollarSign, Newspaper, FlaskConical,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -443,6 +443,10 @@ export function Sidebar() {
 
               <NavGroup label="PR & Communications" storageKey="nav_pr_comms">
                 <NavItem icon={<Newspaper className="w-3.5 h-3.5" />}      label="PR & Comms Engine" onClick={() => { router.push(`/projects/${activeProject.id}/pr-comms`); setSidebarOpen(false) }} />
+              </NavGroup>
+
+              <NavGroup label="Experimentation" storageKey="nav_experiments">
+                <NavItem icon={<FlaskConical className="w-3.5 h-3.5" />}   label="Experiments Engine" onClick={() => { router.push(`/projects/${activeProject.id}/experiments`); setSidebarOpen(false) }} />
               </NavGroup>
 
               <NavGroup label="Studio" storageKey="nav_studio">

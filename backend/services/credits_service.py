@@ -100,6 +100,12 @@ CREDIT_COSTS: dict[str, int] = {
     "pillar8_award_submission":     15,
     "pillar8_analyst_relations":    20,
     "pillar8_partnership_comms":    10,
+    # --- Pillar 10: Experimentation & Optimisation ---
+    "pillar10_ab_test_design":       10,
+    "pillar10_landing_page_cro":     15,
+    "pillar10_messaging_resonance":  15,
+    "pillar10_email_ab_test":        10,
+    "pillar10_learning_propagation": 20,
 }
 
 # ---------------------------------------------------------------------------

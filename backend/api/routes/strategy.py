@@ -176,6 +176,22 @@ from backend.services.pillar8 import (
     analyst_relations_service,
     partnership_comms_service,
 )
+from backend.schemas.pillar10 import (
+    ABTestDesignRequest,
+    LandingPageCRORequest,
+    MessagingResonanceRequest,
+    EmailABTestRequest,
+    ExperimentLogCreate,
+    ExperimentLogUpdate,
+    LearningPropagationRequest,
+)
+from backend.services.pillar10 import (
+    ab_test_design_service,
+    landing_page_cro_service,
+    messaging_resonance_service,
+    email_ab_service,
+    learning_propagation_service,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects/{project_id}/strategy", tags=["strategy"])
@@ -1674,4 +1690,175 @@ async def draft_partnership_comms(project_id: str, body: PartnershipCommsRequest
 async def list_partnership_comms(project_id: str, user: CurrentUser):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "partnership_comms")
+    return {"docs": docs}
+
+
+# ===========================================================================
+# Pillar 10 — Experimentation & Optimisation
+# Features: A/B Test Design, Landing Page CRO, Messaging Resonance,
+#           Email A/B Testing, Experiment Log (CRUD), Learning Propagation
+# ===========================================================================
+
+def _p10_stream(service_fn, project, body, project_id, uid):
+    """Helper: wrap a pillar10 service generator in a StreamingResponse."""
+    async def event_stream():
+        try:
+            gen = await service_fn(project, body, project_id, uid)
+            async for chunk in gen:
+                yield chunk
+        except Exception as exc:
+            logger.exception("Pillar 10 stream error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------------
+# A/B Test Design
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar10/ab-test/design")
+async def design_ab_test(project_id: str, body: ABTestDesignRequest, user: CurrentUser):
+    """Design a statistically rigorous A/B test with variants and sample size. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_ab_test_design")
+    return _p10_stream(ab_test_design_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar10/ab-test/list")
+async def list_ab_tests(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "ab_test_design")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Landing Page CRO
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar10/cro/generate")
+async def generate_cro_variants(project_id: str, body: LandingPageCRORequest, user: CurrentUser):
+    """Generate copy variants for each landing page section. Firecrawl + Claude. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_landing_page_cro")
+    return _p10_stream(landing_page_cro_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar10/cro/list")
+async def list_cro_sessions(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "landing_page_cro")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Messaging Resonance Testing
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar10/messaging-resonance/analyse")
+async def analyse_messaging_resonance(project_id: str, body: MessagingResonanceRequest, user: CurrentUser):
+    """Read Meta Ads test results and identify which message angle resonated. Streams SSE. 15 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_messaging_resonance")
+    return _p10_stream(messaging_resonance_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar10/messaging-resonance/list")
+async def list_resonance_analyses(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "messaging_resonance")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Email A/B Testing
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar10/email-ab/analyse")
+async def analyse_email_ab(project_id: str, body: EmailABTestRequest, user: CurrentUser):
+    """Analyse email A/B test results, identify winner, recommend next iteration. Streams SSE. 10 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_email_ab_test")
+    return _p10_stream(email_ab_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar10/email-ab/list")
+async def list_email_ab_tests(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "email_ab_test")
+    return {"docs": docs}
+
+
+# ---------------------------------------------------------------------------
+# Experiment Log — CRUD (no SSE, no credits)
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar10/experiment-log")
+async def create_experiment(project_id: str, body: ExperimentLogCreate, user: CurrentUser):
+    """Create a new experiment in the log."""
+    get_project_as_member(project_id, user["uid"])
+    entry = await asyncio.to_thread(
+        firebase_service.create_experiment,
+        project_id,
+        user["uid"],
+        body.model_dump(exclude_none=True),
+    )
+    return {"experiment": entry}
+
+
+@router.get("/pillar10/experiment-log")
+async def list_experiment_log(
+    project_id: str,
+    user: CurrentUser,
+    status: str | None = None,
+):
+    """List all experiments for this project."""
+    get_project_as_member(project_id, user["uid"])
+    experiments = await asyncio.to_thread(firebase_service.list_experiments, project_id, status)
+    return {"experiments": experiments}
+
+
+@router.get("/pillar10/experiment-log/{experiment_id}")
+async def get_experiment(project_id: str, experiment_id: str, user: CurrentUser):
+    """Get a single experiment."""
+    get_project_as_member(project_id, user["uid"])
+    exp = await asyncio.to_thread(firebase_service.get_experiment, project_id, experiment_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return {"experiment": exp}
+
+
+@router.patch("/pillar10/experiment-log/{experiment_id}")
+async def update_experiment(project_id: str, experiment_id: str, body: ExperimentLogUpdate, user: CurrentUser):
+    """Update an experiment — results, winner, learnings, status."""
+    get_project_as_member(project_id, user["uid"])
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    await asyncio.to_thread(firebase_service.update_experiment, project_id, experiment_id, updates)
+    return {"ok": True}
+
+
+@router.delete("/pillar10/experiment-log/{experiment_id}")
+async def delete_experiment(project_id: str, experiment_id: str, user: CurrentUser):
+    """Delete an experiment from the log."""
+    get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(firebase_service.delete_experiment, project_id, experiment_id)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Learning Propagation
+# ---------------------------------------------------------------------------
+
+@router.post("/pillar10/learning-propagation/generate")
+async def propagate_learnings(project_id: str, body: LearningPropagationRequest, user: CurrentUser):
+    """Synthesise experiment learnings and generate a propagation action plan. Streams SSE. 20 credits."""
+    project = get_project_as_member(project_id, user["uid"])
+    await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_learning_propagation")
+    return _p10_stream(learning_propagation_service.generate, project, body, project_id, user["uid"])
+
+
+@router.get("/pillar10/learning-propagation/list")
+async def list_propagation_reports(project_id: str, user: CurrentUser):
+    get_project_as_member(project_id, user["uid"])
+    docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "learning_propagation")
     return {"docs": docs}

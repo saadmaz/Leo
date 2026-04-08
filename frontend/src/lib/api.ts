@@ -2814,4 +2814,34 @@ export const api = {
     streamPartnershipComms: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
       streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar8/partnership/draft`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
   },
+
+  pillar10: {
+    streamABTestDesign: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar10/ab-test/design`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamLandingPageCRO: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar10/cro/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamMessagingResonance: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar10/messaging-resonance/analyse`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamEmailAB: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar10/email-ab/analyse`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    streamLearningPropagation: (projectId: string, body: unknown, callbacks: Pillar1StreamCallbacks, signal?: AbortSignal) =>
+      streamPost<Pillar1SSEEvent>(`/projects/${projectId}/strategy/pillar10/learning-propagation/generate`, body, makePillar1Handler(callbacks), () => callbacks.onDone?.(), signal),
+
+    // Experiment Log — REST (no SSE)
+    listExperiments: (projectId: string) =>
+      get<unknown[]>(`/projects/${projectId}/strategy/pillar10/experiment-log`),
+
+    createExperiment: (projectId: string, body: unknown) =>
+      post<unknown>(`/projects/${projectId}/strategy/pillar10/experiment-log`, body),
+
+    updateExperiment: (projectId: string, experimentId: string, body: unknown) =>
+      patch<unknown>(`/projects/${projectId}/strategy/pillar10/experiment-log/${experimentId}`, body),
+
+    deleteExperiment: (projectId: string, experimentId: string) =>
+      del(`/projects/${projectId}/strategy/pillar10/experiment-log/${experimentId}`),
+  },
 }
