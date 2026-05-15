@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   description: 'Brand-aware AI marketing co-pilot. Build your Brand Core and create on-brand campaigns, content, and copy - all in one chat.',
   manifest: '/manifest.json',
   themeColor: '#7c3aed',
+  icons: {
+    icon: '/Leo.png',
+    apple: '/Leo.png',
+    shortcut: '/Leo.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
