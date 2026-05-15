@@ -284,6 +284,10 @@ export const adminApi = {
     abuse: () => get<AbuseReport>('/moderation/abuse'),
   },
 
+  apiKeys: {
+    list: () => get<ApiKeyStatus[]>('/api-keys'),
+  },
+
   credits: {
     /** Add credits to any user. Hits /credits/topup (not under /admin prefix). */
     topup: async (uid: string, amount: number, reason: string) => {
@@ -386,6 +390,15 @@ export interface BroadcastResult {
   sent: number
   failed: number
   errors: string[]
+}
+
+export interface ApiKeyStatus {
+  id: string
+  name: string
+  category: string
+  configured: boolean
+  maskedKey: string | null
+  note: string | null
 }
 
 // ---------------------------------------------------------------------------

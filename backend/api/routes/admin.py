@@ -100,6 +100,61 @@ class BroadcastRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# API Key status
+# ---------------------------------------------------------------------------
+
+@router.get("/api-keys")
+def get_api_keys(_user: SuperAdminUser):
+    """Return configured status of all API keys. Values are masked — never exposed."""
+    from backend.config import settings
+    from typing import Optional as Opt
+
+    def mask(val: Opt[str]) -> Opt[str]:
+        if not val:
+            return None
+        if len(val) <= 8:
+            return "***"
+        return f"{val[:4]}...{val[-4:]}"
+
+    entries = [
+        # (id, name, category, value, note)
+        ("anthropic",     "Anthropic (Claude)",  "LLM",         settings.ANTHROPIC_API_KEY,    None),
+        ("gemini",        "Google Gemini",        "LLM",         settings.GEMINI_API_KEY,       None),
+        ("groq",          "Groq",                 "LLM",         settings.GROQ_API_KEY,         None),
+        ("openrouter",    "OpenRouter",           "LLM",         settings.OPENROUTER_API_KEY,   None),
+        ("exa",           "Exa",                  "Search",      settings.EXA_API_KEY,          f"{settings.EXA_DAILY_SEARCH_LIMIT}/day limit"),
+        ("tavily",        "Tavily",               "Search",      settings.TAVILY_API_KEY,       f"{settings.TAVILY_DAILY_SEARCH_LIMIT}/day limit"),
+        ("serpapi",       "SerpAPI",              "Search",      settings.SERPAPI_API_KEY,      None),
+        ("firecrawl",     "Firecrawl",            "Scraping",    settings.FIRECRAWL_API_KEY,    None),
+        ("apify",         "Apify",                "Scraping",    settings.APIFY_API_KEY,        None),
+        ("ayrshare",      "Ayrshare",             "Social",      settings.AYRSHARE_API_KEY,     None),
+        ("youtube",       "YouTube",              "Social",      settings.YOUTUBE_API_KEY,      None),
+        ("logo_dev",      "Logo.dev",             "Brand",       settings.LOGO_DEV_API_KEY,     None),
+        ("brandfetch",    "Brandfetch",           "Brand",       settings.BRANDFETCH_API_KEY,   None),
+        ("brand_dev",     "Brand.dev",            "Brand",       settings.BRAND_DEV_API_KEY,    None),
+        ("cloudflare_r2", "Cloudflare R2",        "Storage",     settings.CLOUDFLARE_R2_TOKEN,  None),
+        ("resend",        "Resend",               "Email",       settings.RESEND_API_KEY,       None),
+        ("stripe",        "Stripe",               "Payments",    settings.STRIPE_SECRET_KEY,    None),
+        ("apollo",        "Apollo.io",            "CRM",         settings.APOLLO_API_KEY,       None),
+        ("hunter",        "Hunter.io",            "PR",          settings.HUNTER_API_KEY,       None),
+        ("deepl",         "DeepL",                "Translation", settings.DEEPL_API_KEY,        None),
+        ("loops",         "Loops.so",             "Email CRM",   settings.LOOPS_API_KEY,        None),
+    ]
+
+    return [
+        {
+            "id": e[0],
+            "name": e[1],
+            "category": e[2],
+            "configured": bool(e[3]),
+            "maskedKey": mask(e[3]),
+            "note": e[4],
+        }
+        for e in entries
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
 
