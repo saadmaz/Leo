@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   MessageSquare, Library, BarChart2, Plus, Sparkles,
@@ -60,6 +59,9 @@ function ProjectCard({
       className="group relative bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
       onClick={() => onNavigate(`/projects/${project.id}/dashboard`)}
     >
+      {/* Left accent bar */}
+      <div className="absolute left-0 inset-y-0 w-[3px] rounded-l-2xl bg-transparent group-hover:bg-primary transition-colors duration-200" />
+
       {/* Card header */}
       <div className="p-5 pb-3">
         <div className="flex items-start gap-3">
@@ -221,11 +223,19 @@ export default function ProjectsPage() {
         {/* Top bar */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
           <SidebarToggle />
-          <Image src="/Leo.png" alt="LEO" width={24} height={24} className="rounded-md" />
-          <span className="font-bold text-sm">LEO</span>
+          <span className="text-sm font-medium text-muted-foreground">All Brands</span>
+          <div className="ml-auto">
+            <button
+              onClick={() => setWizardOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              New brand
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-[radial-gradient(ellipse_60%_30%_at_50%_0%,hsl(var(--primary)/0.07),transparent)]">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
             {/* Greeting */}

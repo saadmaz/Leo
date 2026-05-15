@@ -36,7 +36,10 @@ export function OnboardingCard() {
     >
       {/* Header */}
       <div className="text-center mb-8">
-        <Image src="/Leo.png" alt="LEO" width={72} height={72} className="mx-auto mb-4 rounded-2xl" />
+        <div className="relative inline-flex mb-5">
+          <div className="absolute inset-0 rounded-3xl bg-primary/25 blur-2xl scale-125" />
+          <Image src="/Leo.png" alt="LEO" width={88} height={88} className="relative rounded-3xl shadow-2xl" />
+        </div>
         <h1 className="text-2xl font-bold">Welcome to LEO</h1>
         <p className="mt-1.5 text-sm text-muted-foreground max-w-xs mx-auto">
           Your brand-aware AI marketing co-pilot. Get started in under 2 minutes.
@@ -46,8 +49,11 @@ export function OnboardingCard() {
       {/* Steps */}
       <div className="space-y-3 mb-8">
         {STEPS.map((step, i) => (
-          <div
+          <motion.div
             key={i}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 + i * 0.1, ease: 'easeOut' }}
             className={cn(
               'flex items-start gap-4 p-4 rounded-xl border transition-colors',
               i === 0
@@ -69,7 +75,7 @@ export function OnboardingCard() {
               </span>
               <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 

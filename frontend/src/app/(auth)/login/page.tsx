@@ -40,7 +40,7 @@ export default function LoginPage() {
         <p className="mt-1 text-sm text-muted-foreground">Your Brand. One Chat. Every Channel.</p>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
         <h2 className="text-lg font-semibold mb-6">Sign in to your account</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">

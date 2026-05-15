@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
         <p className="mt-1 text-sm text-muted-foreground">Your Brand. One Chat. Every Channel.</p>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
         {sent ? (
           <div className="text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">

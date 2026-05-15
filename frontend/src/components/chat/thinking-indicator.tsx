@@ -153,8 +153,8 @@ function ToolIndicator({ tool, query }: ToolIndicatorProps) {
     >
       {/* Leo avatar + tool icon overlay */}
       <div className="relative shrink-0 mt-0.5">
-        <div className="w-8 h-8 rounded-xl bg-primary/5 border border-border/50 flex items-center justify-center overflow-hidden">
-          <Image src="/Leo.png" alt="LEO" width={20} height={20} className="rounded-md opacity-90" />
+        <div className="w-8 h-8 rounded-full bg-primary/5 border border-border/50 flex items-center justify-center overflow-hidden">
+          <Image src="/Leo.png" alt="LEO" width={32} height={32} className="rounded-full object-cover opacity-90" />
         </div>
         <div className={cn(
           'absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full border-2 border-background flex items-center justify-center',
@@ -169,6 +169,8 @@ function ToolIndicator({ tool, query }: ToolIndicatorProps) {
       {/* Text */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
+          <span className="text-[10px] font-medium text-muted-foreground/50">LEO</span>
+          <span className="text-muted-foreground/30 text-[10px]">·</span>
           <span className={cn('text-xs font-semibold', cfg.accent)}>{cfg.label}</span>
           <PulsingDots accent={cfg.accent} />
         </div>
@@ -208,8 +210,8 @@ function StatusIndicator({ message }: StatusIndicatorProps) {
     >
       {/* Spinning ring avatar */}
       <div className="relative shrink-0">
-        <div className="w-8 h-8 rounded-xl bg-primary/5 border border-border/50 flex items-center justify-center overflow-hidden">
-          <Image src="/Leo.png" alt="LEO" width={20} height={20} className="rounded-md opacity-90" />
+        <div className="w-8 h-8 rounded-full bg-primary/5 border border-border/50 flex items-center justify-center overflow-hidden">
+          <Image src="/Leo.png" alt="LEO" width={32} height={32} className="rounded-full object-cover opacity-90" />
         </div>
         {/* Orbit ring */}
         <motion.div
@@ -220,7 +222,9 @@ function StatusIndicator({ message }: StatusIndicatorProps) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-medium text-muted-foreground/50">LEO</span>
+          <span className="text-muted-foreground/30 text-[10px]">·</span>
           <span className={cn('text-xs font-medium', cfg.accent)}>{message}</span>
           <PulsingDots accent={cfg.accent} />
         </div>

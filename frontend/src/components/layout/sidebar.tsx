@@ -284,12 +284,14 @@ export function Sidebar() {
           // Mobile: fixed overlay, slide in/out
           'fixed inset-y-0 left-0',
           sidebarOpen ? 'flex w-64' : 'hidden md:flex',
+          // Dark mode
+          'dark:bg-[#0a0a0b] dark:border-white/[0.06]',
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-2">
-            <Image src="/Leo.png" alt="LEO" width={28} height={28} className="rounded-lg" />
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border shrink-0 bg-gradient-to-b from-primary/[0.06] to-transparent">
+          <div className="flex items-center gap-2.5">
+            <Image src="/Leo.png" alt="LEO" width={28} height={28} className="rounded-xl" />
             <span className="text-base font-bold tracking-tight">LEO</span>
           </div>
           <div className="flex items-center gap-1">

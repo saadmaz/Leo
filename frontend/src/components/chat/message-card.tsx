@@ -148,8 +148,8 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
     <div className="w-full py-5 px-4">
       <div className="flex gap-4 max-w-3xl mx-auto">
         {/* Avatar */}
-        <div className="w-8 h-8 shrink-0 rounded-xl bg-primary/5 border border-border/50 flex items-center justify-center mt-0.5 overflow-hidden">
-          <Image src="/Leo.png" alt="LEO" width={20} height={20} className="rounded-md" />
+        <div className="w-8 h-8 shrink-0 rounded-full bg-primary/5 border border-border/50 flex items-center justify-center mt-0.5 overflow-hidden">
+          <Image src="/Leo.png" alt="LEO" width={32} height={32} className="rounded-full object-cover" />
         </div>
 
         {/* Content */}
@@ -241,7 +241,7 @@ export function MessageCard({ message, isLast, onRegenerate, projectId }: Messag
                   // Blockquote
                   blockquote({ children }) {
                     return (
-                      <blockquote className="my-4 pl-4 border-l-[3px] border-primary/50 text-foreground/70 text-[14px] leading-[1.8] bg-muted/30 py-2.5 pr-3 rounded-r-lg">
+                      <blockquote className="my-4 pl-4 border-l-[3px] border-primary/50 text-foreground/70 text-[14px] leading-[1.8] bg-muted/30 py-2.5 pr-3 rounded-r-xl">
                         {children}
                       </blockquote>
                     )

@@ -272,8 +272,8 @@ function LeoMessageWrapper({ children }: { children: React.ReactNode }) {
       className="flex gap-3 px-4 py-2 max-w-3xl mx-auto w-full"
     >
       {/* LEO avatar */}
-      <div className="w-8 h-8 rounded-lg bg-primary/10 border border-border flex items-center justify-center shrink-0 mt-0.5">
-        <Image src="/Leo.png" alt="LEO" width={20} height={20} className="rounded" />
+      <div className="w-8 h-8 rounded-full bg-primary/10 border border-border flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+        <Image src="/Leo.png" alt="LEO" width={32} height={32} className="rounded-full object-cover" />
       </div>
 
       <div className="flex-1 min-w-0">
