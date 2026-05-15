@@ -10,7 +10,7 @@ import {
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
-  Mic2, Shield, DollarSign, Newspaper, FlaskConical,
+  Mic2, Shield, DollarSign, Newspaper, FlaskConical, MessageSquare,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -72,12 +72,9 @@ function AccountModal({ onClose }: { onClose: () => void }) {
         className="bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Mobile drag handle */}
         <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
         </div>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-primary" />
@@ -87,17 +84,12 @@ function AccountModal({ onClose }: { onClose: () => void }) {
             <X className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Body */}
         <div className="p-5 space-y-4">
-          {/* Avatar */}
           <div className="flex justify-center">
             <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xl select-none">
               {initials}
             </div>
           </div>
-
-          {/* Plan badge */}
           {plan && (
             <div className="flex justify-center">
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-primary/10 text-primary">
@@ -106,34 +98,24 @@ function AccountModal({ onClose }: { onClose: () => void }) {
               </span>
             </div>
           )}
-
-          {/* Display name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Display name
-            </label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Display name</label>
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') save() }}
               placeholder="Your name"
-              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
-
-          {/* Email */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Email
-            </label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</label>
             <input
               value={user?.email ?? ''}
               readOnly
-              className="w-full px-3 py-2 text-sm bg-muted border border-border rounded-lg text-muted-foreground cursor-not-allowed"
+              className="w-full px-3 py-2 text-sm bg-muted border border-border rounded-xl text-muted-foreground cursor-not-allowed"
             />
           </div>
-
-          {/* Credits */}
           {credits && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -148,7 +130,7 @@ function AccountModal({ onClose }: { onClose: () => void }) {
                     'h-full rounded-full transition-all',
                     credits.balance / credits.planAllotment <= 0.1 ? 'bg-red-500'
                     : credits.balance / credits.planAllotment <= 0.3 ? 'bg-amber-500'
-                    : 'bg-primary',
+                    : 'bg-emerald-500',
                   )}
                   style={{ width: `${Math.min((credits.balance / credits.planAllotment) * 100, 100)}%` }}
                 />
@@ -156,27 +138,25 @@ function AccountModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </div>
-
-        {/* Footer */}
         <div className="px-5 py-4 border-t border-border shrink-0 flex items-center gap-2">
           <button
             onClick={save}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
             {saving ? 'Saving…' : 'Save changes'}
           </button>
           <button
             onClick={() => { router.push('/billing'); onClose() }}
-            className="px-3 py-2 text-xs border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+            className="px-3 py-2 text-xs border border-border rounded-xl hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
           >
             <CreditCard className="w-3.5 h-3.5" />
             Plans
           </button>
           <button
             onClick={handleSignOut}
-            className="px-3 py-2 text-xs text-destructive border border-destructive/20 rounded-lg hover:bg-destructive/5 transition-colors flex items-center gap-1.5"
+            className="px-3 py-2 text-xs text-destructive border border-destructive/20 rounded-xl hover:bg-destructive/5 transition-colors flex items-center gap-1.5"
           >
             <LogOut className="w-3.5 h-3.5" />
             Sign out
@@ -206,7 +186,6 @@ export function Sidebar() {
     setMyBrandPanelOpen,
   } = useAppStore()
 
-
   const [mounted, setMounted] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -215,7 +194,6 @@ export function Sidebar() {
 
   useEffect(() => { setMounted(true) }, [])
 
-  // ⌘K / Ctrl+K to open command palette
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -229,9 +207,7 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!user) return
-    api.projects.list()
-      .then(setProjects)
-      .catch(console.error)
+    api.projects.list().then(setProjects).catch(console.error)
     api.credits.getBalance().then(setCredits).catch(console.error)
   }, [user, setProjects, setCredits])
 
@@ -246,7 +222,6 @@ export function Sidebar() {
     if (found && found.id !== activeProject?.id) setActiveProject(found)
   }, [params.projectId, projects, activeProject, setActiveProject])
 
-  // Close on Escape key (mobile UX)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setSidebarOpen(false)
@@ -264,9 +239,28 @@ export function Sidebar() {
     .map((w) => w[0].toUpperCase())
     .join('')
 
+  function nav(path: string) {
+    router.push(path)
+    setSidebarOpen(false)
+  }
+
+  async function openLatestChat() {
+    if (!activeProject) return
+    try {
+      const chats = await api.chats.list(activeProject.id)
+      if (chats.length > 0) {
+        nav(`/projects/${activeProject.id}/chats/${chats[0].id}`)
+      } else {
+        const chat = await api.chats.create(activeProject.id)
+        nav(`/projects/${activeProject.id}/chats/${chat.id}`)
+      }
+    } catch {
+      nav(`/projects/${activeProject.id}/dashboard`)
+    }
+  }
+
   return (
     <>
-      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
@@ -276,15 +270,11 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          // Base layout
           'flex flex-col shrink-0 border-r border-border bg-card h-screen z-50',
-          // Desktop: collapse by reducing width (smooth transition)
           'hidden md:flex md:relative md:translate-x-0 transition-all duration-200',
           sidebarCollapsed ? 'md:w-0 md:overflow-hidden md:border-r-0' : 'md:w-60',
-          // Mobile: fixed overlay, slide in/out
           'fixed inset-y-0 left-0',
           sidebarOpen ? 'flex w-64' : 'hidden md:flex',
-          // Dark mode
           'dark:bg-[#0a0a0b] dark:border-white/[0.06]',
         )}
       >
@@ -310,11 +300,9 @@ export function Sidebar() {
             >
               <PanelLeft className="w-3.5 h-3.5" />
             </button>
-            {/* Close button - mobile only */}
             <button
               onClick={() => setSidebarOpen(false)}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors md:hidden"
-              title="Close sidebar"
             >
               <X className="w-4 h-4" />
             </button>
@@ -322,12 +310,12 @@ export function Sidebar() {
         </div>
 
         {/* Scrollable nav */}
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-2 sidebar-scroll">
 
-          {/* Active project context + switch link */}
+          {/* Brand switcher */}
           <div className="px-3 pb-2">
             {activeProject ? (
-              <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
+              <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-primary/5 border border-primary/10">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-5 h-5 rounded bg-primary/15 text-primary flex items-center justify-center font-bold text-[9px] shrink-0">
                     {activeProject.name.slice(0, 2).toUpperCase()}
@@ -345,7 +333,7 @@ export function Sidebar() {
             ) : (
               <button
                 onClick={() => { router.push('/projects'); setSidebarOpen(false) }}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-xl border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
               >
                 <Layers className="w-3.5 h-3.5" />
                 Select a brand
@@ -353,7 +341,7 @@ export function Sidebar() {
             )}
           </div>
 
-          {/* New project shortcut */}
+          {/* New brand shortcut */}
           <button
             onClick={() => { setWizardOpen(true); setSidebarOpen(false) }}
             className="flex items-center gap-2 w-full px-5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
@@ -362,109 +350,106 @@ export function Sidebar() {
             New brand
           </button>
 
-          {/* Project-scoped nav groups - only visible when a project is active */}
+          {/* ── Quick-action pills ────────────────────────────────────────── */}
           {activeProject && (
-            <div className="mt-1 border-t border-border/50 pt-1">
+            <div className="px-3 pt-2 pb-1 grid grid-cols-2 gap-1.5">
+              {[
+                { label: 'Chat', icon: <MessageSquare className="w-3 h-3" />, action: openLatestChat },
+                { label: 'Dashboard', icon: <LayoutDashboard className="w-3 h-3" />, action: () => nav(`/projects/${activeProject.id}/dashboard`) },
+                { label: 'Library', icon: <Library className="w-3 h-3" />, action: () => nav(`/projects/${activeProject.id}/library`) },
+                { label: 'Analytics', icon: <BarChart2 className="w-3 h-3" />, action: () => nav(`/projects/${activeProject.id}/analytics`) },
+              ].map(({ label, icon, action }) => (
+                <button
+                  key={label}
+                  onClick={action}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
-              {/* Personal Brand section - only for personal brand projects */}
+          {/* ── Project nav groups ────────────────────────────────────────── */}
+          {activeProject && (
+            <div className="mt-1 border-t border-border/40 pt-1">
+
+              {/* Personal Brand — only for personal projects */}
               {activeProject.projectType === 'personal' && (
                 <>
-                  <NavGroup label="Personal Brand" storageKey="nav_personal_brand">
-                    <NavItem icon={<User className="w-3.5 h-3.5" />}            label="My Brand"        onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
-                    <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/dashboard`); setSidebarOpen(false) }} />
-                    <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}        label="Interview"       onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/onboarding`); setSidebarOpen(false) }} />
-                    <NavItem icon={<Map className="w-3.5 h-3.5" />}             label="Strategy"        onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/strategy`); setSidebarOpen(false) }} />
-                    <NavItem icon={<Mic2 className="w-3.5 h-3.5" />}            label="Content Engine"  onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/content`); setSidebarOpen(false) }} />
-                  </NavGroup>
-                  <NavGroup label="Personal Publish" storageKey="nav_personal_publish">
-                    <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Publishing"      onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/publishing`); setSidebarOpen(false) }} />
-                    <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}    label="Calendar"        onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/calendar`); setSidebarOpen(false) }} />
-                  </NavGroup>
-                  <NavGroup label="Personal Insights" storageKey="nav_personal_insights">
-                    <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}       label="Analytics"       onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/analytics`); setSidebarOpen(false) }} />
-                    <NavItem icon={<Shield className="w-3.5 h-3.5" />}          label="Reputation"      onClick={() => { router.push(`/projects/${activeProject.id}/personal-brand/reputation`); setSidebarOpen(false) }} />
+                  <NavGroup label="Personal Brand" storageKey="nav_personal" color="text-violet-500">
+                    <NavItem icon={<User className="w-3.5 h-3.5" />}            label="My Brand"       onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
+                    <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/dashboard`)} />
+                    <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}        label="Interview"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/onboarding`)} />
+                    <NavItem icon={<Map className="w-3.5 h-3.5" />}             label="Strategy"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/strategy`)} />
+                    <NavItem icon={<Mic2 className="w-3.5 h-3.5" />}            label="Content Engine" onClick={() => nav(`/projects/${activeProject.id}/personal-brand/content`)} />
+                    <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Publishing"     onClick={() => nav(`/projects/${activeProject.id}/personal-brand/publishing`)} />
+                    <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}    label="Calendar"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/calendar`)} />
+                    <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}       label="Analytics"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/analytics`)} />
                   </NavGroup>
                 </>
               )}
 
-              <NavGroup label="Workspace" storageKey="nav_workspace">
-                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"       onClick={() => { router.push(`/projects/${activeProject.id}/campaigns`); setSidebarOpen(false) }} />
-                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"           onClick={() => { router.push(`/projects/${activeProject.id}/posts`); setSidebarOpen(false) }} />
-                <NavItem icon={<Users className="w-3.5 h-3.5" />}         label="Team"            onClick={() => { router.push(`/projects/${activeProject.id}/team`); setSidebarOpen(false) }} />
+              {/* Create */}
+              <NavGroup label="Create" storageKey="nav_create_v2" color="text-violet-500">
+                <NavItem icon={<Layers className="w-3.5 h-3.5" />}        label="Content Studio"  onClick={() => nav(`/projects/${activeProject.id}/content`)} />
+                <NavItem icon={<Library className="w-3.5 h-3.5" />}       label="Library"         onClick={() => nav(`/projects/${activeProject.id}/library`)} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}           label="Bulk Generate"   onClick={() => nav(`/projects/${activeProject.id}/bulk`)} />
+                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />} label="Content Planner" onClick={() => nav(`/projects/${activeProject.id}/planner`)} />
+                <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}     label="Image Studio"    onClick={() => nav(`/projects/${activeProject.id}/images`)} />
               </NavGroup>
 
-              <NavGroup label="Create" storageKey="nav_content">
-                <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"       onClick={() => { router.push(`/projects/${activeProject.id}/dashboard`); setSidebarOpen(false) }} />
-                <NavItem icon={<Library className="w-3.5 h-3.5" />}         label="Library"         onClick={() => { router.push(`/projects/${activeProject.id}/library`); setSidebarOpen(false) }} />
-                <NavItem icon={<Zap className="w-3.5 h-3.5" />}             label="Bulk Generate"   onClick={() => { router.push(`/projects/${activeProject.id}/bulk`); setSidebarOpen(false) }} />
-                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}   label="Content Planner" onClick={() => { router.push(`/projects/${activeProject.id}/planner`); setSidebarOpen(false) }} />
-                <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}       label="Image Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/images`); setSidebarOpen(false) }} />
+              {/* Publish */}
+              <NavGroup label="Publish" storageKey="nav_publish_v2" color="text-emerald-500">
+                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue"  onClick={() => nav(`/projects/${activeProject.id}/review`)} />
+                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"      onClick={() => nav(`/projects/${activeProject.id}/calendar`)} />
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue" onClick={() => nav(`/projects/${activeProject.id}/publish`)} />
               </NavGroup>
 
-              <NavGroup label="Publish" storageKey="nav_schedule">
-                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue" onClick={() => { router.push(`/projects/${activeProject.id}/review`); setSidebarOpen(false) }} />
-                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"      onClick={() => { router.push(`/projects/${activeProject.id}/calendar`); setSidebarOpen(false) }} />
-                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue" onClick={() => { router.push(`/projects/${activeProject.id}/publish`); setSidebarOpen(false) }} />
+              {/* Grow */}
+              <NavGroup label="Grow" storageKey="nav_grow" color="text-rose-500">
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="SEO Engine"    onClick={() => nav(`/projects/${activeProject.id}/seo-pro`)} />
+                <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}   label="Paid Ads"      onClick={() => nav(`/projects/${activeProject.id}/paid-ads`)} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}         label="Email CRM"     onClick={() => nav(`/projects/${activeProject.id}/email-crm`)} />
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}         label="Social Engine" onClick={() => nav(`/projects/${activeProject.id}/social`)} />
+                <NavItem icon={<Newspaper className="w-3.5 h-3.5" />}    label="PR & Comms"    onClick={() => nav(`/projects/${activeProject.id}/pr-comms`)} />
+                <NavItem icon={<FlaskConical className="w-3.5 h-3.5" />} label="Experiments"   onClick={() => nav(`/projects/${activeProject.id}/experiments`)} />
               </NavGroup>
 
-              <NavGroup label="Insights" storageKey="nav_intelligence">
-                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"      onClick={() => { router.push(`/projects/${activeProject.id}/analytics`); setSidebarOpen(false) }} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"        onClick={() => { router.push(`/projects/${activeProject.id}/reports`); setSidebarOpen(false) }} />
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"    onClick={() => { router.push(`/projects/${activeProject.id}/deep-search`); setSidebarOpen(false) }} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"    onClick={() => { router.push(`/projects/${activeProject.id}/intelligence`); setSidebarOpen(false) }} />
-                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"  onClick={() => { router.push(`/projects/${activeProject.id}/intelligence/deep-research`); setSidebarOpen(false) }} />
+              {/* Intelligence */}
+              <NavGroup label="Intelligence" storageKey="nav_intel_v2" color="text-blue-500">
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"      onClick={() => nav(`/projects/${activeProject.id}/analytics`)} />
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Analytics Pro"  onClick={() => nav(`/projects/${activeProject.id}/analytics-pro`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"        onClick={() => nav(`/projects/${activeProject.id}/reports`)} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"    onClick={() => nav(`/projects/${activeProject.id}/deep-search`)} />
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"    onClick={() => nav(`/projects/${activeProject.id}/intelligence`)} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"  onClick={() => nav(`/projects/${activeProject.id}/intelligence/deep-research`)} />
+                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Brand Health"  onClick={() => nav(`/projects/${activeProject.id}/brand-health`)} />
               </NavGroup>
 
-              <NavGroup label="Strategy" storageKey="nav_strategy">
-                <NavItem icon={<Map className="w-3.5 h-3.5" />} label="Strategy Hub" onClick={() => { router.push(`/projects/${activeProject.id}/strategy`); setSidebarOpen(false) }} />
+              {/* Strategy */}
+              <NavGroup label="Strategy" storageKey="nav_strategy_v2" color="text-amber-500">
+                <NavItem icon={<Map className="w-3.5 h-3.5" />}           label="Strategy Hub" onClick={() => nav(`/projects/${activeProject.id}/strategy`)} />
+                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"    onClick={() => nav(`/projects/${activeProject.id}/campaigns`)} />
+                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"        onClick={() => nav(`/projects/${activeProject.id}/posts`)} />
               </NavGroup>
 
-              <NavGroup label="Content Studio" storageKey="nav_content_studio">
-                <NavItem icon={<Layers className="w-3.5 h-3.5" />}         label="Content Studio"   onClick={() => { router.push(`/projects/${activeProject.id}/content`); setSidebarOpen(false) }} />
+              {/* Brand */}
+              <NavGroup label="Brand" storageKey="nav_brand_v2" color="text-muted-foreground/60">
+                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}      label="Style Guide"   onClick={() => nav(`/projects/${activeProject.id}/style-guide`)} />
+                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"    onClick={() => nav(`/projects/${activeProject.id}/templates`)} />
+                <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"   onClick={() => nav(`/projects/${activeProject.id}/seo`)} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio" onClick={() => nav(`/projects/${activeProject.id}/emails`)} />
+                <NavItem icon={<Users className="w-3.5 h-3.5" />}          label="Team"         onClick={() => nav(`/projects/${activeProject.id}/team`)} />
               </NavGroup>
 
-              <NavGroup label="SEO &amp; Organic" storageKey="nav_seo_organic">
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}          label="SEO Engine"       onClick={() => { router.push(`/projects/${activeProject.id}/seo-pro`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="Paid Advertising" storageKey="nav_paid_ads">
-                <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}      label="Paid Ads Engine"  onClick={() => { router.push(`/projects/${activeProject.id}/paid-ads`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="Email &amp; CRM" storageKey="nav_email_crm">
-                <NavItem icon={<Mail className="w-3.5 h-3.5" />}            label="Email CRM Engine" onClick={() => { router.push(`/projects/${activeProject.id}/email-crm`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="Social Media" storageKey="nav_social">
-                <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Social Engine"    onClick={() => { router.push(`/projects/${activeProject.id}/social`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="Analytics & Reporting" storageKey="nav_analytics_pro">
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}      label="Analytics Pro"    onClick={() => { router.push(`/projects/${activeProject.id}/analytics-pro`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="PR & Communications" storageKey="nav_pr_comms">
-                <NavItem icon={<Newspaper className="w-3.5 h-3.5" />}      label="PR & Comms Engine" onClick={() => { router.push(`/projects/${activeProject.id}/pr-comms`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="Experimentation" storageKey="nav_experiments">
-                <NavItem icon={<FlaskConical className="w-3.5 h-3.5" />}   label="Experiments Engine" onClick={() => { router.push(`/projects/${activeProject.id}/experiments`); setSidebarOpen(false) }} />
-              </NavGroup>
-
-              <NavGroup label="Studio" storageKey="nav_studio">
-                <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"    onClick={() => { router.push(`/projects/${activeProject.id}/seo`); setSidebarOpen(false) }} />
-                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"  onClick={() => { router.push(`/projects/${activeProject.id}/emails`); setSidebarOpen(false) }} />
-                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"     onClick={() => { router.push(`/projects/${activeProject.id}/templates`); setSidebarOpen(false) }} />
-                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}       label="Style Guide"   onClick={() => { router.push(`/projects/${activeProject.id}/style-guide`); setSidebarOpen(false) }} />
-                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />}    label="Brand Health"  onClick={() => { router.push(`/projects/${activeProject.id}/brand-health`); setSidebarOpen(false) }} />
-              </NavGroup>
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="border-t border-border p-3 space-y-1 shrink-0">
-          {/* Credits bar */}
           {credits ? (
             <div className="px-1 mb-2 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -477,7 +462,7 @@ export function Sidebar() {
                     'h-full rounded-full transition-all',
                     credits.balance / credits.planAllotment <= 0.1 ? 'bg-red-500'
                     : credits.balance / credits.planAllotment <= 0.3 ? 'bg-amber-500'
-                    : 'bg-primary',
+                    : 'bg-emerald-500',
                   )}
                   style={{ width: `${Math.min((credits.balance / credits.planAllotment) * 100, 100)}%` }}
                 />
@@ -495,7 +480,7 @@ export function Sidebar() {
                     'h-full rounded-full transition-all',
                     billingStatus.messages.used / billingStatus.messages.limit >= 0.9 ? 'bg-red-500'
                     : billingStatus.messages.used / billingStatus.messages.limit >= 0.7 ? 'bg-amber-500'
-                    : 'bg-primary',
+                    : 'bg-emerald-500',
                   )}
                   style={{
                     width: billingStatus.messages.limit >= 999
@@ -507,7 +492,6 @@ export function Sidebar() {
             </div>
           )}
 
-          {/* What's New */}
           <button
             onClick={() => setChangelogOpen(true)}
             className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -521,7 +505,6 @@ export function Sidebar() {
             <span>What&apos;s New</span>
           </button>
 
-          {/* Theme toggle */}
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -530,7 +513,6 @@ export function Sidebar() {
             <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
           </button>
 
-          {/* Settings */}
           <button
             onClick={() => { router.push('/settings'); setSidebarOpen(false) }}
             className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -539,7 +521,6 @@ export function Sidebar() {
             <span>Settings</span>
           </button>
 
-          {/* My Account - user avatar + name */}
           <button
             onClick={() => setAccountOpen(true)}
             className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md hover:bg-muted transition-colors group"
@@ -558,25 +539,25 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Modals */}
       {accountOpen && <AccountModal onClose={() => setAccountOpen(false)} />}
       <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
-
-      {/* Personal Brand panel */}
       <MyBrandPanel />
     </>
   )
 }
 
 // ---------------------------------------------------------------------------
-// NavGroup - collapsible section with localStorage persistence
+// NavGroup — collapsible section with colour accent + left-border indicator
 // ---------------------------------------------------------------------------
 
-function NavGroup({ label, storageKey, children }: {
+function NavGroup({
+  label, storageKey, children, color,
+}: {
   label: string
   storageKey: string
   children: React.ReactNode
+  color?: string
 }) {
   const [open, setOpen] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -595,15 +576,26 @@ function NavGroup({ label, storageKey, children }: {
     <div>
       <button
         onClick={toggle}
-        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className={cn(
+          'flex items-center gap-1.5 w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors',
+          open ? (color ?? 'text-muted-foreground/70') : 'text-muted-foreground/45 hover:text-muted-foreground/70',
+        )}
       >
         {open
-          ? <ChevronDown className="w-2.5 h-2.5" />
-          : <ChevronRight className="w-2.5 h-2.5" />
+          ? <ChevronDown className="w-2.5 h-2.5 shrink-0" />
+          : <ChevronRight className="w-2.5 h-2.5 shrink-0" />
         }
         {label}
       </button>
-      {open && <div className="pb-1">{children}</div>}
+      {open && (
+        <div className="pb-1 relative">
+          <div className={cn(
+            'absolute left-[14px] top-0 bottom-1 w-px opacity-20',
+            color?.replace('text-', 'bg-') ?? 'bg-muted-foreground',
+          )} />
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -616,7 +608,7 @@ function NavItem({ icon, label, onClick }: {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 w-full pl-6 pr-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+      className="flex items-center gap-2 w-full pl-7 pr-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
     >
       <span className="shrink-0">{icon}</span>
       <span>{label}</span>
@@ -625,14 +617,13 @@ function NavItem({ icon, label, onClick }: {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar toggle - works for both mobile (open) and desktop (uncollapse)
+// SidebarToggle
 // ---------------------------------------------------------------------------
 
 export function SidebarToggle({ className }: { className?: string }) {
   const { setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useAppStore()
   return (
     <>
-      {/* Mobile: open sidebar overlay */}
       <button
         onClick={() => setSidebarOpen(true)}
         className={cn(
@@ -643,7 +634,6 @@ export function SidebarToggle({ className }: { className?: string }) {
       >
         <Menu className="w-4 h-4" />
       </button>
-      {/* Desktop: show when collapsed */}
       {sidebarCollapsed && (
         <button
           onClick={() => setSidebarCollapsed(false)}

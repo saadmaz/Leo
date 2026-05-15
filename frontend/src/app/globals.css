@@ -79,3 +79,53 @@ body {
   background: hsl(var(--ring) / 0.25);
   color: hsl(var(--foreground));
 }
+
+/* ── Card depth system ─────────────────────────────────────────────────── */
+.card-flat {
+  @apply bg-card border border-border rounded-2xl;
+}
+.card-raised {
+  @apply bg-card border border-border rounded-2xl shadow-sm;
+}
+.card-floating {
+  @apply bg-card border border-border rounded-2xl shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
+}
+
+/* ── Gradient text ─────────────────────────────────────────────────────── */
+.text-gradient {
+  @apply bg-gradient-to-r from-foreground to-foreground/50 bg-clip-text text-transparent;
+}
+.text-gradient-primary {
+  background: linear-gradient(135deg, hsl(262 83% 58%), hsl(217 91% 60%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Page enter animation ──────────────────────────────────────────────── */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: page-enter 0.25s ease-out both;
+}
+
+/* ── Section accent colours (used as Tailwind text/bg classes inline) ──── */
+/* create    → violet-500  #8b5cf6 */
+/* publish   → emerald-500 #10b981 */
+/* grow      → rose-500    #f43f5e */
+/* intel     → blue-500    #3b82f6 */
+/* strategy  → amber-500   #f59e0b */
+
+/* ── Thin sidebar scrollbar ────────────────────────────────────────────── */
+.sidebar-scroll::-webkit-scrollbar { width: 3px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
+
+/* ── Stat counter animation ────────────────────────────────────────────── */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-enter { animation: count-up 0.35s ease-out both; }
