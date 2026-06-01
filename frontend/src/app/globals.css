@@ -11,12 +11,13 @@
   --popover-foreground: 215 25% 15%;
   --primary: 262 83% 58%; /* Leo violet #7C3AED */
   --primary-foreground: 0 0% 100%;
+  --primary-subtle: 262 83% 94%;
   --secondary: 262 30% 95%;
   --secondary-foreground: 262 60% 30%;
   --muted: 262 15% 94%;
   --muted-foreground: 215 15% 45%;
-  --accent: 262 60% 96%;
-  --accent-foreground: 262 60% 30%;
+  --accent: 262 83% 96%;
+  --accent-foreground: 262 83% 35%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
   --border: 262 15% 88%;
@@ -32,19 +33,20 @@
   --card-foreground: 262 10% 95%;
   --popover: 260 18% 10%;
   --popover-foreground: 262 10% 95%;
-  --primary: 262 83% 70%; /* Brighter violet for dark bg */
+  --primary: 262 83% 68%; /* Brighter violet for dark bg */
   --primary-foreground: 0 0% 100%;
+  --primary-subtle: 262 50% 20%;
   --secondary: 262 20% 18%;
   --secondary-foreground: 262 10% 95%;
   --muted: 262 20% 15%;
   --muted-foreground: 262 10% 65%;
-  --accent: 262 40% 18%;
+  --accent: 262 50% 18%;
   --accent-foreground: 262 83% 90%;
   --destructive: 0 62% 30%;
   --destructive-foreground: 262 10% 98%;
   --border: 262 20% 20%;
   --input: 262 20% 20%;
-  --ring: 262 83% 70%;
+  --ring: 262 83% 68%;
 }
 
 * {

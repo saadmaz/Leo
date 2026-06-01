@@ -409,7 +409,7 @@ export function Sidebar() {
                   className={cn(
                     'flex items-center gap-2 w-full px-3 py-1.5 text-xs font-medium transition-colors',
                     isActive('personal-brand')
-                      ? 'text-violet-500 bg-violet-500/10'
+                      ? 'text-primary bg-primary/10'
                       : 'text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/50',
                   )}
                 >
@@ -420,7 +420,7 @@ export function Sidebar() {
               )}
 
               {/* Create */}
-              <NavGroup label="Create" storageKey="nav_create_v2" color="text-violet-500">
+              <NavGroup label="Create" storageKey="nav_create_v2" color="text-primary">
                 {/* Content Studio hub is Free; sub-pages are Pro */}
                 <NavItem
                   icon={<Layers className="w-3.5 h-3.5" />}
