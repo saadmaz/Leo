@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import { usePillar2Store } from '@/stores/pillar2-store'
 import { cn } from '@/lib/utils'
 import type { VideoScriptPayload, PodcastPayload, ProgressStep } from '@/types'
+import { MovedNotice } from '@/components/layout/moved-notice'
 
 const VIDEO_PLATFORMS = ['YouTube', 'TikTok', 'LinkedIn', 'Instagram Reels', 'Twitter/X']
 
@@ -292,9 +293,11 @@ export default function LongFormScriptsPage() {
     : podcastMode === 'url' ? !!audioUrl.trim() : !!transcript.trim()
 
   return (
-    <SSEFeaturePage
-      projectId={projectId}
-      title="Long-form Scripts"
+    <>
+      <MovedNotice />
+      <SSEFeaturePage
+        projectId={projectId}
+        title="Long-form Scripts"
       subtitle={isVideo ? 'Video scriptwriting · Claude' : 'Podcast show notes · Whisper + Claude'}
       icon={isVideo ? <Video className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
       credits={isVideo ? 15 : 20}
@@ -307,5 +310,6 @@ export default function LongFormScriptsPage() {
       submitLabel={isVideo ? 'Write Script - 15 credits' : 'Generate Show Notes - 20 credits'}
       canSubmit={canSubmit}
     />
+    </>
   )
 }

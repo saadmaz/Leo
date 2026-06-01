@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
+import { MovedNotice } from '@/components/layout/moved-notice'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { usePillar7Store } from '@/stores/pillar7-store'
@@ -630,6 +631,7 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
+      <MovedNotice />
       <header className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />
         <BackButton />

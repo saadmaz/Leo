@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { ClipboardList, Plus, ChevronDown, ChevronUp, Trash2, Edit2, Check, X, Zap, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { MovedNotice } from '@/components/layout/moved-notice'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { usePillar10Store } from '@/stores/pillar10-store'
@@ -483,6 +484,7 @@ export default function ExperimentLogPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
+      <MovedNotice />
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
         <SidebarToggle />
         <div className="flex-1 flex items-center gap-3">

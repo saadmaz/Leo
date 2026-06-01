@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { VisualBriefModal } from '@/components/campaigns/VisualBriefModal'
 import { ContextPanel } from '@/components/layout/ContextPanel'
+import { MovedNotice } from '@/components/layout/moved-notice'
 
 // ---------------------------------------------------------------------------
 // Channel display helpers
@@ -150,6 +151,7 @@ export default function CampaignsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <MovedNotice />
       {/* Left column - campaign list */}
       <div className="w-80 shrink-0 border-r border-border flex flex-col bg-card">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">

@@ -18,6 +18,7 @@ import { RecycleModal } from '@/components/content-ops/recycle-modal'
 import { TransformModal } from '@/components/content-ops/transform-modal'
 import { PerformanceModal } from '@/components/content-ops/performance-modal'
 import { LogMetricsModal } from '@/components/brand-tools/log-metrics-modal'
+import { MovedNotice } from '@/components/layout/moved-notice'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -206,6 +207,7 @@ export default function LibraryPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
+      <MovedNotice />
       {/* Header */}
       <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border shrink-0">
         <SidebarToggle />

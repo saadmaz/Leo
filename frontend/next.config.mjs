@@ -26,6 +26,33 @@ const nextConfig = {
         destination: '/projects/:projectId/intelligence/deep-research',
         permanent: true,
       },
+
+      // ── Demoted pages (non-permanent so bookmarks get the toast context) ──
+      {
+        source: '/projects/:projectId/content/translate',
+        destination: '/projects/:projectId/library?movedFrom=translate',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/content/visual-brief',
+        destination: '/projects/:projectId/campaigns?movedFrom=visual-brief',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/content/podcast',
+        destination: '/projects/:projectId/content/video-script?movedFrom=podcast',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/experiments/learning-propagation',
+        destination: '/projects/:projectId/experiments/experiment-log?movedFrom=learning-propagation',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/analytics-pro/board-report',
+        destination: '/projects/:projectId/reports?tab=board&movedFrom=board-report',
+        permanent: false,
+      },
     ]
   },
   async rewrites() {
