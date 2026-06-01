@@ -1,15 +1,15 @@
-"""
+﻿"""
 Personal Branding Module routes.
 
 Endpoints:
-  POST   /projects/{id}/persona/core/init         – Create initial Personal Core
-  GET    /projects/{id}/persona/core               – Get Personal Core
-  PATCH  /projects/{id}/persona/core               – Update Personal Core fields
-  GET    /projects/{id}/persona/interview/questions – Get all interview questions
-  GET    /projects/{id}/persona/interview/next      – Get next unanswered question
-  POST   /projects/{id}/persona/interview/answer    – Save a single answer
-  POST   /projects/{id}/persona/interview/extract   – Synthesise answers → PersonalCore (SSE)
-  GET    /projects/{id}/persona/voice               – Get voice profile
+  POST   /projects/{id}/persona/core/init         â€“ Create initial Personal Core
+  GET    /projects/{id}/persona/core               â€“ Get Personal Core
+  PATCH  /projects/{id}/persona/core               â€“ Update Personal Core fields
+  GET    /projects/{id}/persona/interview/questions â€“ Get all interview questions
+  GET    /projects/{id}/persona/interview/next      â€“ Get next unanswered question
+  POST   /projects/{id}/persona/interview/answer    â€“ Save a single answer
+  POST   /projects/{id}/persona/interview/extract   â€“ Synthesise answers â†’ PersonalCore (SSE)
+  GET    /projects/{id}/persona/voice               â€“ Get voice profile
 """
 
 import asyncio
@@ -20,7 +20,7 @@ from typing import AsyncIterator
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from backend.api.deps import assert_editor, assert_member, get_project_or_404
+from backend.api.deps import assert_editor, assert_member, get_project_or_404, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.schemas.personal_brand import (
     AddSamplesRequest,
@@ -69,7 +69,7 @@ def _assert_personal(project: dict) -> None:
 # ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/persona/core/init", status_code=status.HTTP_201_CREATED)
-async def init_personal_core(project_id: str, body: PersonalCoreCreate, user: CurrentUser):
+async def init_personal_core(project_id: str, body: PersonalCoreCreate, user: CurrentUser, _tier: None = require_tier("pro")):
     """
     Create the initial Personal Core for a personal brand project.
     Called immediately after project creation on the personal brand wizard.
@@ -92,7 +92,7 @@ async def init_personal_core(project_id: str, body: PersonalCoreCreate, user: Cu
 
 
 @router.get("/{project_id}/persona/core")
-async def get_personal_core(project_id: str, user: CurrentUser):
+async def get_personal_core(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the Personal Core for a personal brand project."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -105,7 +105,7 @@ async def get_personal_core(project_id: str, user: CurrentUser):
 
 
 @router.patch("/{project_id}/persona/core")
-async def update_personal_core(project_id: str, body: PersonalCoreUpdate, user: CurrentUser):
+async def update_personal_core(project_id: str, body: PersonalCoreUpdate, user: CurrentUser, _tier: None = require_tier("pro")):
     """Update fields of the Personal Core."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -124,7 +124,7 @@ async def update_personal_core(project_id: str, body: PersonalCoreUpdate, user: 
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/persona/interview/questions")
-async def get_interview_questions(project_id: str, user: CurrentUser):
+async def get_interview_questions(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return all interview questions grouped by module."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -133,7 +133,7 @@ async def get_interview_questions(project_id: str, user: CurrentUser):
 
 
 @router.get("/{project_id}/persona/interview/next")
-async def get_next_question(project_id: str, user: CurrentUser):
+async def get_next_question(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """
     Return the next unanswered question and current progress.
     Returns null for 'question' when the interview is complete.
@@ -164,7 +164,7 @@ async def get_next_question(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/persona/interview/answer")
-async def save_interview_answer(project_id: str, body: InterviewAnswerRequest, user: CurrentUser):
+async def save_interview_answer(project_id: str, body: InterviewAnswerRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """
     Persist a single interview answer. The client calls this after each question.
     Returns the updated next question and progress.
@@ -203,7 +203,7 @@ async def save_interview_answer(project_id: str, body: InterviewAnswerRequest, u
 # ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/persona/interview/extract")
-async def extract_personal_core(project_id: str, user: CurrentUser):
+async def extract_personal_core(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """
     Synthesise all collected interview answers into a structured Personal Core.
     Streams progress events via SSE. Same format as the ingestion pipeline.
@@ -248,7 +248,7 @@ async def extract_personal_core(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/persona/voice")
-async def get_voice_profile(project_id: str, user: CurrentUser):
+async def get_voice_profile(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the voice profile for a personal brand project."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -266,7 +266,7 @@ async def get_voice_profile(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/persona/strategy")
-async def get_personal_strategy(project_id: str, user: CurrentUser):
+async def get_personal_strategy(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the saved personal brand strategy (if generated)."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -280,7 +280,7 @@ async def get_personal_strategy(project_id: str, user: CurrentUser):
 
 
 @router.post("/{project_id}/persona/strategy/generate")
-async def generate_personal_strategy(project_id: str, user: CurrentUser):
+async def generate_personal_strategy(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Stream a full personal brand strategy (platform plan + roadmap) via SSE."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -308,7 +308,7 @@ async def generate_personal_strategy(project_id: str, user: CurrentUser):
 
 
 @router.post("/{project_id}/persona/strategy/niche")
-async def research_niche(project_id: str, user: CurrentUser):
+async def research_niche(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Stream niche competitor research via SSE."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -340,7 +340,7 @@ async def research_niche(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/persona/analytics")
-async def get_analytics(project_id: str, user: CurrentUser):
+async def get_analytics(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return analytics snapshots for the personal brand project."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -358,7 +358,7 @@ async def get_analytics(project_id: str, user: CurrentUser):
 
 
 @router.post("/{project_id}/persona/analytics/snapshot")
-async def trigger_snapshot(project_id: str, user: CurrentUser):
+async def trigger_snapshot(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Manually trigger an analytics snapshot for all connected platforms."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -374,7 +374,7 @@ async def trigger_snapshot(project_id: str, user: CurrentUser):
 
 
 @router.get("/{project_id}/persona/analytics/brief")
-async def get_weekly_brief(project_id: str, user: CurrentUser):
+async def get_weekly_brief(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the latest weekly brief, generating one if needed."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -396,7 +396,7 @@ async def get_weekly_brief(project_id: str, user: CurrentUser):
 
 
 @router.post("/{project_id}/persona/analytics/brief/regenerate")
-async def regenerate_weekly_brief(project_id: str, user: CurrentUser):
+async def regenerate_weekly_brief(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Force-regenerate the weekly brief (ignores any cached version)."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -416,7 +416,7 @@ async def regenerate_weekly_brief(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/persona/reputation")
-async def get_reputation(project_id: str, user: CurrentUser):
+async def get_reputation(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the latest reputation snapshot."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -441,7 +441,7 @@ def _get_voice_profile(project_id: str) -> dict | None:
 
 
 @router.post("/{project_id}/persona/content/generate")
-async def generate_post(project_id: str, body: GeneratePostRequest, user: CurrentUser):
+async def generate_post(project_id: str, body: GeneratePostRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Stream a quick on-brand post for any platform (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -474,8 +474,8 @@ async def generate_post(project_id: str, body: GeneratePostRequest, user: Curren
 
 
 @router.post("/{project_id}/persona/content/story")
-async def story_to_post(project_id: str, body: StoryToPostRequest, user: CurrentUser):
-    """Stream a story → platform-native post conversion (SSE)."""
+async def story_to_post(project_id: str, body: StoryToPostRequest, user: CurrentUser, _tier: None = require_tier("pro")):
+    """Stream a story â†’ platform-native post conversion (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
     _assert_personal(project)
@@ -507,7 +507,7 @@ async def story_to_post(project_id: str, body: StoryToPostRequest, user: Current
 
 
 @router.post("/{project_id}/persona/content/opinion")
-async def opinion_extractor(project_id: str, body: OpinionRequest, user: CurrentUser):
+async def opinion_extractor(project_id: str, body: OpinionRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """
     Opinion extractor - two-phase SSE flow.
     Phase 1 (answers=null): returns 3 probing questions.
@@ -545,7 +545,7 @@ async def opinion_extractor(project_id: str, body: OpinionRequest, user: Current
 
 
 @router.post("/{project_id}/persona/content/bio")
-async def bio_writer(project_id: str, user: CurrentUser):
+async def bio_writer(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Stream per-platform bio + headline generation (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -576,7 +576,7 @@ async def bio_writer(project_id: str, user: CurrentUser):
 
 
 @router.post("/{project_id}/persona/content/reformat")
-async def reformat_content(project_id: str, body: ReformatRequest, user: CurrentUser):
+async def reformat_content(project_id: str, body: ReformatRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Stream reformatting of one piece of content for multiple platforms (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -613,7 +613,7 @@ async def reformat_content(project_id: str, body: ReformatRequest, user: Current
 
 
 @router.post("/{project_id}/persona/content/approve")
-async def approve_output(project_id: str, body: ApproveOutputRequest, user: CurrentUser):
+async def approve_output(project_id: str, body: ApproveOutputRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Save an approved (or edited) output to the voice profile for future calibration."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -628,7 +628,7 @@ async def approve_output(project_id: str, body: ApproveOutputRequest, user: Curr
 
 
 @router.post("/{project_id}/persona/content/article")
-async def write_article(project_id: str, body: ArticleRequest, user: CurrentUser):
+async def write_article(project_id: str, body: ArticleRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Stream a full thought leadership article in the user's voice (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -666,7 +666,7 @@ async def write_article(project_id: str, body: ArticleRequest, user: CurrentUser
 # ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/persona/voice/samples")
-async def add_voice_samples(project_id: str, body: AddSamplesRequest, user: CurrentUser):
+async def add_voice_samples(project_id: str, body: AddSamplesRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Add new writing samples and trigger voice re-calibration (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -696,7 +696,7 @@ async def add_voice_samples(project_id: str, body: AddSamplesRequest, user: Curr
 
 
 @router.post("/{project_id}/persona/voice/calibrate")
-async def calibrate_voice(project_id: str, user: CurrentUser):
+async def calibrate_voice(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Re-calibrate voice profile from accumulated approved outputs (SSE)."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -725,7 +725,7 @@ async def calibrate_voice(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/{project_id}/persona/reputation/check")
-async def check_reputation(project_id: str, user: CurrentUser):
+async def check_reputation(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Run a reputation check: Google name search + social mention scan."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -749,7 +749,7 @@ async def check_reputation(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/persona/publishing/profile")
-async def get_publishing_profile(project_id: str, user: CurrentUser):
+async def get_publishing_profile(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the Ayrshare profile + connected platforms for this project."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -769,7 +769,7 @@ async def get_publishing_profile(project_id: str, user: CurrentUser):
 
 
 @router.get("/{project_id}/persona/publishing/connect/{platform}")
-async def get_connect_url(project_id: str, platform: str, user: CurrentUser):
+async def get_connect_url(project_id: str, platform: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return a social-auth URL for connecting a platform to this project's profile."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -788,7 +788,7 @@ async def get_connect_url(project_id: str, platform: str, user: CurrentUser):
 
 
 @router.post("/{project_id}/persona/publishing/publish")
-async def publish_post_now(project_id: str, body: PublishNowRequest, user: CurrentUser):
+async def publish_post_now(project_id: str, body: PublishNowRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Publish a post immediately to the selected platforms."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -812,7 +812,7 @@ async def publish_post_now(project_id: str, body: PublishNowRequest, user: Curre
 
 
 @router.post("/{project_id}/persona/publishing/schedule")
-async def schedule_post(project_id: str, body: SchedulePostRequest, user: CurrentUser):
+async def schedule_post(project_id: str, body: SchedulePostRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Schedule a post for a future UTC datetime."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -836,7 +836,7 @@ async def schedule_post(project_id: str, body: SchedulePostRequest, user: Curren
 
 
 @router.get("/{project_id}/persona/publishing/scheduled")
-async def list_scheduled(project_id: str, user: CurrentUser):
+async def list_scheduled(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return all pending scheduled posts for this project."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -855,7 +855,7 @@ async def list_scheduled(project_id: str, user: CurrentUser):
 
 
 @router.delete("/{project_id}/persona/publishing/scheduled")
-async def cancel_scheduled(project_id: str, body: CancelScheduledRequest, user: CurrentUser):
+async def cancel_scheduled(project_id: str, body: CancelScheduledRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Cancel a pending scheduled post."""
     project = get_project_or_404(project_id)
     assert_editor(project, user["uid"])
@@ -874,7 +874,7 @@ async def cancel_scheduled(project_id: str, body: CancelScheduledRequest, user: 
 
 
 @router.get("/{project_id}/persona/publishing/history")
-async def get_publish_history(project_id: str, user: CurrentUser):
+async def get_publish_history(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return the publish history stored in Firestore."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])
@@ -892,7 +892,7 @@ async def get_publish_history(project_id: str, user: CurrentUser):
 
 
 @router.get("/{project_id}/persona/publishing/analytics/{post_id}")
-async def get_post_analytics(project_id: str, post_id: str, user: CurrentUser):
+async def get_post_analytics(project_id: str, post_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     """Return Ayrshare post-level analytics for a specific published post."""
     project = get_project_or_404(project_id)
     assert_member(project, user["uid"])

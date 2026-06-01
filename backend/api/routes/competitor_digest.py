@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 
-from backend.api.deps import get_project_as_member
+from backend.api.deps import get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service
 from backend.services.llm_service import call_claude_raw
@@ -166,6 +166,7 @@ Keep it tight. Each bullet should be one sentence. Marketing director audience â
 async def send_digest(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Generate and email the weekly competitor digest to the project owner."""
     project = get_project_as_member(project_id, user["uid"])
@@ -193,6 +194,7 @@ async def send_digest(
 async def preview_digest(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Return the digest HTML without sending it â€” useful for the settings/test UI."""
     project = get_project_as_member(project_id, user["uid"])

@@ -131,8 +131,12 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 async def _resolve_uid(data: dict) -> str | None:
     """
     Try to resolve a Firebase UID from a Stripe event data object.
-    Checks subscription/session metadata first, then falls back to
-    a Customer.retrieve() call for subscription events.
+
+    Resolution order:
+      1. data.metadata.firebase_uid  (set on subscriptions/checkout sessions)
+      2. Customer.metadata.firebase_uid  (set when the customer was created)
+      3. Customer.metadata.uid  (legacy alias)
+      4. Firestore users collection lookup by customer email
     """
     uid = data.get("metadata", {}).get("firebase_uid")
     if uid:
@@ -144,9 +148,31 @@ async def _resolve_uid(data: dict) -> str | None:
         import asyncio
         import stripe as _stripe
         customer = await asyncio.to_thread(_stripe.Customer.retrieve, customer_id)
-        return customer.get("metadata", {}).get("firebase_uid")
+
+        # Primary metadata keys
+        meta = customer.get("metadata") or {}
+        uid = meta.get("firebase_uid") or meta.get("uid")
+        if uid:
+            return uid
+
+        # Email fallback — look up the user in Firestore by email
+        email = customer.get("email")
+        if email:
+            db = firebase_service.get_db()
+            users = await asyncio.to_thread(
+                lambda: list(
+                    db.collection("users")
+                    .where("email", "==", email)
+                    .limit(1)
+                    .stream()
+                )
+            )
+            if users:
+                return users[0].id
+
+        return None
     except Exception as exc:
-        logger.warning("Could not resolve uid from customer %s: %s", customer_id, exc)
+        logger.error("UID resolution failed for customer %s: %s", customer_id, exc)
         return None
 
 

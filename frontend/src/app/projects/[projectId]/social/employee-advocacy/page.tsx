@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'
 import { api } from '@/lib/api'
 import { usePillar6Store } from '@/stores/pillar6-store'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { useFeatureFlag } from '@/hooks/useFeatureFlag'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { cn } from '@/lib/utils'
 import type { ProgressStep } from '@/types'
@@ -286,8 +286,16 @@ function AdvocacyPage() {
 // ---------------------------------------------------------------------------
 
 export default function EmployeeAdvocacyPage() {
-  if (!isFeatureEnabled('employee_advocacy_enabled')) {
-    return <FeatureGate />
+  const { enabled, loading } = useFeatureFlag('employee_advocacy_enabled')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
+
+  if (!enabled) return <FeatureGate />
   return <AdvocacyPage />
 }

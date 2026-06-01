@@ -15,7 +15,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from backend.api.deps import get_project_as_member
+from backend.api.deps import get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import deep_search_service, firebase_service
 from backend.services.credits_service import check_and_deduct
@@ -34,6 +34,7 @@ async def run_deep_search(
     project_id: str,
     body: DeepSearchRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Stream deep search results as SSE events.
@@ -85,7 +86,7 @@ async def run_deep_search(
 
 
 @router.get("/projects/{project_id}/deep-search/history")
-async def get_search_history(project_id: str, user: CurrentUser):
+async def get_search_history(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     """Return the last 20 deep search results for this project."""
     await get_project_as_member(project_id, user)
     results = await asyncio.to_thread(

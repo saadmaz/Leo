@@ -1,4 +1,4 @@
-"""
+﻿"""
 Funnel Strategy Engine - API routes.
 
 POST /projects/{project_id}/strategy/start
@@ -29,7 +29,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from backend.api.deps import get_project_as_member
+from backend.api.deps import get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.schemas.strategy import (
     StrategyAnswerRequest,
@@ -206,6 +206,7 @@ async def start_strategy(
     project_id: str,
     body: StrategyStartRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Creates a new strategy session and returns the first intake question.
@@ -247,6 +248,7 @@ async def answer_question(
     session_id: str,
     body: StrategyAnswerRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Stores one intake answer and returns the next question.
@@ -318,6 +320,7 @@ async def run_research(
     project_id: str,
     session_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Triggers live research (Google Trends + Apify + Firecrawl).
@@ -352,6 +355,7 @@ async def generate_strategy(
     project_id: str,
     session_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Generates the full strategy document from research cache + Brand Core.
@@ -385,6 +389,7 @@ async def generate_strategy(
 async def list_strategies(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """Return all saved strategies for a project, newest first."""
     get_project_as_member(project_id, user["uid"])
@@ -402,6 +407,7 @@ async def refine_strategy(
     strategy_id: str,
     body: StrategyRefineRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Stream a follow-up response to an existing strategy.
@@ -436,7 +442,7 @@ async def refine_strategy(
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/icp/generate")
-async def generate_icp(project_id: str, body: ICPGenerateRequest, user: CurrentUser):
+async def generate_icp(project_id: str, body: ICPGenerateRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Generate Ideal Customer Profile segments. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_icp")
@@ -455,7 +461,7 @@ async def generate_icp(project_id: str, body: ICPGenerateRequest, user: CurrentU
 
 
 @router.get("/pillar1/icp/list")
-async def list_icps(project_id: str, user: CurrentUser):
+async def list_icps(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "icp")
     return {"docs": docs}
@@ -466,7 +472,7 @@ async def list_icps(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/gtm/generate")
-async def generate_gtm(project_id: str, body: GTMGenerateRequest, user: CurrentUser):
+async def generate_gtm(project_id: str, body: GTMGenerateRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Generate GTM strategy. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_gtm")
@@ -485,7 +491,7 @@ async def generate_gtm(project_id: str, body: GTMGenerateRequest, user: CurrentU
 
 
 @router.get("/pillar1/gtm/list")
-async def list_gtms(project_id: str, user: CurrentUser):
+async def list_gtms(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "gtm")
     return {"docs": docs}
@@ -496,7 +502,7 @@ async def list_gtms(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/okr/generate")
-async def generate_okr(project_id: str, body: OKRGenerateRequest, user: CurrentUser):
+async def generate_okr(project_id: str, body: OKRGenerateRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate quarterly OKRs (fast, non-streaming)."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_okr")
@@ -505,7 +511,7 @@ async def generate_okr(project_id: str, body: OKRGenerateRequest, user: CurrentU
 
 
 @router.get("/pillar1/okr/list")
-async def list_okrs(project_id: str, user: CurrentUser):
+async def list_okrs(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "okr")
     return {"docs": docs}
@@ -516,7 +522,7 @@ async def list_okrs(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/budget/model")
-async def model_budget(project_id: str, body: BudgetModelRequest, user: CurrentUser):
+async def model_budget(project_id: str, body: BudgetModelRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate budget model. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_budget")
@@ -535,7 +541,7 @@ async def model_budget(project_id: str, body: BudgetModelRequest, user: CurrentU
 
 
 @router.get("/pillar1/budget/list")
-async def list_budgets(project_id: str, user: CurrentUser):
+async def list_budgets(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "budget")
     return {"docs": docs}
@@ -546,7 +552,7 @@ async def list_budgets(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/personas/generate")
-async def generate_personas(project_id: str, body: PersonaGenerateRequest, user: CurrentUser):
+async def generate_personas(project_id: str, body: PersonaGenerateRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Generate buyer personas. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_persona")
@@ -565,7 +571,7 @@ async def generate_personas(project_id: str, body: PersonaGenerateRequest, user:
 
 
 @router.get("/pillar1/personas/list")
-async def list_personas(project_id: str, user: CurrentUser):
+async def list_personas(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "persona")
     return {"docs": docs}
@@ -576,7 +582,7 @@ async def list_personas(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/market-size/analyze")
-async def analyze_market_size(project_id: str, body: MarketSizingRequest, user: CurrentUser):
+async def analyze_market_size(project_id: str, body: MarketSizingRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate TAM/SAM/SOM analysis. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_market_sizing")
@@ -595,7 +601,7 @@ async def analyze_market_size(project_id: str, body: MarketSizingRequest, user: 
 
 
 @router.get("/pillar1/market-size/list")
-async def list_market_sizes(project_id: str, user: CurrentUser):
+async def list_market_sizes(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "market_sizing")
     return {"docs": docs}
@@ -606,7 +612,7 @@ async def list_market_sizes(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/positioning/start")
-async def start_positioning(project_id: str, body: PositioningStartRequest, user: CurrentUser):
+async def start_positioning(project_id: str, body: PositioningStartRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Start a new Positioning Workshop session. Returns doc_id."""
     get_project_as_member(project_id, user["uid"])
     doc = await asyncio.to_thread(
@@ -621,6 +627,7 @@ async def positioning_message(
     doc_id: str,
     body: PositioningMessageRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """Send a message in the Positioning Workshop. Streams SSE events. 5 credits/message."""
     project = get_project_as_member(project_id, user["uid"])
@@ -640,7 +647,7 @@ async def positioning_message(
 
 
 @router.get("/pillar1/positioning/{doc_id}")
-async def get_positioning_session(project_id: str, doc_id: str, user: CurrentUser):
+async def get_positioning_session(project_id: str, doc_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     doc = await asyncio.to_thread(firebase_service.get_pillar1_doc, project_id, doc_id)
     if not doc:
@@ -654,7 +661,7 @@ async def get_positioning_session(project_id: str, doc_id: str, user: CurrentUse
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/comp-map/generate")
-async def generate_comp_map(project_id: str, body: CompMapGenerateRequest, user: CurrentUser):
+async def generate_comp_map(project_id: str, body: CompMapGenerateRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate competitive positioning map. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_comp_map")
@@ -673,7 +680,7 @@ async def generate_comp_map(project_id: str, body: CompMapGenerateRequest, user:
 
 
 @router.get("/pillar1/comp-map/list")
-async def list_comp_maps(project_id: str, user: CurrentUser):
+async def list_comp_maps(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "comp_map")
     return {"docs": docs}
@@ -684,7 +691,7 @@ async def list_comp_maps(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/launch/plan")
-async def plan_launch(project_id: str, body: LaunchPlanRequest, user: CurrentUser):
+async def plan_launch(project_id: str, body: LaunchPlanRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate launch plan. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_launch")
@@ -703,7 +710,7 @@ async def plan_launch(project_id: str, body: LaunchPlanRequest, user: CurrentUse
 
 
 @router.get("/pillar1/launch/list")
-async def list_launches(project_id: str, user: CurrentUser):
+async def list_launches(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "launch")
     return {"docs": docs}
@@ -714,7 +721,7 @@ async def list_launches(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar1/risk/scan")
-async def scan_risks(project_id: str, body: RiskScanRequest, user: CurrentUser):
+async def scan_risks(project_id: str, body: RiskScanRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Run risk scan. Streams SSE events."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar1_risk_scan")
@@ -733,14 +740,14 @@ async def scan_risks(project_id: str, body: RiskScanRequest, user: CurrentUser):
 
 
 @router.get("/pillar1/risk/alerts")
-async def list_risk_alerts(project_id: str, user: CurrentUser):
+async def list_risk_alerts(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "risk_flag")
     return {"docs": docs}
 
 
 @router.post("/pillar1/risk/alerts/{doc_id}/dismiss/{risk_id}")
-async def dismiss_risk_alert(project_id: str, doc_id: str, risk_id: str, user: CurrentUser):
+async def dismiss_risk_alert(project_id: str, doc_id: str, risk_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(firebase_service.dismiss_risk_alert, project_id, doc_id, risk_id)
     return {"status": "dismissed"}
@@ -769,7 +776,7 @@ def _p2_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/headline/generate")
-async def generate_headlines(project_id: str, body: HeadlineGenerateRequest, user: CurrentUser):
+async def generate_headlines(project_id: str, body: HeadlineGenerateRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate headline A/B variants. Streams SSE events. 5 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_headline")
@@ -777,7 +784,7 @@ async def generate_headlines(project_id: str, body: HeadlineGenerateRequest, use
 
 
 @router.get("/pillar2/headline/list")
-async def list_headlines(project_id: str, user: CurrentUser):
+async def list_headlines(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "headline")
     return {"docs": docs}
@@ -788,7 +795,7 @@ async def list_headlines(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/visual-brief/generate")
-async def generate_visual_brief(project_id: str, body: VisualBriefRequest, user: CurrentUser):
+async def generate_visual_brief(project_id: str, body: VisualBriefRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate a visual creative brief. Streams SSE events. 5 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_visual_brief")
@@ -796,7 +803,7 @@ async def generate_visual_brief(project_id: str, body: VisualBriefRequest, user:
 
 
 @router.get("/pillar2/visual-brief/list")
-async def list_visual_briefs(project_id: str, user: CurrentUser):
+async def list_visual_briefs(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "visual_brief")
     return {"docs": docs}
@@ -807,7 +814,7 @@ async def list_visual_briefs(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/video-script/generate")
-async def generate_video_script(project_id: str, body: VideoScriptRequest, user: CurrentUser):
+async def generate_video_script(project_id: str, body: VideoScriptRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate a full video script. Streams SSE events. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_video_script")
@@ -815,7 +822,7 @@ async def generate_video_script(project_id: str, body: VideoScriptRequest, user:
 
 
 @router.get("/pillar2/video-script/list")
-async def list_video_scripts(project_id: str, user: CurrentUser):
+async def list_video_scripts(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "video_script")
     return {"docs": docs}
@@ -826,7 +833,7 @@ async def list_video_scripts(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/podcast/process")
-async def process_podcast(project_id: str, body: PodcastNotesRequest, user: CurrentUser):
+async def process_podcast(project_id: str, body: PodcastNotesRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Transcribe and generate podcast show notes. Streams SSE events. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_podcast")
@@ -834,7 +841,7 @@ async def process_podcast(project_id: str, body: PodcastNotesRequest, user: Curr
 
 
 @router.get("/pillar2/podcast/list")
-async def list_podcasts(project_id: str, user: CurrentUser):
+async def list_podcasts(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "podcast")
     return {"docs": docs}
@@ -845,7 +852,7 @@ async def list_podcasts(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/quality/score")
-async def score_content_quality(project_id: str, body: QualityScoreRequest, user: CurrentUser):
+async def score_content_quality(project_id: str, body: QualityScoreRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Score content quality across 6 dimensions. Streams SSE events. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_quality")
@@ -853,7 +860,7 @@ async def score_content_quality(project_id: str, body: QualityScoreRequest, user
 
 
 @router.get("/pillar2/quality/list")
-async def list_quality_scores(project_id: str, user: CurrentUser):
+async def list_quality_scores(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "quality_score")
     return {"docs": docs}
@@ -864,7 +871,7 @@ async def list_quality_scores(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/translate/adapt")
-async def adapt_translation(project_id: str, body: TranslateRequest, user: CurrentUser):
+async def adapt_translation(project_id: str, body: TranslateRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Translate and adapt content via DeepL + Claude. Streams SSE events. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_translate")
@@ -872,7 +879,7 @@ async def adapt_translation(project_id: str, body: TranslateRequest, user: Curre
 
 
 @router.get("/pillar2/translate/list")
-async def list_translations(project_id: str, user: CurrentUser):
+async def list_translations(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "translation")
     return {"docs": docs}
@@ -883,7 +890,7 @@ async def list_translations(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/case-study/generate")
-async def generate_case_study(project_id: str, body: CaseStudyRequest, user: CurrentUser):
+async def generate_case_study(project_id: str, body: CaseStudyRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate a publication-ready case study. Streams SSE events. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_case_study")
@@ -891,7 +898,7 @@ async def generate_case_study(project_id: str, body: CaseStudyRequest, user: Cur
 
 
 @router.get("/pillar2/case-study/list")
-async def list_case_studies(project_id: str, user: CurrentUser):
+async def list_case_studies(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "case_study")
     return {"docs": docs}
@@ -902,7 +909,7 @@ async def list_case_studies(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar2/content-gap/analyze")
-async def analyze_content_gap(project_id: str, body: ContentGapRequest, user: CurrentUser):
+async def analyze_content_gap(project_id: str, body: ContentGapRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Analyse content gaps via DataForSEO + Claude. Streams SSE events. 40 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar2_content_gap")
@@ -910,7 +917,7 @@ async def analyze_content_gap(project_id: str, body: ContentGapRequest, user: Cu
 
 
 @router.get("/pillar2/content-gap/list")
-async def list_content_gaps(project_id: str, user: CurrentUser):
+async def list_content_gaps(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "content_gap")
     return {"docs": docs}
@@ -939,7 +946,7 @@ def _p3_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar3/keywords/research")
-async def research_keywords(project_id: str, body: KeywordResearchRequest, user: CurrentUser):
+async def research_keywords(project_id: str, body: KeywordResearchRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Keyword research via DataForSEO + Claude. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_keyword_research")
@@ -947,7 +954,7 @@ async def research_keywords(project_id: str, body: KeywordResearchRequest, user:
 
 
 @router.get("/pillar3/keywords/list")
-async def list_keyword_research(project_id: str, user: CurrentUser):
+async def list_keyword_research(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "keyword_research")
     return {"docs": docs}
@@ -958,7 +965,7 @@ async def list_keyword_research(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar3/serp-intent/map")
-async def map_serp_intent(project_id: str, body: SerpIntentRequest, user: CurrentUser):
+async def map_serp_intent(project_id: str, body: SerpIntentRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """SERP intent mapping via DataForSEO + Claude. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_serp_intent")
@@ -966,7 +973,7 @@ async def map_serp_intent(project_id: str, body: SerpIntentRequest, user: Curren
 
 
 @router.get("/pillar3/serp-intent/list")
-async def list_serp_intents(project_id: str, user: CurrentUser):
+async def list_serp_intents(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "serp_intent")
     return {"docs": docs}
@@ -977,7 +984,7 @@ async def list_serp_intents(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar3/on-page/audit")
-async def audit_on_page(project_id: str, body: OnPageSeoRequest, user: CurrentUser):
+async def audit_on_page(project_id: str, body: OnPageSeoRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """On-page SEO audit via DataForSEO + Claude. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_on_page_seo")
@@ -985,7 +992,7 @@ async def audit_on_page(project_id: str, body: OnPageSeoRequest, user: CurrentUs
 
 
 @router.get("/pillar3/on-page/list")
-async def list_on_page_audits(project_id: str, user: CurrentUser):
+async def list_on_page_audits(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "on_page_seo")
     return {"docs": docs}
@@ -996,7 +1003,7 @@ async def list_on_page_audits(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar3/featured-snippet/optimize")
-async def optimize_featured_snippet(project_id: str, body: FeaturedSnippetRequest, user: CurrentUser):
+async def optimize_featured_snippet(project_id: str, body: FeaturedSnippetRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Featured snippet optimisation via DataForSEO + Claude. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_featured_snippet")
@@ -1004,7 +1011,7 @@ async def optimize_featured_snippet(project_id: str, body: FeaturedSnippetReques
 
 
 @router.get("/pillar3/featured-snippet/list")
-async def list_featured_snippets(project_id: str, user: CurrentUser):
+async def list_featured_snippets(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "featured_snippet")
     return {"docs": docs}
@@ -1015,7 +1022,7 @@ async def list_featured_snippets(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar3/freshness/check")
-async def check_content_freshness(project_id: str, body: ContentFreshnessRequest, user: CurrentUser):
+async def check_content_freshness(project_id: str, body: ContentFreshnessRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Content freshness check via DataForSEO + Claude. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_content_freshness")
@@ -1023,7 +1030,7 @@ async def check_content_freshness(project_id: str, body: ContentFreshnessRequest
 
 
 @router.get("/pillar3/freshness/list")
-async def list_freshness_checks(project_id: str, user: CurrentUser):
+async def list_freshness_checks(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "content_freshness")
     return {"docs": docs}
@@ -1034,7 +1041,7 @@ async def list_freshness_checks(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar3/technical/audit")
-async def audit_technical_seo(project_id: str, body: TechnicalSeoRequest, user: CurrentUser):
+async def audit_technical_seo(project_id: str, body: TechnicalSeoRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Technical SEO audit via DataForSEO + Claude. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar3_technical_seo")
@@ -1042,7 +1049,7 @@ async def audit_technical_seo(project_id: str, body: TechnicalSeoRequest, user: 
 
 
 @router.get("/pillar3/technical/list")
-async def list_technical_audits(project_id: str, user: CurrentUser):
+async def list_technical_audits(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "technical_seo")
     return {"docs": docs}
@@ -1071,7 +1078,7 @@ def _p4_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar4/ad-brief/generate")
-async def generate_ad_brief(project_id: str, body: AdBriefRequest, user: CurrentUser):
+async def generate_ad_brief(project_id: str, body: AdBriefRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate a comprehensive paid ad campaign brief. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_ad_brief")
@@ -1079,7 +1086,7 @@ async def generate_ad_brief(project_id: str, body: AdBriefRequest, user: Current
 
 
 @router.get("/pillar4/ad-brief/list")
-async def list_ad_briefs(project_id: str, user: CurrentUser):
+async def list_ad_briefs(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "ad_brief")
     return {"docs": docs}
@@ -1090,7 +1097,7 @@ async def list_ad_briefs(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar4/ad-copy/generate")
-async def generate_ad_copy(project_id: str, body: AdCopyRequest, user: CurrentUser):
+async def generate_ad_copy(project_id: str, body: AdCopyRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate multi-variant platform-specific ad copy. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_ad_copy")
@@ -1098,7 +1105,7 @@ async def generate_ad_copy(project_id: str, body: AdCopyRequest, user: CurrentUs
 
 
 @router.get("/pillar4/ad-copy/list")
-async def list_ad_copies(project_id: str, user: CurrentUser):
+async def list_ad_copies(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "ad_copy")
     return {"docs": docs}
@@ -1109,7 +1116,7 @@ async def list_ad_copies(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar4/retargeting/build")
-async def build_retargeting_sequence(project_id: str, body: RetargetingRequest, user: CurrentUser):
+async def build_retargeting_sequence(project_id: str, body: RetargetingRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Build a full retargeting funnel sequence. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_retargeting")
@@ -1117,7 +1124,7 @@ async def build_retargeting_sequence(project_id: str, body: RetargetingRequest, 
 
 
 @router.get("/pillar4/retargeting/list")
-async def list_retargeting_sequences(project_id: str, user: CurrentUser):
+async def list_retargeting_sequences(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "retargeting_sequence")
     return {"docs": docs}
@@ -1128,7 +1135,7 @@ async def list_retargeting_sequences(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar4/attribution/analyse")
-async def analyse_attribution(project_id: str, body: AttributionRequest, user: CurrentUser):
+async def analyse_attribution(project_id: str, body: AttributionRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Cross-channel attribution analysis via GA4 + Claude. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar4_attribution")
@@ -1136,7 +1143,7 @@ async def analyse_attribution(project_id: str, body: AttributionRequest, user: C
 
 
 @router.get("/pillar4/attribution/list")
-async def list_attribution_reports(project_id: str, user: CurrentUser):
+async def list_attribution_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "attribution")
     return {"docs": docs}
@@ -1165,7 +1172,7 @@ def _p5_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/email-sequence/build")
-async def build_email_sequence(project_id: str, body: EmailSequenceRequest, user: CurrentUser):
+async def build_email_sequence(project_id: str, body: EmailSequenceRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Write a full email sequence + optionally push to Loops.so. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_email_sequence")
@@ -1173,7 +1180,7 @@ async def build_email_sequence(project_id: str, body: EmailSequenceRequest, user
 
 
 @router.get("/pillar5/email-sequence/list")
-async def list_email_sequences(project_id: str, user: CurrentUser):
+async def list_email_sequences(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "email_sequence")
     return {"docs": docs}
@@ -1184,7 +1191,7 @@ async def list_email_sequences(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/subject-lines/optimise")
-async def optimise_subject_lines(project_id: str, body: SubjectLineRequest, user: CurrentUser):
+async def optimise_subject_lines(project_id: str, body: SubjectLineRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate subject line variants with open-rate scores. Streams SSE. 5 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_subject_lines")
@@ -1192,7 +1199,7 @@ async def optimise_subject_lines(project_id: str, body: SubjectLineRequest, user
 
 
 @router.get("/pillar5/subject-lines/list")
-async def list_subject_line_results(project_id: str, user: CurrentUser):
+async def list_subject_line_results(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "subject_lines")
     return {"docs": docs}
@@ -1203,7 +1210,7 @@ async def list_subject_line_results(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/send-time/optimise")
-async def optimise_send_time(project_id: str, body: SendTimeRequest, user: CurrentUser):
+async def optimise_send_time(project_id: str, body: SendTimeRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Recommend optimal email send windows from audience data. Streams SSE. 5 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_send_time")
@@ -1211,7 +1218,7 @@ async def optimise_send_time(project_id: str, body: SendTimeRequest, user: Curre
 
 
 @router.get("/pillar5/send-time/list")
-async def list_send_time_results(project_id: str, user: CurrentUser):
+async def list_send_time_results(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "send_time")
     return {"docs": docs}
@@ -1222,7 +1229,7 @@ async def list_send_time_results(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/newsletter/produce")
-async def produce_newsletter(project_id: str, body: NewsletterRequest, user: CurrentUser):
+async def produce_newsletter(project_id: str, body: NewsletterRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Write a full newsletter edition + optionally push to Loops.so. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_newsletter")
@@ -1230,7 +1237,7 @@ async def produce_newsletter(project_id: str, body: NewsletterRequest, user: Cur
 
 
 @router.get("/pillar5/newsletter/list")
-async def list_newsletters(project_id: str, user: CurrentUser):
+async def list_newsletters(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "newsletter")
     return {"docs": docs}
@@ -1241,7 +1248,7 @@ async def list_newsletters(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/churn-risk/analyse")
-async def analyse_churn_risk(project_id: str, body: ChurnRiskRequest, user: CurrentUser):
+async def analyse_churn_risk(project_id: str, body: ChurnRiskRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Score contact churn risk + generate win-back emails. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_churn_risk")
@@ -1249,7 +1256,7 @@ async def analyse_churn_risk(project_id: str, body: ChurnRiskRequest, user: Curr
 
 
 @router.get("/pillar5/churn-risk/list")
-async def list_churn_risk_reports(project_id: str, user: CurrentUser):
+async def list_churn_risk_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "churn_risk")
     return {"docs": docs}
@@ -1260,7 +1267,7 @@ async def list_churn_risk_reports(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/lead-scoring/score")
-async def score_leads(project_id: str, body: LeadScoringRequest, user: CurrentUser):
+async def score_leads(project_id: str, body: LeadScoringRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Score leads against ICP + optionally sync to HubSpot. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_lead_scoring")
@@ -1268,7 +1275,7 @@ async def score_leads(project_id: str, body: LeadScoringRequest, user: CurrentUs
 
 
 @router.get("/pillar5/lead-scoring/list")
-async def list_lead_scoring_results(project_id: str, user: CurrentUser):
+async def list_lead_scoring_results(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "lead_scoring")
     return {"docs": docs}
@@ -1279,7 +1286,7 @@ async def list_lead_scoring_results(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/winloss/analyse")
-async def analyse_winloss(project_id: str, body: WinLossRequest, user: CurrentUser):
+async def analyse_winloss(project_id: str, body: WinLossRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Synthesise deal outcomes into competitive intelligence. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar5_winloss")
@@ -1287,7 +1294,7 @@ async def analyse_winloss(project_id: str, body: WinLossRequest, user: CurrentUs
 
 
 @router.get("/pillar5/winloss/list")
-async def list_winloss_reports(project_id: str, user: CurrentUser):
+async def list_winloss_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "winloss")
     return {"docs": docs}
@@ -1298,7 +1305,7 @@ async def list_winloss_reports(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar5/list-hygiene/validate")
-async def validate_emails(project_id: str, body: dict, user: CurrentUser):
+async def validate_emails(project_id: str, body: dict, user: CurrentUser, _tier: None = require_tier("agency")):
     """
     Validate up to 100 email addresses via ZeroBounce.
     Body: { "emails": ["a@b.com", ...] }
@@ -1343,7 +1350,7 @@ def _p6_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar6/community/manage")
-async def manage_community(project_id: str, body: CommunityManagementRequest, user: CurrentUser):
+async def manage_community(project_id: str, body: CommunityManagementRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Draft brand-aligned replies to social comments (Ayrshare pull or manual). Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar6_community_management")
@@ -1351,7 +1358,7 @@ async def manage_community(project_id: str, body: CommunityManagementRequest, us
 
 
 @router.get("/pillar6/community/list")
-async def list_community_sessions(project_id: str, user: CurrentUser):
+async def list_community_sessions(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "community_management")
     return {"docs": docs}
@@ -1362,7 +1369,7 @@ async def list_community_sessions(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar6/social-proof/harvest")
-async def harvest_social_proof(project_id: str, body: SocialProofRequest, user: CurrentUser):
+async def harvest_social_proof(project_id: str, body: SocialProofRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Search for brand mentions + surface top testimonials & UGC via Tavily + Claude. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar6_social_proof")
@@ -1370,7 +1377,7 @@ async def harvest_social_proof(project_id: str, body: SocialProofRequest, user: 
 
 
 @router.get("/pillar6/social-proof/list")
-async def list_social_proof_harvests(project_id: str, user: CurrentUser):
+async def list_social_proof_harvests(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "social_proof")
     return {"docs": docs}
@@ -1381,7 +1388,7 @@ async def list_social_proof_harvests(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar6/employee-advocacy/generate")
-async def generate_employee_advocacy(project_id: str, body: EmployeeAdvocacyRequest, user: CurrentUser):
+async def generate_employee_advocacy(project_id: str, body: EmployeeAdvocacyRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate pre-approved employee-voice posts per platform. Optionally push to Ayrshare. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar6_employee_advocacy")
@@ -1389,7 +1396,7 @@ async def generate_employee_advocacy(project_id: str, body: EmployeeAdvocacyRequ
 
 
 @router.get("/pillar6/employee-advocacy/list")
-async def list_employee_advocacy_sessions(project_id: str, user: CurrentUser):
+async def list_employee_advocacy_sessions(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "employee_advocacy")
     return {"docs": docs}
@@ -1417,7 +1424,7 @@ def _p7_stream(service_fn, project, body, project_id, uid):
 
 
 @router.post("/pillar7/unified-dashboard/generate")
-async def generate_unified_dashboard(project_id: str, body: UnifiedDashboardRequest, user: CurrentUser):
+async def generate_unified_dashboard(project_id: str, body: UnifiedDashboardRequest, user: CurrentUser, _tier: None = require_tier("pro")):
     """Unified GA4 + Meta + manual channel dashboard with Claude narrative. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_unified_dashboard")
@@ -1425,14 +1432,14 @@ async def generate_unified_dashboard(project_id: str, body: UnifiedDashboardRequ
 
 
 @router.get("/pillar7/unified-dashboard/list")
-async def list_unified_dashboards(project_id: str, user: CurrentUser):
+async def list_unified_dashboards(project_id: str, user: CurrentUser, _tier: None = require_tier("pro")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "unified_dashboard")
     return {"docs": docs}
 
 
 @router.post("/pillar7/cohort/analyse")
-async def analyse_cohorts(project_id: str, body: CohortAnalysisRequest, user: CurrentUser):
+async def analyse_cohorts(project_id: str, body: CohortAnalysisRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Interpret cohort retention/activation data with Claude. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_cohort_analysis")
@@ -1440,14 +1447,14 @@ async def analyse_cohorts(project_id: str, body: CohortAnalysisRequest, user: Cu
 
 
 @router.get("/pillar7/cohort/list")
-async def list_cohort_analyses(project_id: str, user: CurrentUser):
+async def list_cohort_analyses(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "cohort_analysis")
     return {"docs": docs}
 
 
 @router.post("/pillar7/funnel/analyse")
-async def analyse_funnel(project_id: str, body: FunnelAnalysisRequest, user: CurrentUser):
+async def analyse_funnel(project_id: str, body: FunnelAnalysisRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Diagnose funnel drop-offs and prescribe CRO fixes. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_funnel_analysis")
@@ -1455,14 +1462,14 @@ async def analyse_funnel(project_id: str, body: FunnelAnalysisRequest, user: Cur
 
 
 @router.get("/pillar7/funnel/list")
-async def list_funnel_analyses(project_id: str, user: CurrentUser):
+async def list_funnel_analyses(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "funnel_analysis")
     return {"docs": docs}
 
 
 @router.post("/pillar7/anomaly/detect")
-async def detect_anomalies(project_id: str, body: AnomalyDetectionRequest, user: CurrentUser):
+async def detect_anomalies(project_id: str, body: AnomalyDetectionRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Statistical + Claude anomaly detection across metric time series. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_anomaly_detection")
@@ -1470,14 +1477,14 @@ async def detect_anomalies(project_id: str, body: AnomalyDetectionRequest, user:
 
 
 @router.get("/pillar7/anomaly/list")
-async def list_anomaly_reports(project_id: str, user: CurrentUser):
+async def list_anomaly_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "anomaly_detection")
     return {"docs": docs}
 
 
 @router.post("/pillar7/forecast/generate")
-async def generate_forecast(project_id: str, body: ForecastingRequest, user: CurrentUser):
+async def generate_forecast(project_id: str, body: ForecastingRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Claude-driven metric forecasting with base/optimistic/pessimistic scenarios. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_forecasting")
@@ -1485,14 +1492,14 @@ async def generate_forecast(project_id: str, body: ForecastingRequest, user: Cur
 
 
 @router.get("/pillar7/forecast/list")
-async def list_forecasts(project_id: str, user: CurrentUser):
+async def list_forecasts(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "forecast")
     return {"docs": docs}
 
 
 @router.post("/pillar7/cac-ltv/calculate")
-async def calculate_cac_ltv(project_id: str, body: CacLtvRequest, user: CurrentUser):
+async def calculate_cac_ltv(project_id: str, body: CacLtvRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Calculate CAC, LTV, payback period from Stripe/HubSpot/manual data. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_cac_ltv")
@@ -1500,14 +1507,14 @@ async def calculate_cac_ltv(project_id: str, body: CacLtvRequest, user: CurrentU
 
 
 @router.get("/pillar7/cac-ltv/list")
-async def list_cac_ltv_reports(project_id: str, user: CurrentUser):
+async def list_cac_ltv_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "cac_ltv")
     return {"docs": docs}
 
 
 @router.post("/pillar7/board-report/generate")
-async def generate_board_report(project_id: str, body: BoardReportRequest, user: CurrentUser):
+async def generate_board_report(project_id: str, body: BoardReportRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Write a board/investor-ready report with narrative, KPI table, and appendix. Streams SSE. 25 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar7_board_report")
@@ -1515,7 +1522,7 @@ async def generate_board_report(project_id: str, body: BoardReportRequest, user:
 
 
 @router.get("/pillar7/board-report/list")
-async def list_board_reports(project_id: str, user: CurrentUser):
+async def list_board_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "board_report")
     return {"docs": docs}
@@ -1546,7 +1553,7 @@ def _p8_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/press-release/write")
-async def write_press_release(project_id: str, body: PressReleaseRequest, user: CurrentUser):
+async def write_press_release(project_id: str, body: PressReleaseRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Draft a brand-aligned press release. Pure Claude. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_press_release")
@@ -1554,7 +1561,7 @@ async def write_press_release(project_id: str, body: PressReleaseRequest, user: 
 
 
 @router.get("/pillar8/press-release/list")
-async def list_press_releases(project_id: str, user: CurrentUser):
+async def list_press_releases(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "press_release")
     return {"docs": docs}
@@ -1565,7 +1572,7 @@ async def list_press_releases(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/media-list/build")
-async def build_media_list(project_id: str, body: MediaListRequest, user: CurrentUser):
+async def build_media_list(project_id: str, body: MediaListRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Build a prioritised journalist media list via Hunter.io + Claude. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_media_list")
@@ -1573,7 +1580,7 @@ async def build_media_list(project_id: str, body: MediaListRequest, user: Curren
 
 
 @router.get("/pillar8/media-list/list")
-async def list_media_lists(project_id: str, user: CurrentUser):
+async def list_media_lists(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "media_list")
     return {"docs": docs}
@@ -1584,7 +1591,7 @@ async def list_media_lists(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/pitch-email/generate")
-async def generate_pitch_email(project_id: str, body: PitchEmailRequest, user: CurrentUser):
+async def generate_pitch_email(project_id: str, body: PitchEmailRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Write a personalised journalist pitch email with subject line variants. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_pitch_email")
@@ -1592,7 +1599,7 @@ async def generate_pitch_email(project_id: str, body: PitchEmailRequest, user: C
 
 
 @router.get("/pillar8/pitch-email/list")
-async def list_pitch_emails(project_id: str, user: CurrentUser):
+async def list_pitch_emails(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "pitch_email")
     return {"docs": docs}
@@ -1603,7 +1610,7 @@ async def list_pitch_emails(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/coverage/monitor")
-async def monitor_coverage(project_id: str, body: CoverageMonitoringRequest, user: CurrentUser):
+async def monitor_coverage(project_id: str, body: CoverageMonitoringRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Scan news and Reddit for brand coverage, synthesise sentiment report. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_coverage_monitoring")
@@ -1611,7 +1618,7 @@ async def monitor_coverage(project_id: str, body: CoverageMonitoringRequest, use
 
 
 @router.get("/pillar8/coverage/list")
-async def list_coverage_reports(project_id: str, user: CurrentUser):
+async def list_coverage_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "coverage_monitoring")
     return {"docs": docs}
@@ -1622,7 +1629,7 @@ async def list_coverage_reports(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/crisis/respond")
-async def respond_to_crisis(project_id: str, body: CrisisCommsRequest, user: CurrentUser):
+async def respond_to_crisis(project_id: str, body: CrisisCommsRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate a crisis communications playbook with stakeholder statements. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_crisis_comms")
@@ -1630,7 +1637,7 @@ async def respond_to_crisis(project_id: str, body: CrisisCommsRequest, user: Cur
 
 
 @router.get("/pillar8/crisis/list")
-async def list_crisis_responses(project_id: str, user: CurrentUser):
+async def list_crisis_responses(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "crisis_comms")
     return {"docs": docs}
@@ -1641,7 +1648,7 @@ async def list_crisis_responses(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/awards/submit")
-async def write_award_submission(project_id: str, body: AwardSubmissionRequest, user: CurrentUser):
+async def write_award_submission(project_id: str, body: AwardSubmissionRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Draft an award submission aligned to the award criteria. Firecrawl + Claude. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_award_submission")
@@ -1649,7 +1656,7 @@ async def write_award_submission(project_id: str, body: AwardSubmissionRequest, 
 
 
 @router.get("/pillar8/awards/list")
-async def list_award_submissions(project_id: str, user: CurrentUser):
+async def list_award_submissions(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "award_submission")
     return {"docs": docs}
@@ -1660,7 +1667,7 @@ async def list_award_submissions(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/analyst/brief")
-async def brief_analyst(project_id: str, body: AnalystRelationsRequest, user: CurrentUser):
+async def brief_analyst(project_id: str, body: AnalystRelationsRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Prepare an analyst briefing document with positioning & Q&A. Firecrawl + Claude. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_analyst_relations")
@@ -1668,7 +1675,7 @@ async def brief_analyst(project_id: str, body: AnalystRelationsRequest, user: Cu
 
 
 @router.get("/pillar8/analyst/list")
-async def list_analyst_briefings(project_id: str, user: CurrentUser):
+async def list_analyst_briefings(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "analyst_relations")
     return {"docs": docs}
@@ -1679,7 +1686,7 @@ async def list_analyst_briefings(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar8/partnership/draft")
-async def draft_partnership_comms(project_id: str, body: PartnershipCommsRequest, user: CurrentUser):
+async def draft_partnership_comms(project_id: str, body: PartnershipCommsRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Draft partnership outreach, proposals, or joint press releases. Pure Claude. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar8_partnership_comms")
@@ -1687,7 +1694,7 @@ async def draft_partnership_comms(project_id: str, body: PartnershipCommsRequest
 
 
 @router.get("/pillar8/partnership/list")
-async def list_partnership_comms(project_id: str, user: CurrentUser):
+async def list_partnership_comms(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "partnership_comms")
     return {"docs": docs}
@@ -1718,7 +1725,7 @@ def _p10_stream(service_fn, project, body, project_id, uid):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar10/ab-test/design")
-async def design_ab_test(project_id: str, body: ABTestDesignRequest, user: CurrentUser):
+async def design_ab_test(project_id: str, body: ABTestDesignRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Design a statistically rigorous A/B test with variants and sample size. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_ab_test_design")
@@ -1726,7 +1733,7 @@ async def design_ab_test(project_id: str, body: ABTestDesignRequest, user: Curre
 
 
 @router.get("/pillar10/ab-test/list")
-async def list_ab_tests(project_id: str, user: CurrentUser):
+async def list_ab_tests(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "ab_test_design")
     return {"docs": docs}
@@ -1737,7 +1744,7 @@ async def list_ab_tests(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar10/cro/generate")
-async def generate_cro_variants(project_id: str, body: LandingPageCRORequest, user: CurrentUser):
+async def generate_cro_variants(project_id: str, body: LandingPageCRORequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate copy variants for each landing page section. Firecrawl + Claude. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_landing_page_cro")
@@ -1745,7 +1752,7 @@ async def generate_cro_variants(project_id: str, body: LandingPageCRORequest, us
 
 
 @router.get("/pillar10/cro/list")
-async def list_cro_sessions(project_id: str, user: CurrentUser):
+async def list_cro_sessions(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "landing_page_cro")
     return {"docs": docs}
@@ -1756,7 +1763,7 @@ async def list_cro_sessions(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar10/messaging-resonance/analyse")
-async def analyse_messaging_resonance(project_id: str, body: MessagingResonanceRequest, user: CurrentUser):
+async def analyse_messaging_resonance(project_id: str, body: MessagingResonanceRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Read Meta Ads test results and identify which message angle resonated. Streams SSE. 15 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_messaging_resonance")
@@ -1764,7 +1771,7 @@ async def analyse_messaging_resonance(project_id: str, body: MessagingResonanceR
 
 
 @router.get("/pillar10/messaging-resonance/list")
-async def list_resonance_analyses(project_id: str, user: CurrentUser):
+async def list_resonance_analyses(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "messaging_resonance")
     return {"docs": docs}
@@ -1775,7 +1782,7 @@ async def list_resonance_analyses(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar10/email-ab/analyse")
-async def analyse_email_ab(project_id: str, body: EmailABTestRequest, user: CurrentUser):
+async def analyse_email_ab(project_id: str, body: EmailABTestRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Analyse email A/B test results, identify winner, recommend next iteration. Streams SSE. 10 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_email_ab_test")
@@ -1783,7 +1790,7 @@ async def analyse_email_ab(project_id: str, body: EmailABTestRequest, user: Curr
 
 
 @router.get("/pillar10/email-ab/list")
-async def list_email_ab_tests(project_id: str, user: CurrentUser):
+async def list_email_ab_tests(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "email_ab_test")
     return {"docs": docs}
@@ -1794,7 +1801,7 @@ async def list_email_ab_tests(project_id: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar10/experiment-log")
-async def create_experiment(project_id: str, body: ExperimentLogCreate, user: CurrentUser):
+async def create_experiment(project_id: str, body: ExperimentLogCreate, user: CurrentUser, _tier: None = require_tier("agency")):
     """Create a new experiment in the log."""
     get_project_as_member(project_id, user["uid"])
     entry = await asyncio.to_thread(
@@ -1819,7 +1826,7 @@ async def list_experiment_log(
 
 
 @router.get("/pillar10/experiment-log/{experiment_id}")
-async def get_experiment(project_id: str, experiment_id: str, user: CurrentUser):
+async def get_experiment(project_id: str, experiment_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     """Get a single experiment."""
     get_project_as_member(project_id, user["uid"])
     exp = await asyncio.to_thread(firebase_service.get_experiment, project_id, experiment_id)
@@ -1829,7 +1836,7 @@ async def get_experiment(project_id: str, experiment_id: str, user: CurrentUser)
 
 
 @router.patch("/pillar10/experiment-log/{experiment_id}")
-async def update_experiment(project_id: str, experiment_id: str, body: ExperimentLogUpdate, user: CurrentUser):
+async def update_experiment(project_id: str, experiment_id: str, body: ExperimentLogUpdate, user: CurrentUser, _tier: None = require_tier("agency")):
     """Update an experiment - results, winner, learnings, status."""
     get_project_as_member(project_id, user["uid"])
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -1838,7 +1845,7 @@ async def update_experiment(project_id: str, experiment_id: str, body: Experimen
 
 
 @router.delete("/pillar10/experiment-log/{experiment_id}")
-async def delete_experiment(project_id: str, experiment_id: str, user: CurrentUser):
+async def delete_experiment(project_id: str, experiment_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     """Delete an experiment from the log."""
     get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(firebase_service.delete_experiment, project_id, experiment_id)
@@ -1850,7 +1857,7 @@ async def delete_experiment(project_id: str, experiment_id: str, user: CurrentUs
 # ---------------------------------------------------------------------------
 
 @router.post("/pillar10/learning-propagation/generate")
-async def propagate_learnings(project_id: str, body: LearningPropagationRequest, user: CurrentUser):
+async def propagate_learnings(project_id: str, body: LearningPropagationRequest, user: CurrentUser, _tier: None = require_tier("agency")):
     """Synthesise experiment learnings and generate a propagation action plan. Streams SSE. 20 credits."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(credits_service.check_and_deduct, user["uid"], "pillar10_learning_propagation")
@@ -1858,7 +1865,7 @@ async def propagate_learnings(project_id: str, body: LearningPropagationRequest,
 
 
 @router.get("/pillar10/learning-propagation/list")
-async def list_propagation_reports(project_id: str, user: CurrentUser):
+async def list_propagation_reports(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     get_project_as_member(project_id, user["uid"])
     docs = await asyncio.to_thread(firebase_service.list_pillar1_docs, project_id, "learning_propagation")
     return {"docs": docs}

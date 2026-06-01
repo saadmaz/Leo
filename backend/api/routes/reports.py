@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from backend.api.deps import get_project_as_member
+from backend.api.deps import get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import analytics_service, intelligence_service, firebase_service
 from backend.services.credits_service import check_and_deduct
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["reports"])
 # ---------------------------------------------------------------------------
 
 @router.get("/reports/digest")
-async def get_weekly_digest(project_id: str, user: CurrentUser):
+async def get_weekly_digest(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")):
     """Generate an AI-powered weekly digest with trends and recommendations."""
     project = get_project_as_member(project_id, user["uid"])
     await asyncio.to_thread(check_and_deduct, user["uid"], "weekly_digest")
@@ -114,6 +114,7 @@ async def score_content_batch(
     project_id: str,
     body: ScoreRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """Score a batch of content library items against brand voice. Returns scores keyed by item_id."""
     project = get_project_as_member(project_id, user["uid"])
@@ -247,6 +248,7 @@ async def start_research(
     project_id: str,
     body: StartResearchRequest,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Start an async deep research task. Returns report_id immediately.
@@ -274,6 +276,7 @@ async def get_research_status(
     project_id: str,
     report_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """
     Poll or stream the status of a research task.
@@ -291,6 +294,7 @@ async def list_research_reports(
     project_id: str,
     user: CurrentUser,
     limit: int = _Query(20, ge=1, le=50),
+    _tier: None = require_tier("agency"),
 ):
     """List all research reports for a project."""
     get_project_as_member(project_id, user["uid"])
@@ -305,6 +309,7 @@ async def get_research_report(
     project_id: str,
     report_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """Get a single research report by ID."""
     get_project_as_member(project_id, user["uid"])
@@ -320,6 +325,7 @@ async def delete_research_report(
     project_id: str,
     report_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ):
     """Delete a research report."""
     get_project_as_member(project_id, user["uid"])

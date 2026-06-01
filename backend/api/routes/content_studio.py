@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.api.deps import get_project_as_member, get_project_as_editor
+from backend.api.deps import get_project_as_member, get_project_as_editor, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import content_studio_service
 from backend.services.credits_service import check_and_deduct
@@ -71,6 +71,7 @@ async def generate_blog_post(
     project_id: str,
     body: BlogPostRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Stream a full SEO-optimised blog post in markdown."""
     project = get_project_as_editor(project_id, user["uid"])
@@ -113,6 +114,7 @@ async def generate_meta_tags(
     project_id: str,
     body: MetaTagsRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Generate a full set of SEO + Open Graph + Twitter meta tags."""
     project = get_project_as_member(project_id, user["uid"])
@@ -141,6 +143,7 @@ async def generate_website_copy(
     project_id: str,
     body: WebsiteCopyRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Generate website copy sections for a given page type."""
     project = get_project_as_editor(project_id, user["uid"])
@@ -169,6 +172,7 @@ async def generate_email_sequence(
     project_id: str,
     body: EmailSequenceRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Generate a complete email sequence (welcome, nurture, launch, etc.)."""
     project = get_project_as_editor(project_id, user["uid"])
@@ -198,6 +202,7 @@ async def generate_single_email(
     project_id: str,
     body: SingleEmailRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Generate a single one-off marketing email."""
     project = get_project_as_editor(project_id, user["uid"])
@@ -225,6 +230,7 @@ async def generate_single_email(
 async def generate_style_guide(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Generate a comprehensive brand style guide from the project's Brand Core."""
     project = get_project_as_member(project_id, user["uid"])

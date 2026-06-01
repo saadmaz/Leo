@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import {
   Library, Search, Trash2, Check, RefreshCw, Loader2, TrendingUp, Hash,
   Instagram, Mail, Video, Megaphone, FileText, RotateCcw, Shuffle, ClipboardCheck, Zap, CalendarRange,
-  ShieldAlert, ShieldCheck, AlertTriangle, X,
+  ShieldAlert, ShieldCheck, AlertTriangle, X, Languages,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,7 @@ import type { ContentLibraryItem, ContentLibraryStatus, BrandDriftResult } from 
 import { RecycleModal } from '@/components/content-ops/recycle-modal'
 import { TransformModal } from '@/components/content-ops/transform-modal'
 import { PerformanceModal } from '@/components/content-ops/performance-modal'
+import { TranslateModal } from '@/components/content-ops/translate-modal'
 import { LogMetricsModal } from '@/components/brand-tools/log-metrics-modal'
 import { MovedNotice } from '@/components/layout/moved-notice'
 
@@ -65,6 +66,7 @@ export default function LibraryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [recycleItem, setRecycleItem] = useState<ContentLibraryItem | null>(null)
   const [transformItem, setTransformItem] = useState<ContentLibraryItem | null>(null)
+  const [translateTarget, setTranslateTarget] = useState<{ content: string; contentId: string } | null>(null)
   const [performanceItem, setPerformanceItem] = useState<ContentLibraryItem | null>(null)
   const [metricsItem, setMetricsItem] = useState<ContentLibraryItem | null>(null)
   const [scoring, setScoring] = useState(false)
@@ -344,6 +346,7 @@ export default function LibraryPage() {
                 onDelete={() => handleDelete(item.id)}
                 onRecycle={() => setRecycleItem(item)}
                 onTransform={() => setTransformItem(item)}
+                onTranslate={() => setTranslateTarget({ content: item.content, contentId: item.id })}
                 onSubmitReview={() => handleSubmitReview(item.id)}
                 onLogMetrics={() => setMetricsItem(item)}
               />
@@ -385,6 +388,13 @@ export default function LibraryPage() {
           onClose={() => setMetricsItem(null)}
         />
       )}
+      <TranslateModal
+        open={translateTarget !== null}
+        onClose={() => setTranslateTarget(null)}
+        content={translateTarget?.content ?? ''}
+        contentId={translateTarget?.contentId ?? ''}
+        projectId={params.projectId}
+      />
 
       {/* Brand Drift Modal */}
       {driftResult && (
@@ -548,7 +558,7 @@ function ScorePill({ score }: { score: number | null }) {
 }
 
 function LibraryCard({
-  item, selected, voiceScore, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onSubmitReview, onLogMetrics,
+  item, selected, voiceScore, onSelect, onStatusChange, onDelete, onRecycle, onTransform, onTranslate, onSubmitReview, onLogMetrics,
 }: {
   item: ContentLibraryItem
   selected: boolean
@@ -558,6 +568,7 @@ function LibraryCard({
   onDelete: () => void
   onRecycle: () => void
   onTransform: () => void
+  onTranslate: () => void
   onSubmitReview: () => void
   onLogMetrics: () => void
 }) {
@@ -652,6 +663,14 @@ function LibraryCard({
         >
           <Shuffle className="w-3 h-3" />
           <span>Transform</span>
+        </button>
+        <button
+          onClick={onTranslate}
+          title="Translate to another language"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-blue-600 hover:bg-muted transition-colors"
+        >
+          <Languages className="w-3 h-3" />
+          <span>Translate</span>
         </button>
         <button
           onClick={onLogMetrics}

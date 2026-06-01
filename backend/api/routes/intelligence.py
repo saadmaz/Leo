@@ -1,4 +1,4 @@
-"""
+﻿"""
 Intelligence routes - Phase 1 + Competitor Profiles.
 
 Endpoints:
@@ -26,7 +26,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from backend.api.deps import get_project_as_member, get_project_as_editor
+from backend.api.deps import get_project_as_member, get_project_as_editor, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service, intelligence_service, cache_service
 from backend.services.credits_service import check_and_deduct
@@ -90,6 +90,7 @@ async def score_brand_voice(
     project_id: str,
     body: ScoreBrandVoiceRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Score any text against the project's Brand Core."""
     project = get_project_as_member(project_id, user["uid"])
@@ -118,6 +119,7 @@ async def predict_performance(
     project_id: str,
     body: PredictPerformanceRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Predict how content will perform on a given platform."""
     project = get_project_as_member(project_id, user["uid"])
@@ -142,6 +144,7 @@ async def refresh_intelligence(
     project_id: str,
     body: RefreshIntelligenceRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Scrape + analyse competitors with live SSE progress stream.
@@ -175,6 +178,7 @@ async def add_discovered_competitor(
     project_id: str,
     body: AddDiscoveredRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Auto-add a discovered competitor: scrape their website for social links,
@@ -208,6 +212,7 @@ async def add_discovered_competitor(
 async def get_intelligence(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Return stored competitor snapshots for this project."""
     get_project_as_member(project_id, user["uid"])
@@ -222,6 +227,7 @@ async def get_intelligence(
 async def get_strategy_plan(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Generate a competitive strategy plan comparing brand core vs competitors.
@@ -257,6 +263,7 @@ async def get_competitor_report(
     project_id: str,
     competitor_name: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Generate a comprehensive deep-dive report for a single competitor.
@@ -298,6 +305,7 @@ async def record_feedback(
     project_id: str,
     body: MemoryFeedbackRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Record feedback on AI-generated content to build brand memory."""
     get_project_as_member(project_id, user["uid"])
@@ -315,6 +323,7 @@ async def record_feedback(
 async def get_memory(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Return a summary of what LEO has learned for this project."""
     get_project_as_member(project_id, user["uid"])
@@ -333,10 +342,11 @@ async def check_drift(
     project_id: str,
     body: DriftCheckRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Analyse recent content against the Brand Core to detect voice drift.
-    Pass in your last 10–20 post texts as own_content.
+    Pass in your last 10â€“20 post texts as own_content.
     """
     project = get_project_as_member(project_id, user["uid"])
     brand_core = project.get("brandCore")
@@ -370,6 +380,7 @@ async def suggest_hashtags(
     project_id: str,
     body: HashtagResearchRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Generate a tiered hashtag strategy for the given topic and platform.
@@ -403,6 +414,7 @@ async def suggest_hashtags(
 async def get_insights(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Generate 3-5 proactive AI insights by analysing brand memory, performance data,
@@ -444,6 +456,7 @@ async def classify_competitor(
     project_id: str,
     body: ClassifyCompetitorRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Classify a competitor across 5 dimensions using public web data + Claude.
@@ -483,6 +496,7 @@ async def classify_competitor(
 async def list_competitor_profiles(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Return all classified competitor profiles for this project."""
     get_project_as_member(project_id, user["uid"])
@@ -497,6 +511,7 @@ async def get_competitor_profile(
     project_id: str,
     profile_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Return a single competitor profile by ID."""
     get_project_as_member(project_id, user["uid"])
@@ -513,6 +528,7 @@ async def delete_competitor_profile(
     project_id: str,
     profile_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Permanently delete a competitor profile."""
     get_project_as_editor(project_id, user["uid"])
@@ -526,6 +542,7 @@ async def refresh_competitor_profile(
     project_id: str,
     profile_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Re-run the 5-dimension classification for an existing competitor profile.

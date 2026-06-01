@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -57,8 +57,12 @@ const MESSAGES: Record<string, { title: string; description: string }> = {
 export function MovedNotice() {
   const router = useRouter()
   const pathname = usePathname()
+  const hasRun = useRef(false)
 
   useEffect(() => {
+    if (hasRun.current) return
+    hasRun.current = true
+
     const params = new URLSearchParams(window.location.search)
     const key = params.get('movedFrom')
     if (!key) return
@@ -71,7 +75,7 @@ export function MovedNotice() {
     params.delete('movedFrom')
     const qs = params.toString()
     router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router, pathname])
 
   return null
 }

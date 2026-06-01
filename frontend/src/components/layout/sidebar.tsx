@@ -547,6 +547,13 @@ export function Sidebar() {
                   locked={!meetsRequirement('pro')}
                 />
                 <NavItem
+                  icon={<Bell className="w-3.5 h-3.5" />}
+                  label="Alerts"
+                  onClick={() => nav(`/projects/${activeProject.id}/intelligence/alerts`)}
+                  active={isActive('intelligence/alerts')}
+                  locked={!meetsRequirement('pro')}
+                />
+                <NavItem
                   icon={<Map className="w-3.5 h-3.5" />}
                   label="Strategy"
                   onClick={() => nav(`/projects/${activeProject.id}/strategy`)}
@@ -738,7 +745,20 @@ function NavGroup({
 }) {
   const [open, setOpen] = useState(() => {
     if (typeof window === 'undefined') return false
-    return localStorage.getItem(storageKey) === 'true'
+    // Check new key first
+    const newVal = localStorage.getItem(storageKey)
+    if (newVal !== null) return newVal === 'true'
+    // Fallback: read old key (storageKey without _v2 suffix)
+    const oldKey = storageKey.replace(/_v2$/, '')
+    const oldVal = localStorage.getItem(oldKey)
+    if (oldVal !== null) {
+      // Migrate: write to new key and remove old
+      localStorage.setItem(storageKey, oldVal)
+      localStorage.removeItem(oldKey)
+      return oldVal === 'true'
+    }
+    // Default: open for Create and Compete, closed for others
+    return storageKey.includes('create') || storageKey.includes('compete')
   })
 
   function toggle() {

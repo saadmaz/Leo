@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from backend.api.deps import get_project_as_member
+from backend.api.deps import get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import analytics_service
 
@@ -86,6 +86,7 @@ async def get_activity(
 async def get_ai_summary(
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     get_project_as_member(project_id, user["uid"])
     summary = await analytics_service.generate_performance_summary(project_id)
@@ -97,6 +98,7 @@ async def get_comparison(
     project_id: str,
     user: CurrentUser,
     period: Optional[str] = Query("7d", regex="^(7d|30d)$"),
+    _tier: None = require_tier("pro"),
 ):
     """Compare key metrics for the current period vs the previous same-length period."""
     get_project_as_member(project_id, user["uid"])

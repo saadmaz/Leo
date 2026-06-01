@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from backend.api.deps import get_project_as_member
+from backend.api.deps import get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 
@@ -29,6 +29,7 @@ async def run_monitor(
     request: Request,
     project_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """
     Trigger an on-demand brand monitoring scan.
@@ -77,6 +78,7 @@ async def list_alerts(
     unread_only: bool = Query(False),
     days: int = Query(30, ge=1, le=90),
     limit: int = Query(50, ge=1, le=100),
+    _tier: None = require_tier("pro"),
 ):
     """List brand monitoring alerts for a project."""
     get_project_as_member(project_id, user["uid"])
@@ -96,6 +98,7 @@ async def mark_alert_read(
     project_id: str,
     alert_id: str,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ):
     """Mark a monitoring alert as read."""
     get_project_as_member(project_id, user["uid"])

@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from backend.api.deps import get_project_as_admin, get_project_as_member
+from backend.api.deps import get_project_as_admin, get_project_as_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service
 
@@ -41,7 +41,7 @@ class InviteMemberBody(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get("/{project_id}/members")
-async def list_members(project_id: str, user: CurrentUser) -> list[dict]:
+async def list_members(project_id: str, user: CurrentUser, _tier: None = require_tier("agency")) -> list[dict]:
     """Return all project members with their profile info and role."""
     project = get_project_as_member(project_id, user["uid"])
     members_map: dict = project.get("members") or {}
@@ -66,7 +66,7 @@ async def list_members(project_id: str, user: CurrentUser) -> list[dict]:
 
 
 @router.post("/{project_id}/members", status_code=status.HTTP_201_CREATED)
-async def invite_member(project_id: str, body: InviteMemberBody, user: CurrentUser) -> dict:
+async def invite_member(project_id: str, body: InviteMemberBody, user: CurrentUser, _tier: None = require_tier("agency")) -> dict:
     """
     Add a user (looked up by email) to the project.
     The caller must be an admin. Invited role may be 'editor' or 'viewer'.
@@ -104,7 +104,8 @@ class UpdateRoleBody(BaseModel):
 
 @router.patch("/{project_id}/members/{member_uid}")
 async def update_member_role(
-    project_id: str, member_uid: str, body: UpdateRoleBody, user: CurrentUser
+    project_id: str, member_uid: str, body: UpdateRoleBody, user: CurrentUser,
+    _tier: None = require_tier("agency"),
 ) -> dict:
     """Change a member's role. Admin only. Cannot demote the last admin."""
     if body.role not in ("admin", "editor", "viewer"):
@@ -128,7 +129,7 @@ async def update_member_role(
 
 
 @router.delete("/{project_id}/members/{member_uid}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_member(project_id: str, member_uid: str, user: CurrentUser) -> None:
+async def remove_member(project_id: str, member_uid: str, user: CurrentUser, _tier: None = require_tier("agency")) -> None:
     """
     Remove a member from the project. Admin only.
     The last admin cannot be removed.

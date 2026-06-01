@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from backend.api.deps import get_project_or_404, assert_member
+from backend.api.deps import get_project_or_404, assert_member, require_tier
 from backend.middleware.auth import CurrentUser
 from backend.middleware.rate_limit import limiter
 from backend.services import content_studio_service, firebase_service
@@ -51,6 +51,7 @@ async def generate_plan(
     project_id: str,
     body: PlannerGenerateRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ) -> dict:
     """Generate an AI content plan for the given duration and platforms."""
     project = get_project_or_404(project_id)
@@ -81,6 +82,7 @@ async def apply_plan(
     project_id: str,
     body: PlannerApplyRequest,
     user: CurrentUser,
+    _tier: None = require_tier("pro"),
 ) -> dict:
     """
     Bulk-add a list of planned content items to the content library as drafts.

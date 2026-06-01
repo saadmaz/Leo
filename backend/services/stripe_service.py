@@ -86,7 +86,7 @@ def get_or_create_customer(uid: str, email: str) -> str:
 
     customer = stripe.Customer.create(
         email=email,
-        metadata={"firebase_uid": uid},
+        metadata={"firebase_uid": uid, "uid": uid},
     )
     logger.info("Created Stripe customer %s for uid %s", customer.id, uid)
     return customer.id
