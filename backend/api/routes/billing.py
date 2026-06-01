@@ -97,7 +97,15 @@ async def create_portal(user: CurrentUser):
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     """
     Receive and process Stripe webhook events.
-    Handles: checkout.session.completed, customer.subscription.updated/deleted
+
+    Handled event types:
+      checkout.session.completed        - new subscription purchase → set tier
+      customer.subscription.updated     - plan change / renewal → sync tier
+      customer.subscription.deleted     - cancellation → downgrade to free
+      customer.subscription.paused      - voluntary pause → downgrade to free
+      customer.subscription.resumed     - resume from pause → restore tier
+      invoice.payment_failed            - first payment failure → mark past_due
+      invoice.paid                      - successful charge → ensure tier is active
     """
     payload = await request.body()
 
@@ -111,14 +119,35 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         logger.warning("Stripe webhook: invalid signature")
         raise HTTPException(status_code=400, detail="Invalid webhook signature.")
     except RuntimeError as exc:
-        # STRIPE_WEBHOOK_SECRET not configured - log but don't crash
+        # STRIPE_WEBHOOK_SECRET not configured — log but don't crash.
         logger.warning("Stripe webhook not verified: %s", exc)
-        # In development, parse the event without verification
         import json
         event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
 
     await _handle_event(event)
     return {"received": True}
+
+
+async def _resolve_uid(data: dict) -> str | None:
+    """
+    Try to resolve a Firebase UID from a Stripe event data object.
+    Checks subscription/session metadata first, then falls back to
+    a Customer.retrieve() call for subscription events.
+    """
+    uid = data.get("metadata", {}).get("firebase_uid")
+    if uid:
+        return uid
+    customer_id = data.get("customer")
+    if not customer_id:
+        return None
+    try:
+        import asyncio
+        import stripe as _stripe
+        customer = await asyncio.to_thread(_stripe.Customer.retrieve, customer_id)
+        return customer.get("metadata", {}).get("firebase_uid")
+    except Exception as exc:
+        logger.warning("Could not resolve uid from customer %s: %s", customer_id, exc)
+        return None
 
 
 async def _handle_event(event: stripe.Event) -> None:
@@ -127,6 +156,9 @@ async def _handle_event(event: stripe.Event) -> None:
     event_type = event["type"]
     data = event["data"]["object"]
 
+    # ------------------------------------------------------------------
+    # New subscription created via Checkout
+    # ------------------------------------------------------------------
     if event_type == "checkout.session.completed":
         uid = data.get("metadata", {}).get("firebase_uid")
         plan = data.get("metadata", {}).get("plan")
@@ -144,39 +176,119 @@ async def _handle_event(event: stripe.Event) -> None:
                 },
             )
             await asyncio.to_thread(firebase_service.set_user_tier, uid, plan)
-            logger.info("Upgraded uid %s to plan %s", uid, plan)
+            logger.info("Upgraded uid=%s to plan=%s via checkout", uid, plan)
 
-    elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
-        uid = data.get("metadata", {}).get("firebase_uid")
-        if not uid:
-            # Try to resolve uid from customer metadata
+    # ------------------------------------------------------------------
+    # Subscription modified (plan change, renewal, status change)
+    # ------------------------------------------------------------------
+    elif event_type == "customer.subscription.updated":
+        uid = await _resolve_uid(data)
+        if uid:
+            status_val = data.get("status", "active")
+            plan = stripe_service.plan_from_subscription(data)
+            updates: dict = {"subscriptionStatus": status_val}
+            if data.get("current_period_end"):
+                updates["currentPeriodEnd"] = data["current_period_end"]
+                updates["messagesResetAt"] = data["current_period_end"]
+            await asyncio.to_thread(firebase_service.update_user_billing, uid, updates)
+            if plan:
+                await asyncio.to_thread(firebase_service.set_user_tier, uid, plan)
+            logger.info(
+                "Updated subscription uid=%s status=%s plan=%s",
+                uid, status_val, plan,
+            )
+
+    # ------------------------------------------------------------------
+    # Subscription cancelled entirely
+    # ------------------------------------------------------------------
+    elif event_type == "customer.subscription.deleted":
+        uid = await _resolve_uid(data)
+        if uid:
+            await asyncio.to_thread(firebase_service.set_user_tier, uid, "free")
+            await asyncio.to_thread(
+                firebase_service.update_user_billing,
+                uid,
+                {"subscriptionStatus": "cancelled"},
+            )
+            logger.info("Downgraded uid=%s to free (subscription cancelled)", uid)
+
+    # ------------------------------------------------------------------
+    # Subscription paused (Stripe pause_collection feature)
+    # ------------------------------------------------------------------
+    elif event_type == "customer.subscription.paused":
+        uid = await _resolve_uid(data)
+        if uid:
+            await asyncio.to_thread(firebase_service.set_user_tier, uid, "free")
+            await asyncio.to_thread(
+                firebase_service.update_user_billing,
+                uid,
+                {"subscriptionStatus": "paused"},
+            )
+            logger.info("Downgraded uid=%s to free (subscription paused)", uid)
+
+    # ------------------------------------------------------------------
+    # Subscription resumed from pause
+    # ------------------------------------------------------------------
+    elif event_type == "customer.subscription.resumed":
+        uid = await _resolve_uid(data)
+        if uid:
+            plan = stripe_service.plan_from_subscription(data)
+            await asyncio.to_thread(
+                firebase_service.update_user_billing,
+                uid,
+                {"subscriptionStatus": "active"},
+            )
+            if plan:
+                await asyncio.to_thread(firebase_service.set_user_tier, uid, plan)
+            logger.info(
+                "Restored uid=%s to plan=%s (subscription resumed)", uid, plan
+            )
+
+    # ------------------------------------------------------------------
+    # Invoice payment failed — mark as past_due but keep tier for now.
+    # Stripe will retry; tier is only removed on subscription.deleted.
+    # ------------------------------------------------------------------
+    elif event_type == "invoice.payment_failed":
+        subscription_id = data.get("subscription")
+        if subscription_id:
             try:
                 import stripe as _stripe
-                customer = _stripe.Customer.retrieve(data["customer"])
-                uid = customer.get("metadata", {}).get("firebase_uid")
-            except Exception:
-                pass
+                sub = await asyncio.to_thread(_stripe.Subscription.retrieve, subscription_id)
+                uid = await _resolve_uid(sub)
+                if uid:
+                    await asyncio.to_thread(
+                        firebase_service.update_user_billing,
+                        uid,
+                        {"subscriptionStatus": "past_due"},
+                    )
+                    logger.warning(
+                        "Payment failed for uid=%s subscription=%s",
+                        uid, subscription_id,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to handle payment_failed for sub %s: %s", subscription_id, exc)
 
-        if uid:
-            if event_type == "customer.subscription.deleted":
-                await asyncio.to_thread(firebase_service.set_user_tier, uid, "free")
-                await asyncio.to_thread(
-                    firebase_service.update_user_billing,
-                    uid,
-                    {"subscriptionStatus": "cancelled"},
-                )
-                logger.info("Downgraded uid %s to free (subscription cancelled)", uid)
-            else:
-                status_val = data.get("status", "active")
-                plan = stripe_service.plan_from_subscription(data)
-                updates: dict = {"subscriptionStatus": status_val}
-                if data.get("current_period_end"):
-                    updates["currentPeriodEnd"] = data["current_period_end"]
-                    # Persist the period-end as the reset timestamp so the billing
-                    # service can auto-reset the message counter on the next request
-                    # after the period rolls over.
-                    updates["messagesResetAt"] = data["current_period_end"]
-                await asyncio.to_thread(firebase_service.update_user_billing, uid, updates)
-                if plan:
+    # ------------------------------------------------------------------
+    # Invoice paid — ensure tier reflects the active subscription.
+    # Handles recovery after a past_due → paid transition.
+    # ------------------------------------------------------------------
+    elif event_type == "invoice.paid":
+        subscription_id = data.get("subscription")
+        if subscription_id:
+            try:
+                import stripe as _stripe
+                sub = await asyncio.to_thread(_stripe.Subscription.retrieve, subscription_id)
+                uid = await _resolve_uid(sub)
+                plan = stripe_service.plan_from_subscription(sub)
+                if uid and plan:
+                    await asyncio.to_thread(
+                        firebase_service.update_user_billing,
+                        uid,
+                        {"subscriptionStatus": "active"},
+                    )
                     await asyncio.to_thread(firebase_service.set_user_tier, uid, plan)
-                logger.info("Updated subscription for uid %s: status=%s plan=%s", uid, status_val, plan)
+                    logger.info(
+                        "Payment recovered — restored uid=%s to plan=%s", uid, plan
+                    )
+            except Exception as exc:
+                logger.warning("Failed to handle invoice.paid for sub %s: %s", subscription_id, exc)

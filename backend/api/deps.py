@@ -1,25 +1,90 @@
 """
-Shared route dependencies - project access control helpers.
+Shared route dependencies - project access control and tier enforcement.
 
-All route handlers that need to gate on project membership or role should
-import from here rather than implementing their own version. This was the
-original problem: projects.py, chats.py, brand_core.py, stream.py, and
-ingestion.py each had their own copy of the same 10-line pattern.
-
-Usage:
+Project helpers:
     from backend.api.deps import get_project_or_404, assert_member, assert_editor
 
     @router.get("/{project_id}/something")
     async def my_route(project_id: str, user: CurrentUser):
         project = get_project_or_404(project_id)
-        assert_member(project, user["uid"])          # any role
-        assert_editor(project, user["uid"])          # editor or admin
-        assert_admin(project, user["uid"])           # admin only
+        assert_member(project, user["uid"])      # any role
+        assert_editor(project, user["uid"])      # editor or admin
+        assert_admin(project, user["uid"])       # admin only
+
+Tier helpers:
+    from backend.api.deps import require_tier
+
+    @router.post("/{project_id}/deep-research")
+    async def deep_research(
+        project_id: str,
+        user: CurrentUser,
+        _tier: None = require_tier("agency"),
+    ):
+        ...
 """
 
-from fastapi import HTTPException, status
+import asyncio
+from typing import Callable
 
+from fastapi import Depends, HTTPException, status
+
+from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service
+
+# ---------------------------------------------------------------------------
+# Tier constants
+# ---------------------------------------------------------------------------
+
+TIER_RANK: dict[str, int] = {"free": 0, "pro": 1, "agency": 2}
+
+
+def get_user_tier(uid: str) -> str:
+    """
+    Synchronous helper: look up a user's current tier from Firestore.
+    Returns 'free' | 'pro' | 'agency'.  Safe to call from sync code;
+    wrap with asyncio.to_thread() from async contexts.
+    """
+    user_doc = firebase_service.get_user(uid) or {}
+    return user_doc.get("tier", "free")
+
+
+def require_tier(minimum_tier: str) -> Callable:
+    """
+    FastAPI dependency factory.  Returns a dependency that raises HTTP 402
+    when the current user's tier is below *minimum_tier*.
+
+    Response body on failure::
+
+        {
+            "error": "upgrade_required",
+            "required_tier": "pro",
+            "current_tier": "free",
+            "upgrade_url": "/billing"
+        }
+
+    Usage::
+
+        @router.post("/expensive-endpoint")
+        async def handler(
+            user: CurrentUser,
+            _tier: None = require_tier("pro"),
+        ):
+            ...
+    """
+    async def _check(user: CurrentUser) -> None:
+        tier = await asyncio.to_thread(get_user_tier, user["uid"])
+        if TIER_RANK.get(tier, 0) < TIER_RANK.get(minimum_tier, 0):
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "upgrade_required",
+                    "required_tier": minimum_tier,
+                    "current_tier": tier,
+                    "upgrade_url": "/billing",
+                },
+            )
+
+    return Depends(_check)
 
 # Role hierarchy: higher index = more permissions.
 _ROLE_RANK = {"viewer": 0, "editor": 1, "admin": 2}

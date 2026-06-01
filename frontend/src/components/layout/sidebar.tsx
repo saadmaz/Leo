@@ -11,7 +11,7 @@ import {
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
   Mic2, Shield, DollarSign, Newspaper, FlaskConical, MessageSquare, Bell, Target,
-  Repeat2, Eye, LineChart,
+  Repeat2, Eye, LineChart, Lock,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -20,6 +20,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { MyBrandPanel } from '@/components/personal-brand/my-brand-panel'
 import { cn } from '@/lib/utils'
+import { useTier, type Tier } from '@/hooks/useTier'
 import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
 import { NotificationBell } from '@/components/layout/notification-bell'
 import { CommandPalette } from '@/components/layout/command-palette'
@@ -233,6 +234,7 @@ export function Sidebar() {
   }, [setSidebarOpen])
 
   const isDark = mounted && resolvedTheme === 'dark'
+  const { meetsRequirement } = useTier()
 
   const userInitials = (user?.displayName || user?.email || 'U')
     .split(/[\s@]/)
@@ -412,12 +414,14 @@ export function Sidebar() {
                   )}
                 >
                   <User className="w-3.5 h-3.5 shrink-0" />
-                  Personal Brand
+                  <span className="flex-1 text-left">Personal Brand</span>
+                  {!meetsRequirement('pro') && <Lock className="w-2.5 h-2.5 shrink-0 text-muted-foreground/40" />}
                 </button>
               )}
 
               {/* Create */}
               <NavGroup label="Create" storageKey="nav_create_v2" color="text-violet-500">
+                {/* Content Studio hub is Free; sub-pages are Pro */}
                 <NavItem
                   icon={<Layers className="w-3.5 h-3.5" />}
                   label="Content Studio"
@@ -429,18 +433,21 @@ export function Sidebar() {
                   label="Blog Brief"
                   onClick={() => nav(`/projects/${activeProject.id}/seo-pro/blog-brief`)}
                   active={isActive('seo-pro/blog-brief', 'search/blog-brief')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<Zap className="w-3.5 h-3.5" />}
                   label="Bulk Generate"
                   onClick={() => nav(`/projects/${activeProject.id}/bulk`)}
                   active={isActive('bulk')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<ImageIcon className="w-3.5 h-3.5" />}
                   label="Image Generation"
                   onClick={() => nav(`/projects/${activeProject.id}/images`)}
                   active={isActive('images')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<LayoutTemplate className="w-3.5 h-3.5" />}
@@ -457,24 +464,28 @@ export function Sidebar() {
                   label="Calendar"
                   onClick={() => nav(`/projects/${activeProject.id}/calendar`)}
                   active={isActive('calendar')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<Send className="w-3.5 h-3.5" />}
                   label="Publish Queue"
                   onClick={() => nav(`/projects/${activeProject.id}/publish`)}
                   active={isActive('publish')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<Megaphone className="w-3.5 h-3.5" />}
                   label="Social"
                   onClick={() => nav(`/projects/${activeProject.id}/social`)}
                   active={isActive('social')}
+                  locked={!meetsRequirement('agency')}
                 />
                 <NavItem
                   icon={<Mail className="w-3.5 h-3.5" />}
                   label="Email CRM"
                   onClick={() => nav(`/projects/${activeProject.id}/email-crm`)}
                   active={isActive('email-crm')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<DollarSign className="w-3.5 h-3.5" />}
@@ -482,6 +493,7 @@ export function Sidebar() {
                   onClick={() => nav(`/projects/${activeProject.id}/paid-ads`)}
                   active={isActive('paid-ads')}
                   secondary
+                  locked={!meetsRequirement('agency')}
                 />
                 <NavItem
                   icon={<Newspaper className="w-3.5 h-3.5" />}
@@ -489,6 +501,7 @@ export function Sidebar() {
                   onClick={() => nav(`/projects/${activeProject.id}/pr-comms`)}
                   active={isActive('pr-comms')}
                   secondary
+                  locked={!meetsRequirement('agency')}
                 />
               </NavGroup>
 
@@ -499,24 +512,28 @@ export function Sidebar() {
                   label="Analytics Pro"
                   onClick={() => nav(`/projects/${activeProject.id}/analytics-pro`)}
                   active={isActive('analytics-pro')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<LineChart className="w-3.5 h-3.5" />}
                   label="Blog Performance"
                   onClick={() => nav(`/projects/${activeProject.id}/analytics-pro/blog-performance`)}
                   active={isActive('analytics-pro/blog-performance')}
+                  locked={!meetsRequirement('agency')}
                 />
                 <NavItem
                   icon={<TrendingUp className="w-3.5 h-3.5" />}
                   label="Rank Tracker"
                   onClick={() => nav(`/projects/${activeProject.id}/seo-pro/rank-tracker`)}
                   active={isActive('seo-pro/rank-tracker', 'search/rank-tracker')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<FlaskConical className="w-3.5 h-3.5" />}
                   label="Experiments"
                   onClick={() => nav(`/projects/${activeProject.id}/experiments`)}
                   active={isActive('experiments')}
+                  locked={!meetsRequirement('agency')}
                 />
               </NavGroup>
 
@@ -527,13 +544,16 @@ export function Sidebar() {
                   label="Intelligence"
                   onClick={() => nav(`/projects/${activeProject.id}/intelligence`)}
                   active={isActive('intelligence')}
+                  locked={!meetsRequirement('pro')}
                 />
                 <NavItem
                   icon={<Map className="w-3.5 h-3.5" />}
                   label="Strategy"
                   onClick={() => nav(`/projects/${activeProject.id}/strategy`)}
                   active={isActive('strategy')}
+                  locked={!meetsRequirement('pro')}
                 />
+                {/* Brand Audit is Free */}
                 <NavItem
                   icon={<Shield className="w-3.5 h-3.5" />}
                   label="Brand Audit"
@@ -545,16 +565,18 @@ export function Sidebar() {
                   label="Brand Health"
                   onClick={() => nav(`/projects/${activeProject.id}/brand-health`)}
                   active={isActive('brand-health')}
+                  locked={!meetsRequirement('pro')}
                 />
               </NavGroup>
 
-              {/* Campaigns */}
+              {/* Campaigns — Pro */}
               <NavGroup label="Campaigns" storageKey="nav_campaigns_v2" color="text-rose-500">
                 <NavItem
                   icon={<Target className="w-3.5 h-3.5" />}
                   label="Overview"
                   onClick={() => nav(`/projects/${activeProject.id}/campaigns`)}
                   active={isActive('campaigns')}
+                  locked={!meetsRequirement('pro')}
                 />
                 {/* Briefs / Assets / Performance require a campaignId — disabled until a campaign is selected */}
                 <NavItem
@@ -577,7 +599,7 @@ export function Sidebar() {
                 />
               </NavGroup>
 
-              {/* Settings */}
+              {/* Settings — Free */}
               <NavGroup label="Settings" storageKey="nav_settings_v2" color="text-muted-foreground/60">
                 <NavItem
                   icon={<Globe className="w-3.5 h-3.5" />}
@@ -760,7 +782,7 @@ function NavGroup({
 // ---------------------------------------------------------------------------
 
 function NavItem({
-  icon, label, onClick, active, disabled, secondary,
+  icon, label, onClick, active, disabled, secondary, locked,
 }: {
   icon: React.ReactNode
   label: string
@@ -768,6 +790,9 @@ function NavItem({
   active?: boolean
   disabled?: boolean
   secondary?: boolean
+  /** When true, shows a subtle lock badge. Navigation still works — the gate
+   *  is on the page itself, not in the nav. */
+  locked?: boolean
 }) {
   return (
     <button
@@ -790,6 +815,9 @@ function NavItem({
         <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/50 bg-muted rounded px-1 py-px">
           soon
         </span>
+      )}
+      {locked && !disabled && (
+        <Lock className="w-2.5 h-2.5 shrink-0 text-muted-foreground/40" />
       )}
     </button>
   )
