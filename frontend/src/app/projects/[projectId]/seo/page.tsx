@@ -369,9 +369,15 @@ function BlogPostTab({ projectId, briefId }: { projectId: string; briefId?: stri
             </div>
           )}
 
-          {/* Score panel (brief mode only, shown after draft completes) */}
-          {isBriefMode && hasDraft && !loading && (
-            <BlogScorePanel draft={body} brief={brief} projectId={projectId} />
+          {/* Score panel — brief mode shows full breakdown; standalone shows heading/readability/WC */}
+          {hasDraft && !loading && (
+            <BlogScorePanel
+              draft={body}
+              brief={isBriefMode ? brief : undefined}
+              projectId={projectId}
+              targetKeyword={!isBriefMode ? keywords.split(',')[0]?.trim() : undefined}
+              targetWordCount={!isBriefMode ? wordCount : undefined}
+            />
           )}
         </div>
 

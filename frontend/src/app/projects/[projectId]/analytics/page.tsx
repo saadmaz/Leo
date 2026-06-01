@@ -9,7 +9,7 @@ import {
 import {
   BarChart2, TrendingUp, FileText, Upload, Sparkles,
   RefreshCw, Clock, CheckCircle2, AlertCircle, Info,
-  Zap, Loader2,
+  Zap, Loader2, Globe, Search, ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -21,7 +21,7 @@ import type {
 } from '@/types'
 import { CHANNELS } from '@/components/chat/channel-selector'
 
-type MainTab = 'overview' | 'predict'
+type MainTab = 'overview' | 'live' | 'predict'
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -194,6 +194,16 @@ export default function AnalyticsPage() {
             Overview
           </button>
           <button
+            onClick={() => setMainTab('live')}
+            className={cn(
+              'flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors',
+              mainTab === 'live' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Globe className="w-3 h-3" />
+            Live Data
+          </button>
+          <button
             onClick={() => setMainTab('predict')}
             className={cn(
               'flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors',
@@ -217,6 +227,13 @@ export default function AnalyticsPage() {
           )}
         </div>
       </header>
+
+      {/* Live Data tab */}
+      {mainTab === 'live' && (
+        <div className="flex-1 overflow-y-auto">
+          <LiveDataTab projectId={projectId} />
+        </div>
+      )}
 
       {/* Predict tab */}
       {mainTab === 'predict' && (
@@ -474,6 +491,258 @@ export default function AnalyticsPage() {
         </div>
       </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Live Data tab (GA4 + GSC)
+// ---------------------------------------------------------------------------
+
+const CHANNEL_COLORS: Record<string, string> = {
+  'Organic Search':  '#7c3aed',
+  'Direct':          '#10b981',
+  'Referral':        '#3b82f6',
+  'Organic Social':  '#ec4899',
+  'Paid Search':     '#f59e0b',
+  'Email':           '#6366f1',
+}
+
+function LiveDataTab({ projectId }: { projectId: string }) {
+  const [ga4Status, setGA4Status] = useState<{ configured: boolean; property_id: string | null; connected: boolean } | null>(null)
+  const [gscStatus, setGscStatus] = useState<{ connected: boolean } | null>(null)
+  const [ga4Overview, setGA4Overview] = useState<{ sessions: number; users: number; pageviews: number; bounce_rate: number; avg_session_duration: number } | null>(null)
+  const [sessions, setSessions] = useState<{ date: string; sessions: number }[]>([])
+  const [sources, setSources] = useState<{ channel: string; sessions: number; users: number }[]>([])
+  const [pages, setPages] = useState<{ page_path: string; title: string; pageviews: number }[]>([])
+  const [gscQueries, setGscQueries] = useState<{ query: string; clicks: number; impressions: number; ctr: number; position: number }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [days, setDays] = useState(30)
+
+  useEffect(() => {
+    Promise.all([
+      api.integrations.ga4Status(projectId).catch(() => null),
+      api.blog.getGSCStatus(projectId).catch(() => null),
+    ]).then(([g4, gsc]) => {
+      setGA4Status(g4)
+      setGscStatus(gsc)
+    }).finally(() => setLoading(false))
+  }, [projectId])
+
+  useEffect(() => {
+    if (!ga4Status?.connected) return
+    Promise.all([
+      api.integrations.ga4Overview(projectId, days).catch(() => null),
+      api.integrations.ga4Sessions(projectId, days).catch(() => ({ rows: [] })),
+      api.integrations.ga4Sources(projectId, days).catch(() => ({ rows: [] })),
+      api.integrations.ga4Pages(projectId, days).catch(() => ({ rows: [] })),
+    ]).then(([ov, sess, src, pg]) => {
+      setGA4Overview(ov)
+      setSessions(sess?.rows ?? [])
+      setSources(src?.rows ?? [])
+      setPages(pg?.rows ?? [])
+    })
+  }, [projectId, ga4Status, days])
+
+  useEffect(() => {
+    if (!gscStatus?.connected) return
+    api.integrations.gscQueries(projectId, days).catch(() => ({ queries: [] }))
+      .then((r) => setGscQueries(r.queries ?? []))
+  }, [projectId, gscStatus, days])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  const noConnections = !ga4Status?.connected && !gscStatus?.connected
+
+  if (noConnections) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4 text-center p-8">
+        <div className="p-4 rounded-full bg-muted">
+          <Globe className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <div className="space-y-1.5 max-w-sm">
+          <h2 className="font-semibold">No live data sources connected</h2>
+          <p className="text-sm text-muted-foreground">
+            Connect Google Analytics 4 or Search Console to see live sessions, traffic sources, and keyword rankings.
+          </p>
+        </div>
+        <a
+          href={`/projects/${projectId}/settings/integrations`}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" /> Go to Integrations
+        </a>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 space-y-6 max-w-5xl">
+
+      {/* Day range picker */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Period:</span>
+        {[7, 30, 90].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            className={cn(
+              'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+              days === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {d}d
+          </button>
+        ))}
+      </div>
+
+      {/* GA4 Section */}
+      {ga4Status?.connected && (
+        <>
+          {/* Overview stat cards */}
+          {ga4Overview && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {[
+                { label: 'Sessions', value: ga4Overview.sessions.toLocaleString() },
+                { label: 'Users', value: ga4Overview.users.toLocaleString() },
+                { label: 'Pageviews', value: ga4Overview.pageviews.toLocaleString() },
+                { label: 'Bounce Rate', value: `${ga4Overview.bounce_rate}%` },
+                { label: 'Avg Duration', value: `${Math.round(ga4Overview.avg_session_duration)}s` },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <p className="text-xl font-bold tabular-nums mt-0.5">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Sessions chart + Traffic sources */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Sessions over time */}
+            <div className="lg:col-span-2 bg-card border border-border rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Globe className="w-3.5 h-3.5 text-primary" />
+                <p className="text-sm font-semibold">Sessions Over Time</p>
+              </div>
+              {sessions.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={sessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(d) => d.slice(5)} />
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+                    <Tooltip contentStyle={{ fontSize: 11 }} />
+                    <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">No data</div>
+              )}
+            </div>
+
+            {/* Traffic sources */}
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-sm font-semibold mb-3">Traffic Sources</p>
+              {sources.length > 0 ? (
+                <div className="space-y-2">
+                  {sources.map((s) => {
+                    const total = sources.reduce((sum, x) => sum + x.sessions, 0)
+                    const pct = total > 0 ? Math.round((s.sessions / total) * 100) : 0
+                    const color = CHANNEL_COLORS[s.channel] ?? '#6b7280'
+                    return (
+                      <div key={s.channel}>
+                        <div className="flex justify-between text-xs mb-0.5">
+                          <span className="text-muted-foreground truncate max-w-[120px]">{s.channel}</span>
+                          <span className="font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">No data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Top pages */}
+          {pages.length > 0 && (
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-border">
+                <p className="text-sm font-semibold">Top Pages</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Page</th>
+                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Pageviews</th>
+                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Avg Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pages.map((p, i) => (
+                      <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="px-4 py-2">
+                          <p className="font-medium truncate max-w-xs">{p.title || p.page_path}</p>
+                          <p className="text-muted-foreground/70 truncate max-w-xs">{p.page_path}</p>
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums">{p.pageviews.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">—</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* GSC Section */}
+      {gscStatus?.connected && gscQueries.length > 0 && (
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+            <Search className="w-3.5 h-3.5 text-primary" />
+            <p className="text-sm font-semibold">Top Search Queries (GSC)</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Query</th>
+                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Clicks</th>
+                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Impressions</th>
+                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">CTR</th>
+                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Position</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gscQueries.slice(0, 20).map((q, i) => (
+                  <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                    <td className="px-4 py-2 font-medium">{q.query}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{q.clicks}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{q.impressions.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{q.ctr}%</td>
+                    <td className={cn('px-4 py-2 text-right tabular-nums font-medium', q.position <= 3 ? 'text-green-600' : q.position <= 10 ? 'text-amber-600' : 'text-muted-foreground')}>
+                      {q.position}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

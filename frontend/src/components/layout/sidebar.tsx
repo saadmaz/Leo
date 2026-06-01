@@ -574,6 +574,13 @@ export function Sidebar() {
                   active={isActive('brand-health')}
                   locked={!meetsRequirement('pro')}
                 />
+                <NavItem
+                  icon={<MessageSquare className="w-3.5 h-3.5" />}
+                  label="Brand Q&A"
+                  onClick={() => nav(`/projects/${activeProject.id}/brand-chat`)}
+                  active={isActive('brand-chat')}
+                  locked={!meetsRequirement('pro')}
+                />
               </NavGroup>
 
               {/* Campaigns — Pro */}

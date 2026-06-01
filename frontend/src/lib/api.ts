@@ -3068,7 +3068,121 @@ export const api = {
     disconnectGSC: (projectId: string) =>
       del(`/projects/${projectId}/blog/gsc-disconnect`),
   },
+
+  // ---------------------------------------------------------------------------
+  // Integrations — GA4 + GSC data
+  // ---------------------------------------------------------------------------
+  integrations: {
+    // GA4
+    ga4Status: (projectId: string) =>
+      get<{ configured: boolean; property_id: string | null; connected: boolean }>(
+        `/projects/${projectId}/integrations/ga4/status`,
+      ),
+
+    setGA4Property: (projectId: string, propertyId: string) =>
+      post<{ ok: boolean; property_id: string }>(
+        `/projects/${projectId}/integrations/ga4/property`,
+        { property_id: propertyId },
+      ),
+
+    clearGA4Property: (projectId: string) =>
+      del(`/projects/${projectId}/integrations/ga4/property`),
+
+    ga4Overview: (projectId: string, days = 30) =>
+      get<{
+        sessions: number; users: number; pageviews: number
+        bounce_rate: number; avg_session_duration: number; days: number
+      }>(`/projects/${projectId}/integrations/ga4/overview?days=${days}`),
+
+    ga4Sessions: (projectId: string, days = 30) =>
+      get<{ rows: { date: string; sessions: number }[]; days: number }>(
+        `/projects/${projectId}/integrations/ga4/sessions?days=${days}`,
+      ),
+
+    ga4Sources: (projectId: string, days = 30) =>
+      get<{ rows: { channel: string; sessions: number; users: number }[]; days: number }>(
+        `/projects/${projectId}/integrations/ga4/sources?days=${days}`,
+      ),
+
+    ga4Pages: (projectId: string, days = 30, limit = 10) =>
+      get<{ rows: { page_path: string; title: string; pageviews: number; avg_time_on_page: number }[]; days: number }>(
+        `/projects/${projectId}/integrations/ga4/pages?days=${days}&limit=${limit}`,
+      ),
+
+    // GSC extra data
+    gscQueries: (projectId: string, days = 28, limit = 20) =>
+      get<{
+        queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[]
+        days: number
+      }>(`/projects/${projectId}/integrations/gsc/queries?days=${days}&limit=${limit}`),
+
+    gscPages: (projectId: string, days = 28, limit = 20) =>
+      get<{
+        pages: { page: string; clicks: number; impressions: number; ctr: number; position: number }[]
+        days: number
+      }>(`/projects/${projectId}/integrations/gsc/pages?days=${days}&limit=${limit}`),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Brand Chat (RAG)
+  // ---------------------------------------------------------------------------
+  brandChat: {
+    send: (
+      projectId: string,
+      message: string,
+      callbacks: {
+        onDelta: (text: string) => void
+        onSources: (sources: BrandChatSource[]) => void
+        onError: (msg: string) => void
+        onDone: () => void
+      },
+      signal?: AbortSignal,
+    ) =>
+      streamPost<BrandChatSSEEvent>(
+        `/projects/${projectId}/brand-chat/message`,
+        { message },
+        (event) => {
+          if (event.type === 'delta') callbacks.onDelta(event.text ?? '')
+          else if (event.type === 'sources') callbacks.onSources(event.sources ?? [])
+          else if (event.type === 'error') callbacks.onError(event.message ?? '')
+        },
+        callbacks.onDone,
+        signal,
+      ),
+
+    index: (projectId: string) =>
+      post<{ ok: boolean; indexed: number }>(`/projects/${projectId}/brand-chat/index`, {}),
+
+    history: (projectId: string, limit = 40) =>
+      get<{ messages: BrandChatMessage[] }>(
+        `/projects/${projectId}/brand-chat/history?limit=${limit}`,
+      ),
+  },
 }
+
+// ---------------------------------------------------------------------------
+// Brand Chat types
+// ---------------------------------------------------------------------------
+
+export interface BrandChatSource {
+  id: string
+  type: string
+  text: string
+  metadata?: Record<string, unknown>
+}
+
+export interface BrandChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sources?: BrandChatSource[]
+  createdAt: string
+}
+
+export type BrandChatSSEEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'sources'; sources: BrandChatSource[] }
+  | { type: 'error'; message: string }
 
 // ---------------------------------------------------------------------------
 // Blog module types
@@ -3091,6 +3205,12 @@ export interface BlogH2Section {
   word_target: number
 }
 
+export interface BlogSemanticKeyword {
+  keyword: string
+  intent: 'Informational' | 'Navigational' | 'Commercial' | 'Transactional'
+  why_relevant: string
+}
+
 export interface BlogBrief {
   id: string
   project_id: string
@@ -3099,6 +3219,8 @@ export interface BlogBrief {
   recommended_word_count: number
   h2_structure: BlogH2Section[]
   nlp_terms_required: string[]
+  lsi_terms?: string[]
+  semantic_keywords?: BlogSemanticKeyword[]
   content_angle: string
   brand_angle: string
   intro_hook: string

@@ -198,6 +198,14 @@ Generate a complete content brief. Return ONLY valid JSON:
     }}
   ],
   "nlp_terms_required": {json.dumps(nlp_terms[:20])},
+  "lsi_terms": ["<term 1>", "<term 2>", "..."],
+  "semantic_keywords": [
+    {{
+      "keyword": "<related keyword>",
+      "intent": "Informational|Navigational|Commercial|Transactional",
+      "why_relevant": "<one sentence on why this keyword should be considered>"
+    }}
+  ],
   "content_angle": "<the specific angle this post should take to beat the gap>",
   "brand_angle": "<how {project_name}'s brand voice and positioning shapes this angle>",
   "intro_hook": "<suggested first sentence or opening approach>",
@@ -211,6 +219,8 @@ Rules:
 - title_options: Each must include the target keyword, be 50-60 chars, and use a different angle.
 - content_angle: Must be specific. Not "be more thorough" — name the angle (e.g. "first-time founder perspective" or "quantified ROI data").
 - brand_angle: Must reference actual brand voice elements from the brand context above.
+- lsi_terms: 12-18 latent semantic indexing terms to weave naturally into the body copy (not forced, not keyword-stuffed).
+- semantic_keywords: 10-15 related keywords the post could rank for as secondary targets — span all four intent types.
 """
 
     client = get_client()

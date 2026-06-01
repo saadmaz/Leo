@@ -388,6 +388,46 @@ export default function BlogBriefPage() {
               </div>
             )}
 
+            {/* LSI Terms */}
+            {brief.lsi_terms && brief.lsi_terms.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">LSI Terms — use naturally in body copy</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {brief.lsi_terms.map((t, i) => (
+                    <span key={i} className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-full">{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Semantic Keyword Expansion */}
+            {brief.semantic_keywords && brief.semantic_keywords.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Semantic Keywords — secondary ranking targets</p>
+                <div className="space-y-1.5">
+                  {brief.semantic_keywords.map((sk, i) => {
+                    const intentColor: Record<string, string> = {
+                      Informational: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+                      Navigational:  'bg-violet-500/10 text-violet-700 dark:text-violet-400',
+                      Commercial:    'bg-orange-500/10 text-orange-700 dark:text-orange-400',
+                      Transactional: 'bg-green-500/10 text-green-700 dark:text-green-400',
+                    }
+                    return (
+                      <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-muted/40">
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${intentColor[sk.intent] ?? 'bg-muted text-muted-foreground'}`}>
+                          {sk.intent}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium">{sk.keyword}</p>
+                          <p className="text-[10px] text-muted-foreground">{sk.why_relevant}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* CTA */}
             {brief.cta_suggestion && (
               <div className="p-3 rounded-lg bg-muted">

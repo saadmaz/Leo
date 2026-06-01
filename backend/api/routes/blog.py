@@ -337,11 +337,11 @@ async def gsc_oauth_callback(
     except Exception as exc:
         logger.error("GSC token exchange failed: %s", exc)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/projects/{project_id}/analytics-pro/blog-performance?gsc_error=1"
+            url=f"{settings.FRONTEND_URL}/projects/{project_id}/settings/integrations?gsc_error=1"
         )
 
     return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/projects/{project_id}/analytics-pro/blog-performance?gsc_connected=1"
+        url=f"{settings.FRONTEND_URL}/projects/{project_id}/settings/integrations?gsc_connected=1"
     )
 
 
