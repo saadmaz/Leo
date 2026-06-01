@@ -69,13 +69,14 @@ async def stream_blog_post(
     # Structured mode: brief provided
     # -------------------------------------------------------------------------
     if brief:
-        yield from _stream_blog_post_with_brief(
+        async for chunk in _stream_blog_post_with_brief(
             client=client,
             project_name=project_name,
             brand_context=brand_context,
             brief=brief,
             tone=tone,
-        )
+        ):
+            yield chunk
         return
 
     # -------------------------------------------------------------------------
@@ -159,7 +160,7 @@ async def _stream_blog_post_with_brief(
     brand_context: str,
     brief: dict,
     tone: str,
-) -> AsyncGenerator[str, None]:
+):
     """
     Section-by-section blog drafting driven by a content brief.
     Called only when a brief is provided to stream_blog_post.

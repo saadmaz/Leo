@@ -1298,10 +1298,16 @@ export const api = {
       keywords?: string[]
       tone?: string
       word_count?: number
+      brief_id?: string
     },
     onMeta: (meta: BlogPostMeta) => void,
     onChunk: (text: string) => void,
     signal?: AbortSignal,
+    callbacks?: {
+      onSectionStart?: (section: string, wordTarget: number) => void
+      onSectionComplete?: (section: string, nlpTermsCovered: string[]) => void
+      onNLPGap?: (missingTerms: string[]) => void
+    },
   ): Promise<void> {
     const headers = await authHeaders()
     const res = await fetch(`${API}/projects/${projectId}/seo/blog-post`, {
@@ -1328,6 +1334,9 @@ export const api = {
           const evt = JSON.parse(raw)
           if (evt.type === 'meta') onMeta(evt as BlogPostMeta)
           else if (evt.type === 'chunk') onChunk(evt.text)
+          else if (evt.type === 'section_start') callbacks?.onSectionStart?.(evt.section, evt.word_target)
+          else if (evt.type === 'section_complete') callbacks?.onSectionComplete?.(evt.section, evt.nlp_terms_covered ?? [])
+          else if (evt.type === 'nlp_gap') callbacks?.onNLPGap?.(evt.missing_terms ?? [])
         } catch { /* skip malformed */ }
       }
     }
@@ -2935,4 +2944,214 @@ export const api = {
     preview: (projectId: string) =>
       get<{ html: string; subject: string }>(`/projects/${projectId}/competitors/digest/preview`),
   },
+
+  // ---------------------------------------------------------------------------
+  // Blog Module
+  // ---------------------------------------------------------------------------
+  blog: {
+    /** Stream SERP content analysis for a keyword (SSE). */
+    streamSERPAnalysis(
+      projectId: string,
+      keyword: string,
+      locationCode: number = 2840,
+      callbacks: {
+        onStep?: (label: string, status: string) => void
+        onDone?: (analysis: BlogSERPAnalysis) => void
+        onError?: (msg: string) => void
+      },
+      signal?: AbortSignal,
+    ) {
+      return streamPost<BlogSERPEvent>(
+        `/projects/${projectId}/blog/serp-analysis`,
+        { keyword, location_code: locationCode },
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label ?? '', event.status ?? '')
+          else if (event.type === 'done') callbacks.onDone?.(event.analysis as BlogSERPAnalysis)
+          else if (event.type === 'error') callbacks.onError?.(event.error ?? '')
+        },
+        () => {},
+        signal,
+      )
+    },
+
+    /** Stream blog content brief generation (SSE). */
+    streamBrief(
+      projectId: string,
+      keyword: string,
+      serpAnalysis: BlogSERPAnalysis,
+      locationCode: number = 2840,
+      callbacks: {
+        onStep?: (label: string, status: string) => void
+        onCannibalizationWarning?: (warning: string) => void
+        onDone?: (brief: BlogBrief) => void
+        onError?: (msg: string) => void
+      },
+      signal?: AbortSignal,
+    ) {
+      return streamPost<BlogBriefEvent>(
+        `/projects/${projectId}/blog/brief`,
+        { keyword, serp_analysis: serpAnalysis, location_code: locationCode },
+        (event) => {
+          if (event.type === 'step') callbacks.onStep?.(event.label ?? '', event.status ?? '')
+          else if (event.type === 'cannibalization_warning') callbacks.onCannibalizationWarning?.(event.warning ?? '')
+          else if (event.type === 'done') callbacks.onDone?.(event.brief as BlogBrief)
+          else if (event.type === 'error') callbacks.onError?.(event.error ?? '')
+        },
+        () => {},
+        signal,
+      )
+    },
+
+    listBriefs: (projectId: string) =>
+      get<{ briefs: BlogBrief[] }>(`/projects/${projectId}/blog/briefs`),
+
+    getBrief: (projectId: string, briefId: string) =>
+      get<BlogBrief>(`/projects/${projectId}/blog/briefs/${briefId}`),
+
+    listCMSConnections: (projectId: string) =>
+      get<{ connections: CMSConnection[] }>(`/projects/${projectId}/blog/cms-connections`),
+
+    addCMSConnection: (
+      projectId: string,
+      payload: { site_url: string; username: string; app_password: string },
+    ) => post<CMSConnection>(`/projects/${projectId}/blog/cms-connections`, payload),
+
+    removeCMSConnection: (projectId: string, connId: string) =>
+      del(`/projects/${projectId}/blog/cms-connections/${connId}`),
+
+    publish: (
+      projectId: string,
+      payload: {
+        connection_id: string
+        title: string
+        content: string
+        status?: 'draft' | 'publish'
+        slug?: string
+        excerpt?: string
+        tags?: string[]
+      },
+    ) =>
+      post<{ ok: boolean; post_id: number; post_url: string; edit_url: string }>(
+        `/projects/${projectId}/blog/publish`,
+        payload,
+      ),
+
+    listRankHistory: (projectId: string) =>
+      get<{ records: BlogRankRecord[] }>(`/projects/${projectId}/blog/rank-history`),
+
+    startTracking: (projectId: string, postUrl: string, targetKeyword: string) =>
+      post<BlogRankRecord>(`/projects/${projectId}/blog/rank-history`, {
+        post_url: postUrl,
+        target_keyword: targetKeyword,
+      }),
+
+    takeSnapshot: (
+      projectId: string,
+      postUrl: string,
+      targetKeyword: string,
+      gscSiteUrl?: string,
+    ) =>
+      post<BlogRankSnapshot>(`/projects/${projectId}/blog/rank-history/snapshot`, {
+        post_url: postUrl,
+        target_keyword: targetKeyword,
+        gsc_site_url: gscSiteUrl,
+      }),
+
+    getGSCStatus: (projectId: string) =>
+      get<{ connected: boolean; properties?: string[] }>(`/projects/${projectId}/blog/gsc-status`),
+
+    getGSCAuthUrl: (projectId: string) =>
+      get<{ auth_url: string }>(`/auth/gsc/url?project_id=${projectId}`),
+
+    disconnectGSC: (projectId: string) =>
+      del(`/projects/${projectId}/blog/gsc-disconnect`),
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Blog module types
+// ---------------------------------------------------------------------------
+
+export interface BlogSERPAnalysis {
+  keyword: string
+  avg_word_count: number
+  recommended_word_count: number
+  consensus_h2s: string[]
+  nlp_terms_required: string[]
+  content_gap: string
+  competing_urls: { url: string; title: string; weakness: string }[]
+  pages_analysed: number
+}
+
+export interface BlogH2Section {
+  heading: string
+  purpose: string
+  word_target: number
+}
+
+export interface BlogBrief {
+  id: string
+  project_id: string
+  target_keyword: string
+  title_options: string[]
+  recommended_word_count: number
+  h2_structure: BlogH2Section[]
+  nlp_terms_required: string[]
+  content_angle: string
+  brand_angle: string
+  intro_hook: string
+  cta_suggestion: string
+  competing_urls: { url: string; title: string; weakness: string }[]
+  cannibalization_warning: string | null
+  created_at: string
+}
+
+export interface CMSConnection {
+  id: string
+  project_id: string
+  type: 'wordpress'
+  site_url: string
+  username: string
+  connected_at: string
+  display_name?: string
+  site_name?: string
+}
+
+export interface BlogRankSnapshot {
+  date: string
+  timestamp: string
+  position: number | null
+  clicks: number | null
+  impressions: number | null
+  ctr: number | null
+  source: 'gsc' | 'dataforseo' | 'unknown'
+}
+
+export interface BlogRankRecord {
+  id: string
+  project_id: string
+  post_url: string
+  target_keyword: string
+  data_source: string
+  snapshots: BlogRankSnapshot[]
+  created_at: string
+  updated_at: string
+}
+
+type BlogSERPEvent = {
+  type: 'step' | 'done' | 'error' | 'progress'
+  label?: string
+  status?: string
+  message?: string
+  analysis?: unknown
+  error?: string
+}
+
+type BlogBriefEvent = {
+  type: 'step' | 'done' | 'error' | 'cannibalization_warning'
+  label?: string
+  status?: string
+  warning?: string
+  brief?: unknown
+  error?: string
 }
