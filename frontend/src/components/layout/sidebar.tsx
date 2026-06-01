@@ -400,18 +400,20 @@ export function Sidebar() {
           {activeProject && (
             <div className="mt-1 border-t border-border/40 pt-1">
 
-              {/* Personal Brand — only for personal projects */}
+              {/* Personal Brand — only for personal projects (single hub entry) */}
               {activeProject.projectType === 'personal' && (
-                <NavGroup label="Personal Brand" storageKey="nav_personal" color="text-violet-500">
-                  <NavItem icon={<User className="w-3.5 h-3.5" />}            label="My Brand"       onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
-                  <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/dashboard`)}  active={isActive('personal-brand/dashboard')} />
-                  <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}        label="Interview"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/onboarding`)}  active={isActive('personal-brand/onboarding')} />
-                  <NavItem icon={<Map className="w-3.5 h-3.5" />}             label="Strategy"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/strategy`)}    active={isActive('personal-brand/strategy')} />
-                  <NavItem icon={<Mic2 className="w-3.5 h-3.5" />}            label="Content Engine" onClick={() => nav(`/projects/${activeProject.id}/personal-brand/content`)}     active={isActive('personal-brand/content')} />
-                  <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Publishing"     onClick={() => nav(`/projects/${activeProject.id}/personal-brand/publishing`)}  active={isActive('personal-brand/publishing')} />
-                  <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}    label="Calendar"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/calendar`)}    active={isActive('personal-brand/calendar')} />
-                  <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}       label="Analytics"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/analytics`)}   active={isActive('personal-brand/analytics')} />
-                </NavGroup>
+                <button
+                  onClick={() => nav(`/projects/${activeProject.id}/personal-brand`)}
+                  className={cn(
+                    'flex items-center gap-2 w-full px-3 py-1.5 text-xs font-medium transition-colors',
+                    isActive('personal-brand')
+                      ? 'text-violet-500 bg-violet-500/10'
+                      : 'text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/50',
+                  )}
+                >
+                  <User className="w-3.5 h-3.5 shrink-0" />
+                  Personal Brand
+                </button>
               )}
 
               {/* Create */}

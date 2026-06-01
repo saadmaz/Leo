@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import {
   Loader2, Sparkles, RefreshCw, ChevronRight, Search, ShieldCheck, Map, BarChart2,
+  Shield, ShieldAlert, ExternalLink,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
+import { SidebarToggle } from '@/components/layout/sidebar'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -473,6 +476,56 @@ function ReputationTab({ projectId }: { projectId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Reputation signals summary (shown at the bottom of every tab)
+// ---------------------------------------------------------------------------
+
+interface ReputationSignals {
+  summary?: { overallSentiment: string; googleResultsFound: number; totalMentionsFound: number }
+  checkedAt?: string
+}
+
+function ReputationSignalsSummary({ projectId }: { projectId: string }) {
+  const params = useParams<{ projectId: string }>()
+  const [data, setData] = useState<ReputationSignals | null>(null)
+
+  useEffect(() => {
+    api.persona.getReputation(projectId).then((r) => setData(r as unknown as ReputationSignals)).catch(() => {})
+  }, [projectId])
+
+  if (!data?.summary) return null
+
+  const { overallSentiment, googleResultsFound, totalMentionsFound } = data.summary
+  const iconEl = overallSentiment === 'positive' ? <ShieldCheck className="w-4 h-4 text-green-600" />
+    : overallSentiment === 'negative' ? <ShieldAlert className="w-4 h-4 text-red-500" />
+    : <Shield className="w-4 h-4 text-muted-foreground" />
+  const sentimentCls = overallSentiment === 'positive' ? 'text-green-600' : overallSentiment === 'negative' ? 'text-red-500' : 'text-muted-foreground'
+
+  return (
+    <div className="mt-8 pt-6 border-t border-border/50">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reputation Signals</p>
+        <Link href={`/projects/${params.projectId}/personal-brand/content?tab=reputation`} className="text-xs text-primary hover:underline flex items-center gap-1">
+          Full report <ExternalLink className="w-3 h-3" />
+        </Link>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-5 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          {iconEl}
+          <div>
+            <p className={cn('text-sm font-semibold capitalize', sentimentCls)}>{overallSentiment} reputation</p>
+            {data.checkedAt && <p className="text-[10px] text-muted-foreground">Checked {new Date(data.checkedAt).toLocaleDateString()}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span><strong className="text-foreground">{googleResultsFound}</strong> Google results</span>
+          <span><strong className="text-foreground">{totalMentionsFound}</strong> social mentions</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -503,8 +556,11 @@ export default function PersonalBrandStrategyPage() {
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Header */}
       <div className="shrink-0 border-b border-border px-6 py-4">
-        <h1 className="text-lg font-bold text-foreground">Personal Brand Strategy</h1>
-        {core?.fullName && <p className="text-sm text-muted-foreground mt-0.5">{core.fullName}</p>}
+        <div className="flex items-center gap-3 mb-1">
+          <SidebarToggle />
+          <h1 className="text-lg font-bold text-foreground">Personal Brand Strategy</h1>
+        </div>
+        {core?.fullName && <p className="text-sm text-muted-foreground">{core.fullName}</p>}
       </div>
 
       {/* Tabs */}
@@ -522,6 +578,8 @@ export default function PersonalBrandStrategyPage() {
           {activeTab === 'audit' && <ProfileAuditTab />}
           {activeTab === 'roadmap' && <PlatformPlanTab projectId={params.projectId} />}
           {activeTab === 'reputation' && <ReputationTab projectId={params.projectId} />}
+          {/* Reputation summary always visible except on the full reputation tab */}
+          {activeTab !== 'reputation' && <ReputationSignalsSummary projectId={params.projectId} />}
         </div>
       </div>
     </div>

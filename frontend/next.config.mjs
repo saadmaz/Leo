@@ -53,6 +53,38 @@ const nextConfig = {
         destination: '/projects/:projectId/reports?tab=board&movedFrom=board-report',
         permanent: false,
       },
+
+      // ── Personal Brand consolidation (8 pages → 3) ──
+      {
+        source: '/projects/:projectId/personal-brand/dashboard',
+        destination: '/projects/:projectId/personal-brand?movedFrom=pb-dashboard',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/personal-brand/onboarding',
+        destination: '/projects/:projectId/personal-brand?movedFrom=pb-onboarding',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/personal-brand/analytics',
+        destination: '/projects/:projectId/personal-brand?movedFrom=pb-analytics',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/personal-brand/publishing',
+        destination: '/projects/:projectId/personal-brand/content?tab=schedule&movedFrom=pb-publishing',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/personal-brand/calendar',
+        destination: '/projects/:projectId/personal-brand/content?tab=posts&movedFrom=pb-calendar',
+        permanent: false,
+      },
+      {
+        source: '/projects/:projectId/personal-brand/reputation',
+        destination: '/projects/:projectId/personal-brand/content?tab=reputation&movedFrom=pb-reputation',
+        permanent: false,
+      },
     ]
   },
   async rewrites() {

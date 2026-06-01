@@ -25,6 +25,31 @@ const MESSAGES: Record<string, { title: string; description: string }> = {
     title: 'Board Report moved to Reports',
     description: 'Select the "Board Report" tab in the Reports page.',
   },
+  // Personal Brand consolidation
+  'pb-dashboard': {
+    title: 'Dashboard is now the Personal Brand hub',
+    description: 'Your analytics summary, checklist, and content pillars are all here.',
+  },
+  'pb-onboarding': {
+    title: 'Interview is now on the Personal Brand hub',
+    description: 'The discovery interview is embedded directly on this page when not yet complete.',
+  },
+  'pb-analytics': {
+    title: 'Analytics summary is now on the Personal Brand hub',
+    description: 'Scroll down to see platform follower counts and consistency scores.',
+  },
+  'pb-publishing': {
+    title: 'Platform connections moved to Content → Schedule',
+    description: 'Use the "Schedule" tab to connect and manage your social accounts.',
+  },
+  'pb-calendar': {
+    title: 'Post schedule moved to Content → Posts',
+    description: 'Use the "Posts" tab to view scheduled and published posts.',
+  },
+  'pb-reputation': {
+    title: 'Reputation monitor moved to Content → Reputation',
+    description: 'Use the "Reputation" tab to run checks and view your online presence.',
+  },
 }
 
 // Reads ?movedFrom=<key> from the current URL on mount, shows a contextual
