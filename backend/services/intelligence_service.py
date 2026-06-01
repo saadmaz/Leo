@@ -587,7 +587,7 @@ Rules:
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
-        max_tokens=3500,  # strategy JSON with 5 competitors can hit 3000+ tokens
+        max_tokens=8192,  # strategy JSON with 5 competitors can exceed 5000+ tokens
         messages=[{"role": "user", "content": prompt}],
     )
 

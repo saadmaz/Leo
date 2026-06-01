@@ -109,6 +109,10 @@ async def discover_competitors(
     project = get_project_as_member(project_id, user["uid"])
     brand_core = project.get("brandCore") or {}
     website_url = project.get("websiteUrl") or project.get("website_url") or None
+    # Inject project name into brand_core so stream_discover_competitors can use it
+    # (brand_core itself doesn't carry brandName — it's a project-level field)
+    if project.get("name") and not brand_core.get("brandName"):
+        brand_core = {**brand_core, "brandName": project["name"]}
 
     async def event_stream():
         try:
