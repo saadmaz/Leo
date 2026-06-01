@@ -20,6 +20,12 @@ const nextConfig = {
         destination: '/projects/:projectId/search/:tool',
         permanent: true,
       },
+      // deep-search consolidated into intelligence/deep-research
+      {
+        source: '/projects/:projectId/deep-search',
+        destination: '/projects/:projectId/intelligence/deep-research',
+        permanent: true,
+      },
     ]
   },
   async rewrites() {
