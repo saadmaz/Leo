@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import {
-  Type, ImageIcon, Video, Mic, CheckCircle, Globe, BookOpen, Search, FileText,
+  Type, Video, CheckCircle, BookOpen, Search, FileText, Repeat2,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { ContextPanel } from '@/components/layout/ContextPanel'
@@ -20,21 +20,10 @@ const FEATURES = [
     accentColor: 'hover:border-violet-500/40',
   },
   {
-    key: 'visual-brief',
-    icon: <ImageIcon className="w-5 h-5" />,
-    title: 'Visual Brief',
-    description: 'Create a detailed creative brief for designers - colour palette, layout, Midjourney prompt included.',
-    path: 'visual-brief',
-    credits: 5,
-    tag: 'Claude',
-    iconColor: 'bg-rose-500/10 text-rose-600',
-    accentColor: 'hover:border-rose-500/40',
-  },
-  {
     key: 'video-script',
     icon: <Video className="w-5 h-5" />,
-    title: 'Video Script',
-    description: 'Write full video scripts with timestamps, B-roll suggestions, and CTA for YouTube, TikTok, or LinkedIn.',
+    title: 'Long-form Scripts',
+    description: 'Write video scripts with timestamps and B-roll, or generate podcast show notes from transcripts or audio URLs.',
     path: 'video-script',
     credits: 15,
     tag: 'Claude',
@@ -42,15 +31,15 @@ const FEATURES = [
     accentColor: 'hover:border-blue-500/40',
   },
   {
-    key: 'podcast',
-    icon: <Mic className="w-5 h-5" />,
-    title: 'Podcast Show Notes',
-    description: 'Upload an audio URL or paste a transcript - get show notes, timestamps, quotes, and a LinkedIn post.',
-    path: 'podcast',
-    credits: 20,
-    tag: 'Whisper + Claude',
-    iconColor: 'bg-amber-500/10 text-amber-600',
-    accentColor: 'hover:border-amber-500/40',
+    key: 'repurpose',
+    icon: <Repeat2 className="w-5 h-5" />,
+    title: 'Repurpose Content',
+    description: 'Turn one piece into many — generate 3 angle variants for the same platform or adapt it across all channels at once.',
+    path: 'repurpose',
+    credits: 5,
+    tag: 'Claude',
+    iconColor: 'bg-rose-500/10 text-rose-600',
+    accentColor: 'hover:border-rose-500/40',
   },
   {
     key: 'quality',
@@ -62,17 +51,6 @@ const FEATURES = [
     tag: 'Claude',
     iconColor: 'bg-emerald-500/10 text-emerald-600',
     accentColor: 'hover:border-emerald-500/40',
-  },
-  {
-    key: 'translate',
-    icon: <Globe className="w-5 h-5" />,
-    title: 'Multilingual Adaptation',
-    description: 'Translate content with DeepL then adapt brand voice and cultural nuances with Claude.',
-    path: 'translate',
-    credits: 15,
-    tag: 'DeepL + Claude',
-    iconColor: 'bg-sky-500/10 text-sky-600',
-    accentColor: 'hover:border-sky-500/40',
   },
   {
     key: 'case-study',
