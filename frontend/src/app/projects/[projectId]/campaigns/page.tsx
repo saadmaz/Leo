@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   Zap, Plus, Trash2, RefreshCw, ChevronRight,
   Copy, Check, Target, Users, Calendar, BarChart2, Download,
@@ -107,6 +107,7 @@ function downloadMarkdown(filename: string, content: string) {
 
 export default function CampaignsPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const router = useRouter()
   const {
     campaigns, setCampaigns, removeCampaign, upsertCampaign,
     activeCampaign, setActiveCampaign,
@@ -224,6 +225,21 @@ export default function CampaignsPage() {
                       <span key={ch} className="text-xs bg-muted px-1.5 py-0.5 rounded-md">
                         {CHANNEL_ICONS[ch] ?? '📄'} {CHANNEL_LABELS[ch] ?? ch}
                       </span>
+                    ))}
+                  </div>
+                  {/* Sub-page quick links */}
+                  <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/50">
+                    {(['brief', 'assets', 'performance'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/projects/${projectId}/campaigns/${campaign.id}/${tab}`)
+                        }}
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary capitalize transition-colors"
+                      >
+                        {tab}
+                      </button>
                     ))}
                   </div>
                 </div>
