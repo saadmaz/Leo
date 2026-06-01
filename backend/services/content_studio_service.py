@@ -38,19 +38,49 @@ async def stream_blog_post(
     keywords: list[str],
     tone: str,
     word_count: int,
+    brief: dict | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream a full SEO-optimised blog post in markdown.
 
+    When `brief` is provided (from the Blog Brief Generator), uses
+    section-by-section structured drafting. Each H2 is generated as a
+    separate Claude call so:
+      - Section progress is visible to the user
+      - NLP term coverage is tracked inline
+      - Long posts are reliable (no single 2000+ token generation)
+
+    Without a brief, falls back to single-shot generation (existing behaviour).
+
     Yields:
-      data: {"type": "meta",  "title": "...", "description": "...", "slug": "..."}
-      data: {"type": "chunk", "text": "..."}   (raw markdown chunks)
+      data: {"type": "meta",             "title": ..., "description": ..., "slug": ...}
+      data: {"type": "section_start",    "section": ..., "word_target": ...}
+      data: {"type": "chunk",            "text": ...}
+      data: {"type": "section_complete", "section": ..., "nlp_terms_covered": [...]}
+      data: {"type": "nlp_gap",          "missing_terms": [...]}
       data: {"type": "done"}
-      data: {"type": "error", "error": "..."}
+      data: {"type": "error",            "error": ...}
     """
     client = get_client()
     brand_context = build_brand_core_context(brand_core)
     keywords_str = ", ".join(keywords) if keywords else topic
+
+    # -------------------------------------------------------------------------
+    # Structured mode: brief provided
+    # -------------------------------------------------------------------------
+    if brief:
+        yield from _stream_blog_post_with_brief(
+            client=client,
+            project_name=project_name,
+            brand_context=brand_context,
+            brief=brief,
+            tone=tone,
+        )
+        return
+
+    # -------------------------------------------------------------------------
+    # Standard mode: no brief (original single-shot behaviour, unchanged)
+    # -------------------------------------------------------------------------
 
     # First generate meta in one shot
     meta_prompt = f"""Generate SEO metadata for a blog post.
@@ -121,6 +151,183 @@ Write only the post body (no title/meta). Start immediately."""
     except Exception as exc:
         logger.error("Blog post streaming failed: %s", exc)
         yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+
+
+async def _stream_blog_post_with_brief(
+    client,
+    project_name: str,
+    brand_context: str,
+    brief: dict,
+    tone: str,
+) -> AsyncGenerator[str, None]:
+    """
+    Section-by-section blog drafting driven by a content brief.
+    Called only when a brief is provided to stream_blog_post.
+    """
+    keyword = brief.get("target_keyword", "")
+    nlp_terms_required: list[str] = brief.get("nlp_terms_required", [])
+    h2_structure: list[dict] = brief.get("h2_structure", [])
+    title_options: list[str] = brief.get("title_options", [])
+    content_angle = brief.get("content_angle", "")
+    brand_angle = brief.get("brand_angle", "")
+    cta_suggestion = brief.get("cta_suggestion", "")
+    intro_hook = brief.get("intro_hook", "")
+
+    chosen_title = title_options[0] if title_options else keyword
+
+    # 1. Generate meta
+    meta_prompt = f"""Generate SEO metadata for this blog post.
+
+TITLE: {chosen_title}
+KEYWORD: {keyword}
+
+Return ONLY valid JSON:
+{{
+  "title": "{chosen_title}",
+  "description": "<meta description, 150-160 chars, includes keyword and CTA>",
+  "slug": "<url-slug>"
+}}"""
+
+    try:
+        meta_resp = await client.messages.create(
+            model=settings.LLM_CHAT_MODEL,
+            max_tokens=300,
+            messages=[{"role": "user", "content": meta_prompt}],
+        )
+        meta = _parse_json(meta_resp.content[0].text)
+    except Exception:
+        meta = {
+            "title": chosen_title,
+            "description": f"Learn about {keyword} with {project_name}.",
+            "slug": keyword.lower().replace(" ", "-"),
+        }
+
+    yield f"data: {json.dumps({'type': 'meta', **meta})}\n\n"
+
+    # 2. Generate intro
+    nlp_str = ", ".join(nlp_terms_required[:10])
+    intro_prompt = f"""You are writing a blog post for {project_name}.
+
+BRAND VOICE:
+{brand_context}
+
+POST TITLE: {chosen_title}
+TARGET KEYWORD: {keyword}
+CONTENT ANGLE: {content_angle}
+BRAND ANGLE: {brand_angle}
+SUGGESTED OPENING: {intro_hook}
+REQUIRED NLP TERMS TO WORK IN: {nlp_str}
+TONE: {tone}
+
+Write the blog post introduction (150-200 words). No heading — just the opening paragraph(s).
+Hook the reader immediately. Work in the target keyword naturally. Do not use "Introduction" as a heading."""
+
+    yield f"data: {json.dumps({'type': 'section_start', 'section': 'Introduction', 'word_target': 175})}\n\n"
+    intro_text = ""
+    try:
+        async with client.messages.stream(
+            model=settings.LLM_CHAT_MODEL,
+            max_tokens=400,
+            messages=[{"role": "user", "content": intro_prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                intro_text += text
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+    except Exception as exc:
+        yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+        return
+
+    covered = _find_covered_nlp_terms(intro_text, nlp_terms_required)
+    yield f"data: {json.dumps({'type': 'section_complete', 'section': 'Introduction', 'nlp_terms_covered': covered})}\n\n"
+
+    # 3. Generate each H2 section
+    all_text = intro_text
+    for section in h2_structure:
+        heading = section.get("heading", "")
+        purpose = section.get("purpose", "")
+        word_target = section.get("word_target", 300)
+
+        remaining_nlp = [t for t in nlp_terms_required if t.lower() not in all_text.lower()]
+        remaining_str = ", ".join(remaining_nlp[:8])
+
+        section_prompt = f"""You are writing a section of a blog post for {project_name}.
+
+BRAND VOICE:
+{brand_context}
+
+POST TITLE: {chosen_title}
+CURRENT SECTION: ## {heading}
+SECTION PURPOSE: {purpose}
+WORD TARGET: approximately {word_target} words
+TONE: {tone}
+NLP TERMS STILL NEEDED: {remaining_str}
+
+Write only this section's content (start with the ## heading).
+Make it specific, data-rich where possible, and on-brand.
+Work in the NLP terms naturally — do not force them.
+Do not add a conclusion or CTA in this section."""
+
+        yield f"data: {json.dumps({'type': 'section_start', 'section': heading, 'word_target': word_target})}\n\n"
+        section_text = f"\n\n## {heading}\n\n"
+        yield f"data: {json.dumps({'type': 'chunk', 'text': section_text})}\n\n"
+
+        try:
+            async with client.messages.stream(
+                model=settings.LLM_CHAT_MODEL,
+                max_tokens=min(word_target * 2, 1500),
+                messages=[{"role": "user", "content": section_prompt}],
+            ) as stream:
+                async for text in stream.text_stream:
+                    section_text += text
+                    all_text += text
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+            return
+
+        covered = _find_covered_nlp_terms(section_text, nlp_terms_required)
+        yield f"data: {json.dumps({'type': 'section_complete', 'section': heading, 'nlp_terms_covered': covered})}\n\n"
+
+    # 4. Generate conclusion + CTA
+    conclusion_prompt = f"""Write the conclusion and CTA for this blog post.
+
+POST: {chosen_title}
+BRAND: {project_name}
+CTA GOAL: {cta_suggestion}
+TONE: {tone}
+
+Write a tight conclusion (## Conclusion, ~120 words) that summarises the key takeaways
+and ends with the CTA naturally integrated — no separate "CTA" heading."""
+
+    yield f"data: {json.dumps({'type': 'section_start', 'section': 'Conclusion', 'word_target': 120})}\n\n"
+    try:
+        async with client.messages.stream(
+            model=settings.LLM_CHAT_MODEL,
+            max_tokens=400,
+            messages=[{"role": "user", "content": conclusion_prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                all_text += text
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+    except Exception as exc:
+        yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+        return
+
+    yield f"data: {json.dumps({'type': 'section_complete', 'section': 'Conclusion', 'nlp_terms_covered': []})}\n\n"
+
+    # 5. Final NLP gap check
+    missing = [t for t in nlp_terms_required if t.lower() not in all_text.lower()]
+    if missing:
+        yield f"data: {json.dumps({'type': 'nlp_gap', 'missing_terms': missing[:10]})}\n\n"
+
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+    yield "data: [DONE]\n\n"
+
+
+def _find_covered_nlp_terms(text: str, nlp_terms: list[str]) -> list[str]:
+    """Return which NLP terms appear in the given text."""
+    text_lower = text.lower()
+    return [t for t in nlp_terms if t.lower() in text_lower]
 
 
 # ---------------------------------------------------------------------------

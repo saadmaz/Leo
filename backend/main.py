@@ -46,7 +46,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.config import settings
 from backend.services import firebase_service
-from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio, templates, planner, analytics, reports, monitoring, seo, posts, credits, deep_search, strategy, carousel, threads, competitors, personal_brand, knowledge, brand_audit, competitor_digest
+from backend.api.routes import projects, chats, stream, ingestion, brand_core, billing, assets, campaigns, generate, members, admin, announcements, intelligence, content_ops, content_studio, templates, planner, analytics, reports, monitoring, seo, posts, credits, deep_search, strategy, carousel, threads, competitors, personal_brand, knowledge, brand_audit, competitor_digest, blog
 from backend.middleware.rate_limit import limiter
 from backend.middleware.request_id import RequestIdFilter, RequestIdMiddleware
 
@@ -230,6 +230,7 @@ app.include_router(personal_brand.router)
 app.include_router(knowledge.router)
 app.include_router(brand_audit.router)
 app.include_router(competitor_digest.router)
+app.include_router(blog.router)
 app.include_router(templates.router_community)
 
 # ---------------------------------------------------------------------------

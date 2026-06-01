@@ -37,6 +37,7 @@ class BlogPostRequest(BaseModel):
     keywords: list[str] = Field(default_factory=list, max_length=10)
     tone: str = Field(default="informative and engaging", max_length=100)
     word_count: int = Field(default=1000, ge=300, le=3000)
+    brief_id: Optional[str] = Field(None, description="Blog brief ID — enables section-by-section structured drafting")
 
 
 class MetaTagsRequest(BaseModel):
@@ -76,6 +77,14 @@ async def generate_blog_post(
     await asyncio.to_thread(check_and_deduct, user["uid"], "blog_post")
     brand_core = project.get("brandCore") or {}
 
+    # Load brief when brief_id is provided (enables structured mode)
+    brief = None
+    if body.brief_id:
+        from backend.services.blog import brief_service as _brief_svc
+        brief = _brief_svc.get_brief(body.brief_id)
+        if brief and brief.get("project_id") != project_id:
+            raise HTTPException(status_code=404, detail="Brief not found")
+
     async def event_stream():
         async for chunk in content_studio_service.stream_blog_post(
             project_name=project.get("name", ""),
@@ -84,6 +93,7 @@ async def generate_blog_post(
             keywords=body.keywords,
             tone=body.tone,
             word_count=body.word_count,
+            brief=brief,
         ):
             yield chunk
 
