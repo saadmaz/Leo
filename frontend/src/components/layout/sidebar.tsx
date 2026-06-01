@@ -10,7 +10,8 @@ import {
   BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
   LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
-  Mic2, Shield, DollarSign, Newspaper, FlaskConical, MessageSquare,
+  Mic2, Shield, DollarSign, Newspaper, FlaskConical, MessageSquare, Bell, Target,
+  Repeat2,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -292,6 +293,15 @@ export function Sidebar() {
             >
               <Search className="w-3.5 h-3.5" />
             </button>
+            {activeProject && (
+              <button
+                onClick={() => { openLatestChat(); setSidebarOpen(false) }}
+                title="Open chat"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+              </button>
+            )}
             {activeProject && <NotificationBell projectId={activeProject.id} />}
             <button
               onClick={() => setSidebarCollapsed(true)}
@@ -352,17 +362,16 @@ export function Sidebar() {
 
           {/* ── Quick-action pills ────────────────────────────────────────── */}
           {activeProject && (
-            <div className="px-3 pt-2 pb-1 grid grid-cols-2 gap-1.5">
+            <div className="px-3 pt-2 pb-1 grid grid-cols-3 gap-1.5">
               {[
-                { label: 'Chat', icon: <MessageSquare className="w-3 h-3" />, action: openLatestChat },
                 { label: 'Dashboard', icon: <LayoutDashboard className="w-3 h-3" />, action: () => nav(`/projects/${activeProject.id}/dashboard`) },
-                { label: 'Library', icon: <Library className="w-3 h-3" />, action: () => nav(`/projects/${activeProject.id}/library`) },
-                { label: 'Analytics', icon: <BarChart2 className="w-3 h-3" />, action: () => nav(`/projects/${activeProject.id}/analytics`) },
+                { label: 'Library',   icon: <Library className="w-3 h-3" />,         action: () => nav(`/projects/${activeProject.id}/library`) },
+                { label: 'Analytics', icon: <BarChart2 className="w-3 h-3" />,       action: () => nav(`/projects/${activeProject.id}/analytics`) },
               ].map(({ label, icon, action }) => (
                 <button
                   key={label}
                   onClick={action}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-primary/10 hover:text-primary transition-colors"
                 >
                   {icon}
                   {label}
@@ -377,76 +386,75 @@ export function Sidebar() {
 
               {/* Personal Brand — only for personal projects */}
               {activeProject.projectType === 'personal' && (
-                <>
-                  <NavGroup label="Personal Brand" storageKey="nav_personal" color="text-violet-500">
-                    <NavItem icon={<User className="w-3.5 h-3.5" />}            label="My Brand"       onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
-                    <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/dashboard`)} />
-                    <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}        label="Interview"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/onboarding`)} />
-                    <NavItem icon={<Map className="w-3.5 h-3.5" />}             label="Strategy"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/strategy`)} />
-                    <NavItem icon={<Mic2 className="w-3.5 h-3.5" />}            label="Content Engine" onClick={() => nav(`/projects/${activeProject.id}/personal-brand/content`)} />
-                    <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Publishing"     onClick={() => nav(`/projects/${activeProject.id}/personal-brand/publishing`)} />
-                    <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}    label="Calendar"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/calendar`)} />
-                    <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}       label="Analytics"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/analytics`)} />
-                  </NavGroup>
-                </>
+                <NavGroup label="Personal Brand" storageKey="nav_personal" color="text-violet-500">
+                  <NavItem icon={<User className="w-3.5 h-3.5" />}            label="My Brand"       onClick={() => { setMyBrandPanelOpen(true); setSidebarOpen(false) }} />
+                  <NavItem icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Dashboard"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/dashboard`)} />
+                  <NavItem icon={<Sparkles className="w-3.5 h-3.5" />}        label="Interview"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/onboarding`)} />
+                  <NavItem icon={<Map className="w-3.5 h-3.5" />}             label="Strategy"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/strategy`)} />
+                  <NavItem icon={<Mic2 className="w-3.5 h-3.5" />}            label="Content Engine" onClick={() => nav(`/projects/${activeProject.id}/personal-brand/content`)} />
+                  <NavItem icon={<Send className="w-3.5 h-3.5" />}            label="Publishing"     onClick={() => nav(`/projects/${activeProject.id}/personal-brand/publishing`)} />
+                  <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}    label="Calendar"       onClick={() => nav(`/projects/${activeProject.id}/personal-brand/calendar`)} />
+                  <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}       label="Analytics"      onClick={() => nav(`/projects/${activeProject.id}/personal-brand/analytics`)} />
+                </NavGroup>
               )}
 
               {/* Create */}
-              <NavGroup label="Create" storageKey="nav_create_v2" color="text-violet-500">
+              <NavGroup label="Create" storageKey="nav_create_v3" color="text-violet-500">
                 <NavItem icon={<Layers className="w-3.5 h-3.5" />}        label="Content Studio"  onClick={() => nav(`/projects/${activeProject.id}/content`)} />
-                <NavItem icon={<Library className="w-3.5 h-3.5" />}       label="Library"         onClick={() => nav(`/projects/${activeProject.id}/library`)} />
+                <NavItem icon={<Globe className="w-3.5 h-3.5" />}         label="SEO Studio"      onClick={() => nav(`/projects/${activeProject.id}/seo`)} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}        label="Search Engine"   onClick={() => nav(`/projects/${activeProject.id}/seo-pro`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}      label="Blog Brief"      onClick={() => nav(`/projects/${activeProject.id}/seo-pro/blog-brief`)} />
+                <NavItem icon={<Repeat2 className="w-3.5 h-3.5" />}       label="Repurpose"       onClick={() => nav(`/projects/${activeProject.id}/library`)} />
                 <NavItem icon={<Zap className="w-3.5 h-3.5" />}           label="Bulk Generate"   onClick={() => nav(`/projects/${activeProject.id}/bulk`)} />
-                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />} label="Content Planner" onClick={() => nav(`/projects/${activeProject.id}/planner`)} />
                 <NavItem icon={<ImageIcon className="w-3.5 h-3.5" />}     label="Image Studio"    onClick={() => nav(`/projects/${activeProject.id}/images`)} />
+                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"      onClick={() => nav(`/projects/${activeProject.id}/templates`)} />
               </NavGroup>
 
-              {/* Publish */}
-              <NavGroup label="Publish" storageKey="nav_publish_v2" color="text-emerald-500">
-                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue"  onClick={() => nav(`/projects/${activeProject.id}/review`)} />
-                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"      onClick={() => nav(`/projects/${activeProject.id}/calendar`)} />
-                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue" onClick={() => nav(`/projects/${activeProject.id}/publish`)} />
+              {/* Distribute */}
+              <NavGroup label="Distribute" storageKey="nav_distribute_v1" color="text-emerald-500">
+                <NavItem icon={<CalendarDays className="w-3.5 h-3.5" />}   label="Calendar"       onClick={() => nav(`/projects/${activeProject.id}/calendar`)} />
+                <NavItem icon={<CalendarRange className="w-3.5 h-3.5" />}  label="Planner"        onClick={() => nav(`/projects/${activeProject.id}/planner`)} />
+                <NavItem icon={<ClipboardCheck className="w-3.5 h-3.5" />} label="Review Queue"   onClick={() => nav(`/projects/${activeProject.id}/review`)} />
+                <NavItem icon={<Send className="w-3.5 h-3.5" />}           label="Publish Queue"  onClick={() => nav(`/projects/${activeProject.id}/publish`)} />
+                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}      label="Social"         onClick={() => nav(`/projects/${activeProject.id}/social`)} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email CRM"      onClick={() => nav(`/projects/${activeProject.id}/email-crm`)} />
+                <NavItem icon={<Newspaper className="w-3.5 h-3.5" />}      label="PR & Comms"     onClick={() => nav(`/projects/${activeProject.id}/pr-comms`)} />
+                <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}     label="Paid Ads"       onClick={() => nav(`/projects/${activeProject.id}/paid-ads`)} />
               </NavGroup>
 
-              {/* Grow */}
-              <NavGroup label="Grow" storageKey="nav_grow" color="text-rose-500">
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="SEO Engine"    onClick={() => nav(`/projects/${activeProject.id}/seo-pro`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="Blog Brief"    onClick={() => nav(`/projects/${activeProject.id}/seo-pro/blog-brief`)} />
-                <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}   label="Paid Ads"      onClick={() => nav(`/projects/${activeProject.id}/paid-ads`)} />
-                <NavItem icon={<Mail className="w-3.5 h-3.5" />}         label="Email CRM"     onClick={() => nav(`/projects/${activeProject.id}/email-crm`)} />
-                <NavItem icon={<Send className="w-3.5 h-3.5" />}         label="Social Engine" onClick={() => nav(`/projects/${activeProject.id}/social`)} />
-                <NavItem icon={<Newspaper className="w-3.5 h-3.5" />}    label="PR & Comms"    onClick={() => nav(`/projects/${activeProject.id}/pr-comms`)} />
-                <NavItem icon={<FlaskConical className="w-3.5 h-3.5" />} label="Experiments"   onClick={() => nav(`/projects/${activeProject.id}/experiments`)} />
+              {/* Analyse */}
+              <NavGroup label="Analyse" storageKey="nav_analyse_v1" color="text-blue-500">
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}     label="Analytics Pro"    onClick={() => nav(`/projects/${activeProject.id}/analytics-pro`)} />
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />}    label="Blog Performance" onClick={() => nav(`/projects/${activeProject.id}/analytics-pro/blog-performance`)} />
+                <NavItem icon={<FlaskConical className="w-3.5 h-3.5" />}  label="Experiments"      onClick={() => nav(`/projects/${activeProject.id}/experiments`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}      label="Reports"          onClick={() => nav(`/projects/${activeProject.id}/reports`)} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}        label="Research"         onClick={() => nav(`/projects/${activeProject.id}/deep-search`)} />
               </NavGroup>
 
-              {/* Intelligence */}
-              <NavGroup label="Intelligence" storageKey="nav_intel_v2" color="text-blue-500">
-                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"        onClick={() => nav(`/projects/${activeProject.id}/analytics`)} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Analytics Pro"    onClick={() => nav(`/projects/${activeProject.id}/analytics-pro`)} />
-                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Blog Performance" onClick={() => nav(`/projects/${activeProject.id}/analytics-pro/blog-performance`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"          onClick={() => nav(`/projects/${activeProject.id}/reports`)} />
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"      onClick={() => nav(`/projects/${activeProject.id}/deep-search`)} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"      onClick={() => nav(`/projects/${activeProject.id}/intelligence`)} />
-                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"    onClick={() => nav(`/projects/${activeProject.id}/intelligence/deep-research`)} />
-                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Brand Health"    onClick={() => nav(`/projects/${activeProject.id}/brand-health`)} />
+              {/* Compete */}
+              <NavGroup label="Compete" storageKey="nav_compete_v1" color="text-amber-500">
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}     label="Competitors"    onClick={() => nav(`/projects/${activeProject.id}/intelligence`)} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}           label="Deep Research"  onClick={() => nav(`/projects/${activeProject.id}/intelligence/deep-research`)} />
+                <NavItem icon={<Bell className="w-3.5 h-3.5" />}          label="Monitoring"     onClick={() => nav(`/projects/${activeProject.id}/intelligence/monitoring`)} />
+                <NavItem icon={<Map className="w-3.5 h-3.5" />}           label="Strategy"       onClick={() => nav(`/projects/${activeProject.id}/strategy`)} />
+                <NavItem icon={<Shield className="w-3.5 h-3.5" />}        label="Brand Audit"    onClick={() => nav(`/projects/${activeProject.id}/brand-audit`)} />
+                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />}   label="Brand Health"   onClick={() => nav(`/projects/${activeProject.id}/brand-health`)} />
+                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}      label="Knowledge Base" onClick={() => nav(`/projects/${activeProject.id}/knowledge`)} />
               </NavGroup>
 
-              {/* Strategy */}
-              <NavGroup label="Strategy" storageKey="nav_strategy_v2" color="text-amber-500">
-                <NavItem icon={<Map className="w-3.5 h-3.5" />}           label="Strategy Hub" onClick={() => nav(`/projects/${activeProject.id}/strategy`)} />
-                <NavItem icon={<Megaphone className="w-3.5 h-3.5" />}     label="Campaigns"    onClick={() => nav(`/projects/${activeProject.id}/campaigns`)} />
-                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"        onClick={() => nav(`/projects/${activeProject.id}/posts`)} />
+              {/* Campaigns */}
+              <NavGroup label="Campaigns" storageKey="nav_campaigns_v1" color="text-rose-500">
+                <NavItem icon={<Target className="w-3.5 h-3.5" />}        label="Campaigns" onClick={() => nav(`/projects/${activeProject.id}/campaigns`)} />
+                <NavItem icon={<ClipboardList className="w-3.5 h-3.5" />} label="Posts"     onClick={() => nav(`/projects/${activeProject.id}/posts`)} />
+                <NavItem icon={<Library className="w-3.5 h-3.5" />}       label="Library"   onClick={() => nav(`/projects/${activeProject.id}/library`)} />
               </NavGroup>
 
-              {/* Brand */}
-              <NavGroup label="Brand" storageKey="nav_brand_v2" color="text-muted-foreground/60">
-                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}      label="Style Guide"      onClick={() => nav(`/projects/${activeProject.id}/style-guide`)} />
-                <NavItem icon={<LayoutTemplate className="w-3.5 h-3.5" />} label="Templates"       onClick={() => nav(`/projects/${activeProject.id}/templates`)} />
-                <NavItem icon={<Shield className="w-3.5 h-3.5" />}         label="Brand Audit"     onClick={() => nav(`/projects/${activeProject.id}/brand-audit`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}       label="Knowledge Base"  onClick={() => nav(`/projects/${activeProject.id}/knowledge`)} />
-                <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"      onClick={() => nav(`/projects/${activeProject.id}/seo`)} />
-                <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"    onClick={() => nav(`/projects/${activeProject.id}/emails`)} />
-                <NavItem icon={<Layers className="w-3.5 h-3.5" />}         label="WordPress"       onClick={() => nav(`/projects/${activeProject.id}/settings/integrations/wordpress`)} />
-                <NavItem icon={<Users className="w-3.5 h-3.5" />}          label="Team"            onClick={() => nav(`/projects/${activeProject.id}/team`)} />
+              {/* Settings */}
+              <NavGroup label="Settings" storageKey="nav_settings_v1" color="text-muted-foreground/60">
+                <NavItem icon={<BookOpen className="w-3.5 h-3.5" />}      label="Style Guide"   onClick={() => nav(`/projects/${activeProject.id}/style-guide`)} />
+                <NavItem icon={<Mail className="w-3.5 h-3.5" />}          label="Email Studio"  onClick={() => nav(`/projects/${activeProject.id}/emails`)} />
+                <NavItem icon={<Globe className="w-3.5 h-3.5" />}         label="WordPress"     onClick={() => nav(`/projects/${activeProject.id}/settings/integrations/wordpress`)} />
+                <NavItem icon={<Users className="w-3.5 h-3.5" />}         label="Team"          onClick={() => nav(`/projects/${activeProject.id}/team`)} />
               </NavGroup>
 
             </div>
