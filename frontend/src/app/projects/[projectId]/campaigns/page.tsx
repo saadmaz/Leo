@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 import type { Campaign, CampaignContentPack } from '@/types'
 import { cn } from '@/lib/utils'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { VisualBriefModal } from '@/components/campaigns/VisualBriefModal'
 
 // ---------------------------------------------------------------------------
 // Channel display helpers
@@ -113,6 +114,7 @@ export default function CampaignsPage() {
   } = useAppStore()
 
   const [loading, setLoading] = useState(true)
+  const [visualBriefOpen, setVisualBriefOpen] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -156,13 +158,22 @@ export default function CampaignsPage() {
               <p className="text-xs text-muted-foreground">{campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          <button
-            onClick={() => setCampaignGeneratorOpen(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-3 h-3" />
-            New
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setVisualBriefOpen(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Visual Brief"
+            >
+              Visual Brief
+            </button>
+            <button
+              onClick={() => setCampaignGeneratorOpen(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-3 h-3" />
+              New
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -255,6 +266,10 @@ export default function CampaignsPage() {
             </div>
         }
       </div>
+
+      {visualBriefOpen && (
+        <VisualBriefModal projectId={projectId} onClose={() => setVisualBriefOpen(false)} />
+      )}
     </div>
   )
 }

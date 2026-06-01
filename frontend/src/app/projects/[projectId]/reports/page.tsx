@@ -1,17 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import {
   FileText, Sparkles, RefreshCw, Download, TrendingUp,
   BarChart2, Upload, CheckCircle2, FlaskConical, Plus, Trash2,
   Clock, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Loader2,
+  XCircle, Check, Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { usePillar7Store } from '@/stores/pillar7-store'
 import type { WeeklyDigest, ResearchReport } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -355,16 +357,249 @@ function ResearchReportsTab({ projectId }: { projectId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Board Report tab
+// ---------------------------------------------------------------------------
+
+const BOARD_REPORT_TYPES = [
+  { value: 'board_update', label: 'Board Update' },
+  { value: 'investor_update', label: 'Investor Update' },
+  { value: 'exec_summary', label: 'Exec Summary' },
+  { value: 'monthly_review', label: 'Monthly Review' },
+]
+const BOARD_TONES = ['professional', 'confident', 'transparent', 'optimistic']
+
+interface MetricRow { id: string; name: string; value: string; vs_prior: string; context: string }
+interface ListItem { id: string; text: string }
+
+function BoardReportTab({ projectId }: { projectId: string }) {
+  const { isStreaming, steps, upsertStep, clearSteps, clearStreamText, appendStreamText, setIsStreaming } = usePillar7Store()
+
+  const [companyName, setCompanyName] = useState('')
+  const [reportPeriod, setReportPeriod] = useState('')
+  const [reportType, setReportType] = useState('board_update')
+  const [tone, setTone] = useState('professional')
+  const [includeAppendix, setIncludeAppendix] = useState(true)
+  const [narrativeContext, setNarrativeContext] = useState('')
+  const [metrics, setMetrics] = useState<MetricRow[]>([{ id: '1', name: '', value: '', vs_prior: '', context: '' }])
+  const [wins, setWins] = useState<ListItem[]>([{ id: '1', text: '' }])
+  const [challenges, setChallenges] = useState<ListItem[]>([{ id: '1', text: '' }])
+  const [priorities, setPriorities] = useState<ListItem[]>([{ id: '1', text: '' }])
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState('')
+
+  const addMetric = () => setMetrics((p) => [...p, { id: Date.now().toString(), name: '', value: '', vs_prior: '', context: '' }])
+  const removeMetric = (id: string) => setMetrics((p) => p.filter((m) => m.id !== id))
+  const updateMetric = (id: string, field: keyof MetricRow, val: string) => setMetrics((p) => p.map((m) => m.id === id ? { ...m, [field]: val } : m))
+  const addItem = (setter: React.Dispatch<React.SetStateAction<ListItem[]>>) => setter((p) => [...p, { id: Date.now().toString(), text: '' }])
+  const removeItem = (setter: React.Dispatch<React.SetStateAction<ListItem[]>>, id: string) => setter((p) => p.filter((i) => i.id !== id))
+  const updateItem = (setter: React.Dispatch<React.SetStateAction<ListItem[]>>, id: string, text: string) => setter((p) => p.map((i) => i.id === id ? { ...i, text } : i))
+  const copyText = (text: string, key: string) => { navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(''), 2000) }
+
+  async function handleRun() {
+    if (!companyName || !reportPeriod) { setError('Enter company name and report period.'); return }
+    setError(''); setResult(null); clearSteps(); clearStreamText()
+    await api.pillar7.streamBoardReport(projectId, {
+      company_name: companyName,
+      report_period: reportPeriod,
+      report_type: reportType,
+      tone,
+      include_appendix: includeAppendix,
+      narrative_context: narrativeContext,
+      metrics: metrics.filter((m) => m.name).map((m) => ({ name: m.name, value: m.value, vs_prior: m.vs_prior, context: m.context })),
+      wins: wins.map((w) => w.text).filter(Boolean),
+      challenges: challenges.map((c) => c.text).filter(Boolean),
+      priorities_next_period: priorities.map((p) => p.text).filter(Boolean),
+    }, {
+      onStep: (step, label, status) => upsertStep(step, label, status as import('@/types').ProgressStep['status']),
+      onDelta: (text) => appendStreamText(text),
+      onSaved: (_id, payload) => { setResult(payload); setIsStreaming(false) },
+      onError: (err) => { setError(err); setIsStreaming(false) },
+      onDone: () => setIsStreaming(false),
+    })
+  }
+
+  const inputCls = 'w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary'
+
+  return (
+    <div className="space-y-4">
+      {/* Header info */}
+      <div className="border border-border rounded-xl bg-card p-4 space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Report Details</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Company Name</label>
+            <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Corp" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Report Period</label>
+            <input value={reportPeriod} onChange={(e) => setReportPeriod(e.target.value)} placeholder="Q1 2025 / March 2025 / FY2024" className={inputCls} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-2 block">Report Type</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {BOARD_REPORT_TYPES.map((rt) => (
+                <button key={rt.value} onClick={() => setReportType(rt.value)}
+                  className={cn('py-1.5 px-2 rounded-lg text-xs font-medium border transition-colors',
+                    reportType === rt.value ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
+                  {rt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-2 block">Tone</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {BOARD_TONES.map((t) => (
+                <button key={t} onClick={() => setTone(t)}
+                  className={cn('py-1.5 px-2 rounded-lg text-xs font-medium border transition-colors capitalize',
+                    tone === t ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-xs cursor-pointer">
+          <input type="checkbox" checked={includeAppendix} onChange={(e) => setIncludeAppendix(e.target.checked)} className="rounded" />
+          Include appendix with supporting data
+        </label>
+      </div>
+
+      {/* Metrics */}
+      <div className="border border-border rounded-xl bg-card p-4 space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Key Metrics</p>
+        {metrics.map((m, idx) => (
+          <div key={m.id} className="grid grid-cols-[1fr_1fr_1fr_2fr_auto] gap-2 items-center">
+            {idx === 0 && ['Metric', 'Value', 'vs Prior', 'Context', ''].map((h) => (
+              <p key={h} className="text-[10px] text-muted-foreground">{h}</p>
+            ))}
+            <input value={m.name} onChange={(e) => updateMetric(m.id, 'name', e.target.value)} placeholder="ARR" className={cn(inputCls, 'text-xs py-1.5')} />
+            <input value={m.value} onChange={(e) => updateMetric(m.id, 'value', e.target.value)} placeholder="$1.2M" className={cn(inputCls, 'text-xs py-1.5')} />
+            <input value={m.vs_prior} onChange={(e) => updateMetric(m.id, 'vs_prior', e.target.value)} placeholder="+18%" className={cn(inputCls, 'text-xs py-1.5')} />
+            <input value={m.context} onChange={(e) => updateMetric(m.id, 'context', e.target.value)} placeholder="Enterprise deals" className={cn(inputCls, 'text-xs py-1.5')} />
+            {metrics.length > 1 ? (
+              <button onClick={() => removeMetric(m.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
+            ) : <div />}
+          </div>
+        ))}
+        <button onClick={addMetric} className="flex items-center gap-1 text-xs text-primary hover:opacity-80">
+          <Plus className="w-3.5 h-3.5" /> Add metric
+        </button>
+      </div>
+
+      {/* Wins / Challenges / Priorities */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Key Wins', icon: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />, items: wins, setter: setWins, placeholder: 'e.g. Closed $500K deal' },
+          { label: 'Challenges', icon: <XCircle className="w-3.5 h-3.5 text-red-400" />, items: challenges, setter: setChallenges, placeholder: 'e.g. Sales cycle elongating' },
+          { label: 'Next Period', icon: <FileText className="w-3.5 h-3.5 text-blue-500" />, items: priorities, setter: setPriorities, placeholder: 'e.g. Launch self-serve' },
+        ].map((section) => (
+          <div key={section.label} className="border border-border rounded-xl bg-card p-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">{section.icon}{section.label}</p>
+            {section.items.map((item) => (
+              <div key={item.id} className="flex items-center gap-1.5">
+                <input value={item.text} onChange={(e) => updateItem(section.setter, item.id, e.target.value)} placeholder={section.placeholder}
+                  className="flex-1 border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                {section.items.length > 1 && (
+                  <button onClick={() => removeItem(section.setter, item.id)} className="text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="w-3 h-3" /></button>
+                )}
+              </div>
+            ))}
+            <button onClick={() => addItem(section.setter)} className="flex items-center gap-1 text-[10px] text-primary hover:opacity-80"><Plus className="w-3 h-3" /> Add</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Narrative context */}
+      <div className="border border-border rounded-xl bg-card p-4">
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Narrative Context</label>
+        <textarea value={narrativeContext} onChange={(e) => setNarrativeContext(e.target.value)} rows={3}
+          placeholder="Add context - e.g. 'Preparing for Series B in Q3', 'Board has flagged burn rate'..."
+          className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
+      </div>
+
+      {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>}
+
+      <button onClick={handleRun} disabled={isStreaming}
+        className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
+        {isStreaming ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Report…</> : 'Generate Board Report — 25 Credits'}
+      </button>
+
+      {steps.length > 0 && (
+        <div className="border border-border rounded-xl bg-card p-4 space-y-2">
+          {steps.map((s, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className={cn('w-2 h-2 rounded-full shrink-0',
+                s.status === 'done' ? 'bg-green-500' : s.status === 'running' ? 'bg-primary animate-pulse' : 'bg-muted-foreground/30')} />
+              <span className="text-xs text-muted-foreground">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-4">
+          {result.executive_summary && (
+            <div className="border border-border rounded-xl bg-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Executive Summary</p>
+                <button onClick={() => copyText(result.executive_summary, 'exec')} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  {copied === 'exec' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied === 'exec' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-sm leading-relaxed">{result.executive_summary}</p>
+            </div>
+          )}
+          {result.business_narrative && (
+            <div className="border border-border rounded-xl bg-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Business Narrative</p>
+                <button onClick={() => copyText(result.business_narrative, 'narrative')} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  {copied === 'narrative' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied === 'narrative' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{result.business_narrative}</p>
+            </div>
+          )}
+          {result.talk_track && (
+            <div className="border border-border rounded-xl bg-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Presenter Talk Track</p>
+                <button onClick={() => copyText(result.talk_track, 'talk')} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  {copied === 'talk' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied === 'talk' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">{result.talk_track}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-type Tab = 'digest' | 'research'
+type Tab = 'digest' | 'research' | 'board'
 
 export default function ReportsPage() {
   const params = useParams<{ projectId: string }>()
   const projectId = params.projectId
+  const searchParams = useSearchParams()
 
-  const [tab, setTab] = useState<Tab>('digest')
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab')
+    if (t === 'research' || t === 'board') return t
+    return 'digest'
+  })
   const [digest, setDigest] = useState<WeeklyDigest | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -404,8 +639,9 @@ export default function ReportsPage() {
         {/* Tabs */}
         <div className="flex items-center gap-1 ml-3">
           {([
-            { id: 'digest',   label: 'Weekly Digest',      icon: <Sparkles className="w-3.5 h-3.5" /> },
+            { id: 'digest',   label: 'Weekly Digest',     icon: <Sparkles className="w-3.5 h-3.5" /> },
             { id: 'research', label: 'Research Reports',  icon: <FlaskConical className="w-3.5 h-3.5" /> },
+            { id: 'board',    label: 'Board Report',      icon: <FileText className="w-3.5 h-3.5" /> },
           ] as { id: Tab; label: string; icon: React.ReactNode }[]).map((t) => (
             <button
               key={t.id}
@@ -547,6 +783,9 @@ export default function ReportsPage() {
 
         {/* ── Research Reports tab ── */}
         {tab === 'research' && <ResearchReportsTab projectId={projectId} />}
+
+        {/* ── Board Report tab ── */}
+        {tab === 'board' && <BoardReportTab projectId={projectId} />}
       </div>
     </div>
   )

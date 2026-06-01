@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { ClipboardList, Plus, ChevronDown, ChevronUp, Trash2, Edit2, Check, X } from 'lucide-react'
+import { ClipboardList, Plus, ChevronDown, ChevronUp, Trash2, Edit2, Check, X, Zap, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { usePillar10Store } from '@/stores/pillar10-store'
+import type { ProgressStep } from '@/types'
 
 const STATUS_COLORS: Record<string, string> = {
   planned:    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -258,8 +260,182 @@ function CreateForm({ projectId, onCreated }: { projectId: string; onCreated: ()
   )
 }
 
+// ---------------------------------------------------------------------------
+// Learning Propagation (Insights tab)
+// ---------------------------------------------------------------------------
+
+const PROPAGATION_CHANNELS = [
+  'landing_pages', 'email_campaigns', 'paid_ads', 'social_content',
+  'blog_posts', 'sales_enablement', 'onboarding_flows', 'pricing_page',
+]
+
+const PRIORITY_COLORS: Record<string, string> = {
+  high:   'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+  medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+  low:    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+}
+
+interface PropagationResult {
+  experiments_analysed: number
+  winning_themes: string[]
+  losing_themes: string[]
+  propagation_actions: { action: string; channel: string; rationale: string; priority: string; effort: string; expected_impact: string }[]
+  quick_wins: string[]
+  long_term_plays: string[]
+  meta_learnings: string[]
+  propagation_summary: string
+}
+
+function InsightsTab({ projectId }: { projectId: string }) {
+  const store = usePillar10Store()
+  const abortRef = useRef<AbortController | null>(null)
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(['landing_pages', 'email_campaigns', 'paid_ads'])
+  const [focusArea, setFocusArea] = useState('')
+  const [result, setResult] = useState<PropagationResult | null>(null)
+
+  function toggleChannel(c: string) {
+    setSelectedChannels((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])
+  }
+
+  async function generate() {
+    if (selectedChannels.length === 0) { toast.error('Select at least one channel'); return }
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+    store.setIsStreaming(true)
+    store.clearSteps()
+    store.clearStreamText()
+    setResult(null)
+    try {
+      await api.pillar10.streamLearningPropagation(projectId,
+        { propagation_channels: selectedChannels, focus_area: focusArea.trim() || undefined },
+        {
+          onStep: (step, label, status) => store.upsertStep(step, label, status as ProgressStep['status']),
+          onDelta: (text) => store.appendStreamText(text),
+          onSaved: (_id, payload) => { setResult(payload as unknown as PropagationResult); store.clearStreamText(); store.setIsStreaming(false); toast.success('Propagation plan ready!') },
+          onError: (msg) => { toast.error(msg); store.setIsStreaming(false) },
+          onDone: () => store.setIsStreaming(false),
+        },
+        abortRef.current.signal,
+      )
+    } catch { store.setIsStreaming(false) }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-4">
+      <div className="border border-border rounded-xl bg-card p-4 space-y-3">
+        <p className="text-sm font-semibold">Learning Propagation</p>
+        <p className="text-xs text-muted-foreground">Analyses all concluded experiments and generates a cross-channel action plan.</p>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Propagation Channels *</label>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {PROPAGATION_CHANNELS.map((c) => (
+              <button key={c} onClick={() => toggleChannel(c)}
+                className={cn('px-3 py-1.5 text-xs rounded-lg border transition-colors capitalize',
+                  selectedChannels.includes(c) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border hover:border-primary/50')}>
+                {c.replace(/_/g, ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Focus Area (optional)</label>
+          <input value={focusArea} onChange={(e) => setFocusArea(e.target.value)}
+            placeholder="e.g. conversion rate, messaging clarity"
+            className="mt-1 w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+
+        <button onClick={generate} disabled={store.isStreaming || selectedChannels.length === 0}
+          className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50">
+          {store.isStreaming ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</> : <><Zap className="w-4 h-4" /> Generate Propagation Plan — 20 credits</>}
+        </button>
+
+        {store.steps.length > 0 && (
+          <div className="space-y-1.5">
+            {store.steps.map((s, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className={cn('w-2 h-2 rounded-full shrink-0',
+                  s.status === 'done' ? 'bg-green-500' : s.status === 'running' ? 'bg-primary animate-pulse' : 'bg-muted-foreground/30')} />
+                <span className="text-xs text-muted-foreground">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {result && (
+        <div className="space-y-4">
+          {result.propagation_summary && (
+            <div className="p-4 rounded-xl border border-border bg-card">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Summary</p>
+              <p className="text-sm">{result.propagation_summary}</p>
+              <p className="text-xs text-muted-foreground mt-1">{result.experiments_analysed} experiment{result.experiments_analysed !== 1 ? 's' : ''} analysed</p>
+            </div>
+          )}
+
+          {(result.winning_themes?.length > 0 || result.losing_themes?.length > 0) && (
+            <div className="grid grid-cols-2 gap-3">
+              {result.winning_themes?.length > 0 && (
+                <div className="p-3 rounded-xl border border-green-500/30 bg-green-50/50 dark:bg-green-900/10">
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-2">What's Working</p>
+                  <ul className="space-y-1">{result.winning_themes.map((t, i) => <li key={i} className="text-xs text-muted-foreground">✓ {t}</li>)}</ul>
+                </div>
+              )}
+              {result.losing_themes?.length > 0 && (
+                <div className="p-3 rounded-xl border border-red-500/30 bg-red-50/50 dark:bg-red-900/10">
+                  <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">What's Not Working</p>
+                  <ul className="space-y-1">{result.losing_themes.map((t, i) => <li key={i} className="text-xs text-muted-foreground">✗ {t}</li>)}</ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {result.quick_wins?.length > 0 && (
+            <div className="p-4 rounded-xl border border-primary/20 bg-primary/5">
+              <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-2">Quick Wins (implement this week)</p>
+              <ol className="space-y-1">
+                {result.quick_wins.map((w, i) => (
+                  <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                    <span className="text-primary font-medium">{i + 1}.</span>{w}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {result.propagation_actions?.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Action Plan</p>
+              {result.propagation_actions.map((a, i) => (
+                <div key={i} className={cn('p-3 rounded-xl border', PRIORITY_COLORS[a.priority] ?? 'border-border bg-card')}>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold capitalize">{a.channel.replace(/_/g, ' ')}</span>
+                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize border', PRIORITY_COLORS[a.priority] ?? 'bg-muted text-muted-foreground border-border')}>{a.priority} priority</span>
+                      <span className="text-[10px] text-muted-foreground">Effort: {a.effort}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">Expected: {a.expected_impact}</span>
+                  </div>
+                  <p className="text-sm font-medium">{a.action}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{a.rationale}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function ExperimentLogPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const [activeTab, setActiveTab] = useState<'log' | 'insights'>('log')
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState('all')
@@ -309,53 +485,66 @@ export default function ExperimentLogPage() {
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
         <SidebarToggle />
-        <div className="flex-1">
+        <div className="flex-1 flex items-center gap-3">
           <h1 className="font-semibold">Experiment Log</h1>
-          <p className="text-xs text-muted-foreground">Pillar 10 - Native DB</p>
-        </div>
-        <CreateForm projectId={projectId} onCreated={load} />
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-4">
-          {/* Status summary */}
-          <div className="grid grid-cols-5 gap-2">
-            {STATUSES.map((s) => (
-              <button key={s} onClick={() => setFilterStatus(filterStatus === s ? 'all' : s)}
-                className={cn('p-2 rounded-lg border text-center transition-colors',
-                  filterStatus === s ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50')}>
-                <p className="text-lg font-bold">{counts[s] ?? 0}</p>
-                <p className="text-[10px] text-muted-foreground capitalize">{s}</p>
+          <div className="flex items-center gap-1">
+            {([
+              { id: 'log',      label: 'Log',     icon: <ClipboardList className="w-3.5 h-3.5" /> },
+              { id: 'insights', label: 'Insights', icon: <Zap className="w-3.5 h-3.5" /> },
+            ] as { id: 'log' | 'insights'; label: string; icon: React.ReactNode }[]).map((t) => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={cn('flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                  activeTab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted')}>
+                {t.icon}{t.label}
               </button>
             ))}
           </div>
+        </div>
+        {activeTab === 'log' && <CreateForm projectId={projectId} onCreated={load} />}
+      </div>
 
-          {/* Filter indicator */}
-          {filterStatus !== 'all' && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Showing: <span className="capitalize font-medium text-foreground">{filterStatus}</span></span>
-              <button onClick={() => setFilterStatus('all')} className="text-xs text-primary hover:underline">Clear</button>
-            </div>
-          )}
-
-          {/* List */}
-          {loading ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">Loading experiments…</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12 space-y-2">
-              <ClipboardList className="w-8 h-8 text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">
-                {filterStatus === 'all' ? 'No experiments yet. Log your first one!' : `No ${filterStatus} experiments.`}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filtered.map((exp) => (
-                <ExperimentCard key={exp.id} exp={exp} onUpdate={handleUpdate} onDelete={handleDelete} />
+      <div className="flex-1 overflow-y-auto p-6">
+        {activeTab === 'insights' ? (
+          <InsightsTab projectId={projectId} />
+        ) : (
+          <div className="max-w-4xl mx-auto space-y-4">
+            {/* Status summary */}
+            <div className="grid grid-cols-5 gap-2">
+              {STATUSES.map((s) => (
+                <button key={s} onClick={() => setFilterStatus(filterStatus === s ? 'all' : s)}
+                  className={cn('p-2 rounded-lg border text-center transition-colors',
+                    filterStatus === s ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50')}>
+                  <p className="text-lg font-bold">{counts[s] ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{s}</p>
+                </button>
               ))}
             </div>
-          )}
-        </div>
+
+            {filterStatus !== 'all' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Showing: <span className="capitalize font-medium text-foreground">{filterStatus}</span></span>
+                <button onClick={() => setFilterStatus('all')} className="text-xs text-primary hover:underline">Clear</button>
+              </div>
+            )}
+
+            {loading ? (
+              <div className="text-center py-12 text-sm text-muted-foreground">Loading experiments…</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-12 space-y-2">
+                <ClipboardList className="w-8 h-8 text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">
+                  {filterStatus === 'all' ? 'No experiments yet. Log your first one!' : `No ${filterStatus} experiments.`}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filtered.map((exp) => (
+                  <ExperimentCard key={exp.id} exp={exp} onUpdate={handleUpdate} onDelete={handleDelete} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
