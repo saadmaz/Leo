@@ -410,6 +410,7 @@ export function Sidebar() {
               {/* Grow */}
               <NavGroup label="Grow" storageKey="nav_grow" color="text-rose-500">
                 <NavItem icon={<Search className="w-3.5 h-3.5" />}       label="SEO Engine"    onClick={() => nav(`/projects/${activeProject.id}/seo-pro`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}     label="Blog Brief"    onClick={() => nav(`/projects/${activeProject.id}/seo-pro/blog-brief`)} />
                 <NavItem icon={<DollarSign className="w-3.5 h-3.5" />}   label="Paid Ads"      onClick={() => nav(`/projects/${activeProject.id}/paid-ads`)} />
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}         label="Email CRM"     onClick={() => nav(`/projects/${activeProject.id}/email-crm`)} />
                 <NavItem icon={<Send className="w-3.5 h-3.5" />}         label="Social Engine" onClick={() => nav(`/projects/${activeProject.id}/social`)} />
@@ -419,13 +420,14 @@ export function Sidebar() {
 
               {/* Intelligence */}
               <NavGroup label="Intelligence" storageKey="nav_intel_v2" color="text-blue-500">
-                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"      onClick={() => nav(`/projects/${activeProject.id}/analytics`)} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Analytics Pro"  onClick={() => nav(`/projects/${activeProject.id}/analytics-pro`)} />
-                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"        onClick={() => nav(`/projects/${activeProject.id}/reports`)} />
-                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"    onClick={() => nav(`/projects/${activeProject.id}/deep-search`)} />
-                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"    onClick={() => nav(`/projects/${activeProject.id}/intelligence`)} />
-                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"  onClick={() => nav(`/projects/${activeProject.id}/intelligence/deep-research`)} />
-                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Brand Health"  onClick={() => nav(`/projects/${activeProject.id}/brand-health`)} />
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Analytics"        onClick={() => nav(`/projects/${activeProject.id}/analytics`)} />
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Analytics Pro"    onClick={() => nav(`/projects/${activeProject.id}/analytics-pro`)} />
+                <NavItem icon={<TrendingUp className="w-3.5 h-3.5" />} label="Blog Performance" onClick={() => nav(`/projects/${activeProject.id}/analytics-pro/blog-performance`)} />
+                <NavItem icon={<FileText className="w-3.5 h-3.5" />}   label="Reports"          onClick={() => nav(`/projects/${activeProject.id}/reports`)} />
+                <NavItem icon={<Search className="w-3.5 h-3.5" />}     label="Deep Search"      onClick={() => nav(`/projects/${activeProject.id}/deep-search`)} />
+                <NavItem icon={<BarChart2 className="w-3.5 h-3.5" />}  label="Competitors"      onClick={() => nav(`/projects/${activeProject.id}/intelligence`)} />
+                <NavItem icon={<Zap className="w-3.5 h-3.5" />}        label="Deep Research"    onClick={() => nav(`/projects/${activeProject.id}/intelligence/deep-research`)} />
+                <NavItem icon={<ShieldCheck className="w-3.5 h-3.5" />} label="Brand Health"    onClick={() => nav(`/projects/${activeProject.id}/brand-health`)} />
               </NavGroup>
 
               {/* Strategy */}
@@ -443,6 +445,7 @@ export function Sidebar() {
                 <NavItem icon={<FileText className="w-3.5 h-3.5" />}       label="Knowledge Base"  onClick={() => nav(`/projects/${activeProject.id}/knowledge`)} />
                 <NavItem icon={<Globe className="w-3.5 h-3.5" />}          label="SEO Studio"      onClick={() => nav(`/projects/${activeProject.id}/seo`)} />
                 <NavItem icon={<Mail className="w-3.5 h-3.5" />}           label="Email Studio"    onClick={() => nav(`/projects/${activeProject.id}/emails`)} />
+                <NavItem icon={<Layers className="w-3.5 h-3.5" />}         label="WordPress"       onClick={() => nav(`/projects/${activeProject.id}/settings/integrations/wordpress`)} />
                 <NavItem icon={<Users className="w-3.5 h-3.5" />}          label="Team"            onClick={() => nav(`/projects/${activeProject.id}/team`)} />
               </NavGroup>
 

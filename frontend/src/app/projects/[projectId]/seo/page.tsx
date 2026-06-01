@@ -1,17 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 import {
   Globe, Loader2, Copy, Check, ChevronDown, ChevronUp,
   FileText, Code2, Layout, Sparkles, Target, Plus, X, TrendingUp, ArrowRight, BookmarkPlus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { api } from '@/lib/api'
+import { api, type BlogBrief } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { BackButton } from '@/components/layout/back-button'
+import { SectionProgressTracker } from '@/components/blog/SectionProgressTracker'
+import { NLPTermTracker } from '@/components/blog/NLPTermTracker'
+import { BlogScorePanel } from '@/components/blog/BlogScorePanel'
 import type { BlogPostMeta, MetaTagsResult, WebsiteCopySection, ContentGap, ContentTopic } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -35,8 +38,10 @@ const PAGE_TYPES = ['homepage', 'about', 'product', 'pricing', 'landing']
 
 export default function SEOPage() {
   const params = useParams<{ projectId: string }>()
+  const searchParams = useSearchParams()
   const { activeProject } = useAppStore()
-  const [tab, setTab] = useState<Tab>('blog')
+  const briefId = searchParams.get('brief_id') ?? undefined
+  const [tab, setTab] = useState<Tab>(briefId ? 'blog' : 'blog')
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -68,7 +73,7 @@ export default function SEOPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-        {tab === 'blog'    && <BlogPostTab projectId={params.projectId} />}
+        {tab === 'blog'    && <BlogPostTab projectId={params.projectId} briefId={briefId} />}
         {tab === 'meta'    && <MetaTagsTab projectId={params.projectId} />}
         {tab === 'website' && <WebsiteCopyTab projectId={params.projectId} />}
         {tab === 'gaps'    && <ContentGapTab projectId={params.projectId} />}
@@ -81,22 +86,54 @@ export default function SEOPage() {
 // Blog Post Tab
 // ---------------------------------------------------------------------------
 
-function BlogPostTab({ projectId }: { projectId: string }) {
-  const [topic, setTopic]       = useState('')
-  const [keywords, setKeywords] = useState('')
-  const [tone, setTone]         = useState('informative and engaging')
+interface SectionState {
+  status: 'pending' | 'in_progress' | 'complete'
+  wordTarget: number
+  nlpTermsCovered: string[]
+}
+
+function BlogPostTab({ projectId, briefId }: { projectId: string; briefId?: string }) {
+  const [topic, setTopic]         = useState('')
+  const [keywords, setKeywords]   = useState('')
+  const [tone, setTone]           = useState('informative and engaging')
   const [wordCount, setWordCount] = useState(1000)
-  const [loading, setLoading]   = useState(false)
-  const [meta, setMeta]         = useState<BlogPostMeta | null>(null)
-  const [body, setBody]         = useState('')
-  const [copied, setCopied]     = useState(false)
-  const [saving, setSaving]     = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [meta, setMeta]           = useState<BlogPostMeta | null>(null)
+  const [body, setBody]           = useState('')
+  const [copied, setCopied]       = useState(false)
+  const [saving, setSaving]       = useState(false)
+
+  // Brief-mode state
+  const [brief, setBrief]                       = useState<BlogBrief | null>(null)
+  const [briefLoading, setBriefLoading]         = useState(false)
+  const [sectionStates, setSectionStates]       = useState<Record<string, SectionState>>({})
+  const [currentSection, setCurrentSection]     = useState<string | null>(null)
+  const [coveredNLPTerms, setCoveredNLPTerms]   = useState<Set<string>>(new Set())
+
+  // Load brief when briefId is provided
+  useEffect(() => {
+    if (!briefId) return
+    setBriefLoading(true)
+    api.blog.getBrief(projectId, briefId)
+      .then((b) => {
+        setBrief(b)
+        setTopic(b.target_keyword)
+        setKeywords(b.target_keyword)
+        setWordCount(b.recommended_word_count)
+      })
+      .catch(() => toast.error('Failed to load brief'))
+      .finally(() => setBriefLoading(false))
+  }, [briefId, projectId])
 
   async function handleGenerate() {
     if (!topic.trim()) { toast.error('Enter a topic.'); return }
     setLoading(true)
     setMeta(null)
     setBody('')
+    setSectionStates({})
+    setCurrentSection(null)
+    setCoveredNLPTerms(new Set())
+
     try {
       await api.streamBlogPost(
         projectId,
@@ -105,9 +142,35 @@ function BlogPostTab({ projectId }: { projectId: string }) {
           keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
           tone,
           word_count: wordCount,
+          brief_id: brief?.id,
         },
         (m) => setMeta(m),
         (chunk) => setBody((prev) => prev + chunk),
+        undefined,
+        {
+          onSectionStart: (section, wordTarget) => {
+            setCurrentSection(section)
+            setSectionStates((prev) => ({
+              ...prev,
+              [section]: { status: 'in_progress', wordTarget, nlpTermsCovered: [] },
+            }))
+          },
+          onSectionComplete: (section, nlpTermsCovered) => {
+            setCurrentSection(null)
+            setSectionStates((prev) => ({
+              ...prev,
+              [section]: { status: 'complete', wordTarget: prev[section]?.wordTarget ?? 0, nlpTermsCovered },
+            }))
+            setCoveredNLPTerms((prev) => {
+              const next = new Set(prev)
+              nlpTermsCovered.forEach((t) => next.add(t.toLowerCase()))
+              return next
+            })
+          },
+          onNLPGap: (missing) => {
+            if (missing.length > 0) toast.warning(`${missing.length} NLP terms uncovered — review before publishing`)
+          },
+        },
       )
     } catch (err) {
       console.error(err)
@@ -119,8 +182,7 @@ function BlogPostTab({ projectId }: { projectId: string }) {
 
   function copyAll() {
     if (!meta || !body) return
-    const full = `# ${meta.title}\n\n${body}`
-    navigator.clipboard.writeText(full)
+    navigator.clipboard.writeText(`# ${meta.title}\n\n${body}`)
     setCopied(true)
     toast.success('Copied to clipboard!')
     setTimeout(() => setCopied(false), 2000)
@@ -141,6 +203,8 @@ function BlogPostTab({ projectId }: { projectId: string }) {
           description: meta.description,
           keywords: meta.keywords,
           topic,
+          target_keyword: brief?.target_keyword,
+          brief_id: brief?.id,
           savedFromSeoStudio: true,
           contentType: 'blog_post',
         },
@@ -154,113 +218,176 @@ function BlogPostTab({ projectId }: { projectId: string }) {
     }
   }
 
-  return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      {/* Inputs */}
-      <div className="border border-border rounded-xl bg-card p-4 space-y-3">
-        <div>
-          <label className="block text-xs font-medium mb-1">Topic *</label>
-          <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="e.g. How to build a sustainable morning routine"
-            className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Target Keywords <span className="text-muted-foreground">(comma-separated)</span></label>
-          <input
-            value={keywords}
-            onChange={(e) => setKeywords(e.target.value)}
-            placeholder="e.g. morning routine, productivity habits, wellness tips"
-            className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium mb-1">Tone</label>
-            <input
-              value={tone}
-              onChange={(e) => setTone(e.target.value)}
-              placeholder="informative and engaging"
-              className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Word count</label>
-            <select
-              value={wordCount}
-              onChange={(e) => setWordCount(Number(e.target.value))}
-              className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {[500, 800, 1000, 1500, 2000, 2500, 3000].map((n) => (
-                <option key={n} value={n}>{n.toLocaleString()} words</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <button
-          onClick={handleGenerate}
-          disabled={loading || !topic.trim()}
-          className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          {loading ? 'Generating…' : 'Generate Blog Post'}
-        </button>
-      </div>
+  const isBriefMode = !!brief
+  const hasDraft = !!body
 
-      {/* Meta preview */}
-      {meta && (
-        <div className="border border-border rounded-xl bg-card p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">SEO Preview</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={saveToLibrary}
-                disabled={!body || saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-foreground hover:bg-muted/70 transition-colors disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
-                Save to Library
-              </button>
-              <button
-                onClick={copyAll}
-                disabled={!body}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                  copied ? 'bg-green-500/10 text-green-600' : 'bg-muted text-foreground hover:bg-muted/70',
-                )}
-              >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Copied!' : 'Copy post'}
-              </button>
-            </div>
-          </div>
-          <p className="text-base font-semibold text-blue-600 hover:underline cursor-pointer">{meta.title}</p>
-          <p className="text-xs text-green-700">/{meta.slug}</p>
-          <p className="text-xs text-muted-foreground">{meta.description}</p>
-          {meta.outline?.length > 0 && (
-            <div className="pt-2 border-t border-border">
-              <p className="text-[10px] font-medium text-muted-foreground mb-1">OUTLINE</p>
-              <ol className="space-y-0.5">
-                {meta.outline.map((h, i) => (
-                  <li key={i} className="text-xs text-foreground/70">{i + 1}. {h}</li>
-                ))}
-              </ol>
+  return (
+    <div className={cn('max-w-3xl mx-auto space-y-4', isBriefMode && 'max-w-5xl')}>
+      <div className={cn('gap-6', isBriefMode && hasDraft ? 'flex items-start' : '')}>
+        {/* Left column: form + output */}
+        <div className="flex-1 min-w-0 space-y-4">
+
+          {/* Brief context banner */}
+          {briefLoading && (
+            <div className="flex items-center gap-2 p-4 border border-border rounded-xl text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading brief…
             </div>
           )}
-        </div>
-      )}
 
-      {/* Post body */}
-      {body && (
-        <div className="border border-border rounded-xl bg-card p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
-            Generated Post {loading && <span className="text-primary animate-pulse">● writing…</span>}
-          </p>
-          <pre className="text-sm text-foreground/80 whitespace-pre-wrap font-sans leading-relaxed">{body}</pre>
+          {brief && (
+            <div className="border border-primary/20 bg-primary/5 rounded-xl p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <p className="text-sm font-semibold text-primary">Brief Mode — Structured Drafting</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Keyword: <span className="font-medium text-foreground">{brief.target_keyword}</span>
+                <span className="mx-2">·</span>
+                Target: <span className="font-medium text-foreground">{brief.recommended_word_count.toLocaleString()} words</span>
+                <span className="mx-2">·</span>
+                {brief.h2_structure.length} sections
+              </p>
+              {brief.content_angle && (
+                <p className="text-xs text-muted-foreground">
+                  Angle: <span className="text-foreground">{brief.content_angle}</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Inputs */}
+          <div className="border border-border rounded-xl bg-card p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Topic *</label>
+              <input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. How to build a sustainable morning routine"
+                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            {!isBriefMode && (
+              <div>
+                <label className="block text-xs font-medium mb-1">Target Keywords <span className="text-muted-foreground">(comma-separated)</span></label>
+                <input
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  placeholder="e.g. morning routine, productivity habits, wellness tips"
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">Tone</label>
+                <input
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  placeholder="informative and engaging"
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {!isBriefMode && (
+                <div>
+                  <label className="block text-xs font-medium mb-1">Word count</label>
+                  <select
+                    value={wordCount}
+                    onChange={(e) => setWordCount(Number(e.target.value))}
+                    className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {[500, 800, 1000, 1500, 2000, 2500, 3000].map((n) => (
+                      <option key={n} value={n}>{n.toLocaleString()} words</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleGenerate}
+              disabled={loading || !topic.trim()}
+              className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {loading ? (isBriefMode ? 'Drafting section by section…' : 'Generating…') : (isBriefMode ? 'Draft with Brief' : 'Generate Blog Post')}
+            </button>
+          </div>
+
+          {/* Meta preview */}
+          {meta && (
+            <div className="border border-border rounded-xl bg-card p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">SEO Preview</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={saveToLibrary}
+                    disabled={!body || saving}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-foreground hover:bg-muted/70 transition-colors disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                    Save to Library
+                  </button>
+                  <button
+                    onClick={copyAll}
+                    disabled={!body}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                      copied ? 'bg-green-500/10 text-green-600' : 'bg-muted text-foreground hover:bg-muted/70',
+                    )}
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? 'Copied!' : 'Copy post'}
+                  </button>
+                </div>
+              </div>
+              <p className="text-base font-semibold text-blue-600 hover:underline cursor-pointer">{meta.title}</p>
+              <p className="text-xs text-green-700">/{meta.slug}</p>
+              <p className="text-xs text-muted-foreground">{meta.description}</p>
+              {!isBriefMode && meta.outline?.length > 0 && (
+                <div className="pt-2 border-t border-border">
+                  <p className="text-[10px] font-medium text-muted-foreground mb-1">OUTLINE</p>
+                  <ol className="space-y-0.5">
+                    {meta.outline.map((h, i) => (
+                      <li key={i} className="text-xs text-foreground/70">{i + 1}. {h}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Post body */}
+          {body && (
+            <div className="border border-border rounded-xl bg-card p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                Generated Post {loading && <span className="text-primary animate-pulse">● writing…</span>}
+              </p>
+              <pre className="text-sm text-foreground/80 whitespace-pre-wrap font-sans leading-relaxed">{body}</pre>
+            </div>
+          )}
+
+          {/* Score panel (brief mode only, shown after draft completes) */}
+          {isBriefMode && hasDraft && !loading && (
+            <BlogScorePanel draft={body} brief={brief} projectId={projectId} />
+          )}
         </div>
-      )}
+
+        {/* Right column: section progress + NLP tracker (brief mode, during/after drafting) */}
+        {isBriefMode && (loading || hasDraft) && (
+          <div className="w-64 shrink-0 space-y-4 sticky top-4">
+            <SectionProgressTracker
+              sections={brief.h2_structure}
+              sectionStates={sectionStates}
+              currentSection={currentSection}
+            />
+            {brief.nlp_terms_required.length > 0 && (
+              <NLPTermTracker
+                terms={brief.nlp_terms_required}
+                coveredTerms={coveredNLPTerms}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
