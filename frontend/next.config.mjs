@@ -6,6 +6,22 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  async redirects() {
+    // seo-pro → search (route rename, Phase 3a)
+    // These server-side redirects handle any bookmarks or external links to the old paths.
+    return [
+      {
+        source: '/projects/:projectId/seo-pro',
+        destination: '/projects/:projectId/search',
+        permanent: true,
+      },
+      {
+        source: '/projects/:projectId/seo-pro/:tool',
+        destination: '/projects/:projectId/search/:tool',
+        permanent: true,
+      },
+    ]
+  },
   async rewrites() {
     // NEXT_PUBLIC_BACKEND_URL should be set to your deployed backend origin in production.
     // e.g. https://leo-api.up.railway.app
