@@ -5,6 +5,7 @@ import {
   Type, ImageIcon, Video, Mic, CheckCircle, Globe, BookOpen, Search, FileText,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
+import { ContextPanel } from '@/components/layout/ContextPanel'
 
 const FEATURES = [
   {
@@ -109,6 +110,7 @@ export default function ContentHubPage() {
         title="Content Studio"
         subtitle="Advanced content creation tools"
         showBack
+        actions={<ContextPanel projectId={projectId} context="content" />}
       />
 
       <div className="flex-1 overflow-y-auto p-6 page-enter">

@@ -14,6 +14,7 @@ import type { Campaign, CampaignContentPack } from '@/types'
 import { cn } from '@/lib/utils'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { VisualBriefModal } from '@/components/campaigns/VisualBriefModal'
+import { ContextPanel } from '@/components/layout/ContextPanel'
 
 // ---------------------------------------------------------------------------
 // Channel display helpers
@@ -349,6 +350,7 @@ function CampaignDetail({ campaign, projectId, onDelete, onSaved }: {
           <h2 className="font-semibold text-base truncate">{campaign.name}</h2>
           <StatusBadge status={campaign.status} />
         </div>
+        <ContextPanel projectId={projectId} context="campaign" />
         {hasEdits && (
           <button
             onClick={saveEdits}

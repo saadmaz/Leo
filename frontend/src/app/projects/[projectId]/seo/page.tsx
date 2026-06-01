@@ -52,6 +52,9 @@ export default function SEOPage() {
         <Globe className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">SEO Studio</span>
         {activeProject && <span className="text-xs text-muted-foreground">- {activeProject.name}</span>}
+        <div className="ml-auto">
+          <ContextPanel projectId={params.projectId} context="seo" />
+        </div>
       </div>
 
       {/* Tabs */}

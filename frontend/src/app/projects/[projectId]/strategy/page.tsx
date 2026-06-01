@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { HubFeatureCard } from '@/components/pillar1/HubFeatureCard'
+import { ContextPanel } from '@/components/layout/ContextPanel'
 import { api } from '@/lib/api'
 import type { Pillar1Doc } from '@/types'
 
@@ -116,10 +117,11 @@ export default function StrategyHubPage() {
       {/* Header */}
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
         <SidebarToggle />
-        <div>
+        <div className="flex-1">
           <h1 className="font-semibold text-lg">Strategy & Planning</h1>
           <p className="text-xs text-muted-foreground">10 AI-powered strategy tools built on your Brand Core</p>
         </div>
+        <ContextPanel projectId={projectId} context="strategy" />
       </div>
 
       {/* Grid */}
