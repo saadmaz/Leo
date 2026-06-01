@@ -1101,6 +1101,8 @@ export const api = {
       get<{ summary: string }>(`/projects/${projectId}/analytics/ai-summary`),
     compare: (projectId: string, period: '7d' | '30d' = '7d') =>
       get<{ period_days: number; library: { current: number; previous: number; pct_change: number | null }; calendar: { current: number; previous: number; pct_change: number | null } }>(`/projects/${projectId}/analytics/compare?period=${period}`),
+    contextSummary: (projectId: string, signal?: AbortSignal) =>
+      get<ContextSummary>(`/projects/${projectId}/analytics/context-summary`, signal),
   },
 
   performance: {
@@ -3154,4 +3156,12 @@ type BlogBriefEvent = {
   warning?: string
   brief?: unknown
   error?: string
+}
+
+export interface ContextSummary {
+  recent_alerts: { title: string; sentiment: 'positive' | 'negative' | 'neutral'; subject?: string; timestamp: string }[]
+  voice_trend: { avg_score: number | null; direction: 'up' | 'down' | 'flat'; recent_count: number }
+  competitor_count: number
+  active_campaign: { id: string; name: string; status: string } | null
+  top_content_type: string | null
 }

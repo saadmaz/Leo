@@ -6,6 +6,7 @@ import { FileText, Search, ChevronRight, AlertTriangle, CheckCircle, Loader2, Ex
 import { toast } from 'sonner'
 import { api, type BlogSERPAnalysis, type BlogBrief } from '@/lib/api'
 import { SidebarToggle } from '@/components/layout/sidebar'
+import { ContextPanel } from '@/components/layout/ContextPanel'
 import { cn } from '@/lib/utils'
 
 type Step = 'keyword' | 'serp' | 'brief' | 'done'
@@ -159,10 +160,11 @@ export default function BlogBriefPage() {
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
         <SidebarToggle />
         <div className="text-primary"><FileText className="w-5 h-5" /></div>
-        <div>
+        <div className="flex-1">
           <h1 className="font-semibold text-sm">Blog Content Brief</h1>
           <p className="text-xs text-muted-foreground">SERP-grounded brief for long-form SEO content</p>
         </div>
+        <ContextPanel projectId={projectId} context="seo" />
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-3xl mx-auto w-full">

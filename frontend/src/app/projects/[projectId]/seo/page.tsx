@@ -15,6 +15,7 @@ import { BackButton } from '@/components/layout/back-button'
 import { SectionProgressTracker } from '@/components/blog/SectionProgressTracker'
 import { NLPTermTracker } from '@/components/blog/NLPTermTracker'
 import { BlogScorePanel } from '@/components/blog/BlogScorePanel'
+import { ContextPanel } from '@/components/layout/ContextPanel'
 import type { BlogPostMeta, MetaTagsResult, WebsiteCopySection, ContentGap, ContentTopic } from '@/types'
 
 // ---------------------------------------------------------------------------
