@@ -232,6 +232,7 @@ app.include_router(brand_audit.router)
 app.include_router(competitor_digest.router)
 app.include_router(blog.router)
 app.include_router(integrations.router)
+app.include_router(integrations.auth_router)
 app.include_router(brand_chat.router)
 app.include_router(templates.router_community)
 

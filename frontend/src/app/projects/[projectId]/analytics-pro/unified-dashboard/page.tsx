@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
-import { LayoutDashboard, Plus, X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { LayoutDashboard, Plus, X, AlertCircle, CheckCircle2, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'
 import { api } from '@/lib/api'
@@ -32,6 +32,7 @@ function newChannel(i: number): ChannelRow {
 
 export default function UnifiedDashboardPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const router = useRouter()
   const store = usePillar7Store()
 
   const [dateRange, setDateRange] = useState(30)
@@ -42,6 +43,41 @@ export default function UnifiedDashboardPage() {
   const [metaAccountId, setMetaAccountId] = useState('')
   const [result, setResult] = useState<DashboardPayload | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // GA4 connection state
+  const [ga4Status, setGA4Status] = useState<{ connected: boolean; property_id: string | null } | null>(null)
+  const [ga4Metrics, setGA4Metrics] = useState<{
+    sessions: number; users: number; pageviews: number
+    bounce_rate: number; avg_session_duration: number
+  } | null>(null)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [refreshingCache, setRefreshingCache] = useState(false)
+
+  useEffect(() => {
+    api.ga4.status(projectId)
+      .then((s) => {
+        setGA4Status(s)
+        if (s.connected && s.property_id) {
+          api.ga4.metrics(projectId).then(setGA4Metrics).catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }, [projectId])
+
+  async function handleRefreshCache() {
+    setRefreshingCache(true)
+    try {
+      await api.ga4.refreshCache(projectId)
+      // Reload metrics after cache clear
+      const fresh = await api.ga4.metrics(projectId)
+      setGA4Metrics(fresh)
+      toast.success('GA4 data refreshed')
+    } catch {
+      toast.error('Failed to refresh GA4 data')
+    } finally {
+      setRefreshingCache(false)
+    }
+  }
 
   function addChannel() { setChannels([...channels, newChannel(channels.length)]) }
   function removeChannel(i: number) { setChannels(channels.filter((_, idx) => idx !== i)) }
@@ -82,6 +118,64 @@ export default function UnifiedDashboardPage() {
   const form = (
     <>
       <h2 className="font-semibold text-sm">Unified Analytics Dashboard</h2>
+
+      {/* GA4 connection banner */}
+      {ga4Status !== null && !ga4Status.connected && !bannerDismissed && (
+        <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-200">Connect Google Analytics 4 for live data</p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+              Without GA4, this dashboard uses manual channel data only.{' '}
+              <button
+                onClick={() => router.push(`/projects/${projectId}/settings/integrations`)}
+                className="underline hover:no-underline"
+              >
+                Go to Settings →
+              </button>
+            </p>
+          </div>
+          <button onClick={() => setBannerDismissed(true)} className="text-amber-400 hover:text-amber-600 shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* GA4 live metrics snapshot (when connected) */}
+      {ga4Status?.connected && ga4Status.property_id && (
+        <div className="p-3 rounded-lg border border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-900/20 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+              <span className="text-xs font-medium text-green-800 dark:text-green-300">
+                GA4 connected — Property {ga4Status.property_id}
+              </span>
+            </div>
+            <button
+              onClick={handleRefreshCache}
+              disabled={refreshingCache}
+              className="text-green-600 hover:text-green-800 transition-colors p-0.5"
+              title="Refresh live data (clears 6h cache)"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', refreshingCache && 'animate-spin')} />
+            </button>
+          </div>
+          {ga4Metrics && (
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {[
+                { label: 'Sessions', value: ga4Metrics.sessions.toLocaleString() },
+                { label: 'Users', value: ga4Metrics.users.toLocaleString() },
+                { label: 'Bounce Rate', value: `${ga4Metrics.bounce_rate}%` },
+              ].map(({ label, value }) => (
+                <div key={label} className="text-center">
+                  <p className="text-[10px] text-green-700 dark:text-green-400">{label}</p>
+                  <p className="text-sm font-bold text-green-800 dark:text-green-300 tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date Range</label>
@@ -107,7 +201,13 @@ export default function UnifiedDashboardPage() {
       <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/20">
         <div className="flex items-center gap-2">
           <input type="checkbox" id="ga4" checked={includeGa4} onChange={(e) => setIncludeGa4(e.target.checked)} className="rounded" />
-          <label htmlFor="ga4" className="text-xs cursor-pointer">Auto-pull from GA4 (requires GA4_PROPERTY_ID + GA4_SERVICE_ACCOUNT_KEY)</label>
+          <label htmlFor="ga4" className="text-xs cursor-pointer">
+            Auto-pull from GA4
+            {ga4Status?.connected
+              ? <span className="ml-1 text-green-600 font-medium">● connected</span>
+              : <span className="ml-1 text-muted-foreground">(not connected — <button className="underline" onClick={() => router.push(`/projects/${projectId}/settings/integrations`)}>connect →</button>)</span>
+            }
+          </label>
         </div>
         <div className="flex items-center gap-2">
           <input type="checkbox" id="meta" checked={includeMeta} onChange={(e) => setIncludeMeta(e.target.checked)} className="rounded" />

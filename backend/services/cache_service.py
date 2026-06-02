@@ -96,3 +96,4 @@ TTL_BRAND_CONTEXT = 300        # brand core + memory — 5 min
 TTL_SEARCH_RESULTS = 3600      # Exa / Tavily results — 1 hour
 TTL_COMPETITOR_PROFILE = 1800  # classified competitor profiles — 30 min
 TTL_BILLING_STATUS = 60        # billing plan check — 1 min
+TTL_GA4_DATA = 21600           # GA4 API responses — 6 hours (200k/day quota)

@@ -499,30 +499,24 @@ export default function AnalyticsPage() {
 // Live Data tab (GA4 + GSC)
 // ---------------------------------------------------------------------------
 
-const CHANNEL_COLORS: Record<string, string> = {
-  'Organic Search':  '#7c3aed',
-  'Direct':          '#10b981',
-  'Referral':        '#3b82f6',
-  'Organic Social':  '#ec4899',
-  'Paid Search':     '#f59e0b',
-  'Email':           '#6366f1',
-}
-
 function LiveDataTab({ projectId }: { projectId: string }) {
-  const [ga4Status, setGA4Status] = useState<{ configured: boolean; property_id: string | null; connected: boolean } | null>(null)
+  const [ga4Status, setGA4Status] = useState<{ connected: boolean; property_id: string | null } | null>(null)
   const [gscStatus, setGscStatus] = useState<{ connected: boolean } | null>(null)
-  const [ga4Overview, setGA4Overview] = useState<{ sessions: number; users: number; pageviews: number; bounce_rate: number; avg_session_duration: number } | null>(null)
-  const [sessions, setSessions] = useState<{ date: string; sessions: number }[]>([])
-  const [sources, setSources] = useState<{ channel: string; sessions: number; users: number }[]>([])
-  const [pages, setPages] = useState<{ page_path: string; title: string; pageviews: number }[]>([])
-  const [gscQueries, setGscQueries] = useState<{ query: string; clicks: number; impressions: number; ctr: number; position: number }[]>([])
+  const [ga4Metrics, setGA4Metrics] = useState<{
+    sessions: number; users: number; pageviews: number
+    bounce_rate: number; avg_session_duration: number
+    daily_sessions: { date: string; sessions: number }[]
+  } | null>(null)
+  const [sources, setSources] = useState<{ source: string; medium: string; sessions: number; percentage: number }[]>([])
+  const [pages, setPages] = useState<{ page: string; sessions: number; pageviews: number; avg_time_on_page: number }[]>([])
+  const [gscQueries, setGscQueries] = useState<{ query: string; clicks: number; impressions: number; ctr: number; avg_position: number; is_quick_win: boolean }[]>([])
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
 
   useEffect(() => {
     Promise.all([
-      api.integrations.ga4Status(projectId).catch(() => null),
-      api.blog.getGSCStatus(projectId).catch(() => null),
+      api.ga4.status(projectId).catch(() => null),
+      api.integrations.gscStatus(projectId).catch(() => null),
     ]).then(([g4, gsc]) => {
       setGA4Status(g4)
       setGscStatus(gsc)
@@ -530,17 +524,15 @@ function LiveDataTab({ projectId }: { projectId: string }) {
   }, [projectId])
 
   useEffect(() => {
-    if (!ga4Status?.connected) return
+    if (!ga4Status?.connected || !ga4Status.property_id) return
     Promise.all([
-      api.integrations.ga4Overview(projectId, days).catch(() => null),
-      api.integrations.ga4Sessions(projectId, days).catch(() => ({ rows: [] })),
-      api.integrations.ga4Sources(projectId, days).catch(() => ({ rows: [] })),
-      api.integrations.ga4Pages(projectId, days).catch(() => ({ rows: [] })),
-    ]).then(([ov, sess, src, pg]) => {
-      setGA4Overview(ov)
-      setSessions(sess?.rows ?? [])
-      setSources(src?.rows ?? [])
-      setPages(pg?.rows ?? [])
+      api.ga4.metrics(projectId).catch(() => null),
+      api.ga4.sources(projectId).catch(() => []),
+      api.ga4.topPages(projectId).catch(() => []),
+    ]).then(([m, src, pg]) => {
+      setGA4Metrics(m)
+      setSources(Array.isArray(src) ? src : [])
+      setPages(Array.isArray(pg) ? pg : [])
     })
   }, [projectId, ga4Status, days])
 
@@ -558,7 +550,8 @@ function LiveDataTab({ projectId }: { projectId: string }) {
     )
   }
 
-  const noConnections = !ga4Status?.connected && !gscStatus?.connected
+  const ga4Connected = ga4Status?.connected && Boolean(ga4Status.property_id)
+  const noConnections = !ga4Connected && !gscStatus?.connected
 
   if (noConnections) {
     return (
@@ -603,17 +596,17 @@ function LiveDataTab({ projectId }: { projectId: string }) {
       </div>
 
       {/* GA4 Section */}
-      {ga4Status?.connected && (
+      {ga4Connected && (
         <>
           {/* Overview stat cards */}
-          {ga4Overview && (
+          {ga4Metrics && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {[
-                { label: 'Sessions', value: ga4Overview.sessions.toLocaleString() },
-                { label: 'Users', value: ga4Overview.users.toLocaleString() },
-                { label: 'Pageviews', value: ga4Overview.pageviews.toLocaleString() },
-                { label: 'Bounce Rate', value: `${ga4Overview.bounce_rate}%` },
-                { label: 'Avg Duration', value: `${Math.round(ga4Overview.avg_session_duration)}s` },
+                { label: 'Sessions', value: ga4Metrics.sessions.toLocaleString() },
+                { label: 'Users', value: ga4Metrics.users.toLocaleString() },
+                { label: 'Pageviews', value: ga4Metrics.pageviews.toLocaleString() },
+                { label: 'Bounce Rate', value: `${ga4Metrics.bounce_rate}%` },
+                { label: 'Avg Duration', value: `${Math.round(ga4Metrics.avg_session_duration)}s` },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
@@ -631,9 +624,9 @@ function LiveDataTab({ projectId }: { projectId: string }) {
                 <Globe className="w-3.5 h-3.5 text-primary" />
                 <p className="text-sm font-semibold">Sessions Over Time</p>
               </div>
-              {sessions.length > 0 ? (
+              {ga4Metrics && ga4Metrics.daily_sessions.length > 0 ? (
                 <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={sessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                  <LineChart data={ga4Metrics.daily_sessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
                     <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(d) => d.slice(5)} />
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
                     <Tooltip contentStyle={{ fontSize: 11 }} />
@@ -650,22 +643,17 @@ function LiveDataTab({ projectId }: { projectId: string }) {
               <p className="text-sm font-semibold mb-3">Traffic Sources</p>
               {sources.length > 0 ? (
                 <div className="space-y-2">
-                  {sources.map((s) => {
-                    const total = sources.reduce((sum, x) => sum + x.sessions, 0)
-                    const pct = total > 0 ? Math.round((s.sessions / total) * 100) : 0
-                    const color = CHANNEL_COLORS[s.channel] ?? '#6b7280'
-                    return (
-                      <div key={s.channel}>
-                        <div className="flex justify-between text-xs mb-0.5">
-                          <span className="text-muted-foreground truncate max-w-[120px]">{s.channel}</span>
-                          <span className="font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-border overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                        </div>
+                  {sources.map((s) => (
+                    <div key={s.medium}>
+                      <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-muted-foreground truncate max-w-[120px]">{s.source}</span>
+                        <span className="font-medium tabular-nums">{s.percentage}%</span>
                       </div>
-                    )
-                  })}
+                      <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                        <div className="h-full rounded-full bg-primary/70" style={{ width: `${s.percentage}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">No data</div>
@@ -684,6 +672,7 @@ function LiveDataTab({ projectId }: { projectId: string }) {
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-2 font-medium text-muted-foreground">Page</th>
+                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Sessions</th>
                       <th className="text-right px-4 py-2 font-medium text-muted-foreground">Pageviews</th>
                       <th className="text-right px-4 py-2 font-medium text-muted-foreground">Avg Time</th>
                     </tr>
@@ -692,11 +681,11 @@ function LiveDataTab({ projectId }: { projectId: string }) {
                     {pages.map((p, i) => (
                       <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
                         <td className="px-4 py-2">
-                          <p className="font-medium truncate max-w-xs">{p.title || p.page_path}</p>
-                          <p className="text-muted-foreground/70 truncate max-w-xs">{p.page_path}</p>
+                          <p className="font-medium truncate max-w-xs">{p.page}</p>
                         </td>
+                        <td className="px-4 py-2 text-right tabular-nums">{p.sessions.toLocaleString()}</td>
                         <td className="px-4 py-2 text-right tabular-nums">{p.pageviews.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">—</td>
+                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(p.avg_time_on_page)}s</td>
                       </tr>
                     ))}
                   </tbody>
@@ -732,8 +721,8 @@ function LiveDataTab({ projectId }: { projectId: string }) {
                     <td className="px-4 py-2 text-right tabular-nums">{q.clicks}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{q.impressions.toLocaleString()}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{q.ctr}%</td>
-                    <td className={cn('px-4 py-2 text-right tabular-nums font-medium', q.position <= 3 ? 'text-green-600' : q.position <= 10 ? 'text-amber-600' : 'text-muted-foreground')}>
-                      {q.position}
+                    <td className={cn('px-4 py-2 text-right tabular-nums font-medium', q.avg_position <= 3 ? 'text-green-600' : q.avg_position <= 10 ? 'text-amber-600' : 'text-muted-foreground')}>
+                      {q.avg_position}
                     </td>
                   </tr>
                 ))}

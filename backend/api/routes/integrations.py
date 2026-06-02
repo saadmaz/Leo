@@ -1,18 +1,28 @@
 """
-Integrations routes — GA4 and GSC per-project configuration.
+Integrations routes — GA4 OAuth + GSC data.
 
-GA4 endpoints:
-  GET  /projects/{id}/integrations/ga4/status     — is service account configured + property set
-  POST /projects/{id}/integrations/ga4/property   — save a property ID to the project
-  GET  /projects/{id}/integrations/ga4/overview   — live session metrics
-  GET  /projects/{id}/integrations/ga4/sessions   — daily sessions time-series
-  GET  /projects/{id}/integrations/ga4/sources    — traffic source breakdown
-  GET  /projects/{id}/integrations/ga4/pages      — top pages by pageviews
+Two routers are exported:
+  router      — prefix /projects/{project_id}/integrations  (data endpoints)
+  auth_router — no prefix                                    (OAuth callbacks)
 
-GSC endpoints (OAuth auth lives in blog.py; data lives here):
-  GET  /projects/{id}/integrations/gsc/status     — connection status, domain, last sync
-  GET  /projects/{id}/integrations/gsc/queries    — top search queries with is_quick_win flag
-  GET  /projects/{id}/integrations/gsc/pages      — top pages from GSC
+GA4 OAuth flow:
+  GET  /auth/ga4/url                          — generate Google OAuth URL
+  GET  /auth/ga4/callback                     — exchange code, store tokens, redirect
+  DELETE /projects/{id}/integrations/ga4      — disconnect (delete tokens + property)
+
+GA4 data (per-user OAuth, require_tier pro):
+  GET  /projects/{id}/integrations/ga4/status      — connected?, property_id, last_synced
+  POST /projects/{id}/integrations/ga4/property    — save property ID to project doc
+  GET  /projects/{id}/integrations/ga4/metrics     — sessions/users/pageviews + daily chart
+  GET  /projects/{id}/integrations/ga4/pages       — top pages
+  GET  /projects/{id}/integrations/ga4/sources     — traffic sources
+  GET  /projects/{id}/integrations/ga4/conversions — conversion events
+  POST /projects/{id}/integrations/ga4/refresh-cache — invalidate 6h cache
+
+GSC data (OAuth auth lives in blog.py, data here):
+  GET  /projects/{id}/integrations/gsc/status   — connected?, domain, last_synced
+  GET  /projects/{id}/integrations/gsc/queries  — top queries with is_quick_win
+  GET  /projects/{id}/integrations/gsc/pages    — top pages
 """
 from __future__ import annotations
 
@@ -20,25 +30,39 @@ import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from backend.api.deps import get_project_as_editor, get_project_as_member, require_tier
+from backend.config import settings
 from backend.middleware.auth import CurrentUser
 from backend.services import firebase_service, ga4_service
 from backend.services.blog import gsc_service
 
 logger = logging.getLogger(__name__)
 
+# Data endpoints — project-scoped
 router = APIRouter(prefix="/projects/{project_id}/integrations", tags=["integrations"])
+
+# OAuth endpoints — top-level (no project prefix, no auth required for callback)
+auth_router = APIRouter(tags=["integrations-auth"])
+
+_GA4_CALLBACK_PATH = "/api/backend/auth/ga4/callback"
 
 
 # ---------------------------------------------------------------------------
-# Schemas
+# Pydantic schemas
 # ---------------------------------------------------------------------------
 
 class SetGA4PropertyRequest(BaseModel):
     property_id: str = Field(..., min_length=1, max_length=50, pattern=r"^\d+$")
+
+
+class GA4StatusResponse(BaseModel):
+    connected: bool
+    property_id: Optional[str] = None
+    last_synced: Optional[str] = None
 
 
 class GSCStatus(BaseModel):
@@ -57,18 +81,98 @@ class GSCQuery(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# GA4 — status + configuration
+# GA4 OAuth — auth_router (no prefix)
 # ---------------------------------------------------------------------------
 
-@router.get("/ga4/status")
+@auth_router.get("/auth/ga4/url")
+async def get_ga4_auth_url(
+    project_id: str = Query(...),
+    redirect_uri: str = Query(...),
+    user: CurrentUser = None,
+):
+    """Return the Google OAuth2 URL for GA4 authorisation."""
+    if not settings.GA4_OAUTH_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="GA4 OAuth not configured on this server.")
+    url = ga4_service.get_auth_url(user["uid"], project_id, redirect_uri)
+    return {"url": url}
+
+
+@auth_router.get("/auth/ga4/callback")
+async def ga4_oauth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+):
+    """
+    Google redirects here after user authorises.
+    Exchanges code for tokens, stores them, then redirects to integrations page.
+    No auth required — Google calls this directly.
+    """
+    if not settings.GA4_OAUTH_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="GA4 OAuth not configured.")
+
+    try:
+        decoded = ga4_service.decode_state(state)
+        project_id = decoded["project_id"]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid state parameter.")
+
+    redirect_uri = f"{settings.FRONTEND_URL.rstrip('/')}{_GA4_CALLBACK_PATH}"
+
+    try:
+        result = await ga4_service.exchange_code(code, state, redirect_uri)
+        project_id = result["project_id"]
+    except Exception as exc:
+        logger.error("GA4 token exchange failed: %s", exc)
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/projects/{project_id}/settings/integrations?ga4_error=1"
+        )
+
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/projects/{project_id}/settings/integrations?connected=ga4"
+    )
+
+
+# ---------------------------------------------------------------------------
+# GA4 data — router (project-scoped)
+# ---------------------------------------------------------------------------
+
+@router.delete("/ga4")
+async def disconnect_ga4(
+    project_id: str,
+    user: CurrentUser,
+):
+    """Delete stored GA4 tokens and remove property ID from project."""
+    get_project_as_member(project_id, user["uid"])
+
+    # Clear tokens
+    await asyncio.to_thread(ga4_service.delete_tokens, project_id, user["uid"])
+
+    # Clear property ID from project doc
+    await asyncio.to_thread(
+        firebase_service.update_project,
+        project_id,
+        {"ga4PropertyId": None},
+    )
+
+    # Evict any cached GA4 data for this user
+    project = await asyncio.to_thread(firebase_service.get_project, project_id) or {}
+    property_id = project.get("ga4PropertyId")
+    if property_id:
+        ga4_service.clear_cache(user["uid"], property_id)
+
+    return {"success": True}
+
+
+@router.get("/ga4/status", response_model=GA4StatusResponse)
 async def ga4_status(
     project_id: str,
     user: CurrentUser,
     _tier: None = require_tier("pro"),
 ):
-    """Return whether the GA4 service account is configured and which property ID is set."""
-    project = get_project_as_member(project_id, user["uid"])
-    return ga4_service.get_status(project)
+    """Return GA4 connection status, property ID, and last sync time."""
+    get_project_as_member(project_id, user["uid"])
+    status = await asyncio.to_thread(ga4_service.get_status, project_id, user["uid"])
+    return GA4StatusResponse(**status)
 
 
 @router.post("/ga4/property")
@@ -88,96 +192,84 @@ async def set_ga4_property(
     return {"ok": True, "property_id": body.property_id}
 
 
-@router.delete("/ga4/property")
-async def clear_ga4_property(
+@router.get("/ga4/metrics")
+async def ga4_metrics(
     project_id: str,
     user: CurrentUser,
+    start_date: str = Query("30daysAgo"),
+    end_date: str = Query("today"),
     _tier: None = require_tier("pro"),
 ):
-    """Remove the GA4 property ID from the project document."""
-    get_project_as_editor(project_id, user["uid"])
-    await asyncio.to_thread(
-        firebase_service.update_project,
-        project_id,
-        {"ga4PropertyId": None},
-    )
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# GA4 — live data
-# ---------------------------------------------------------------------------
-
-@router.get("/ga4/overview")
-async def ga4_overview(
-    project_id: str,
-    user: CurrentUser,
-    days: int = Query(30, ge=7, le=365),
-    _tier: None = require_tier("pro"),
-):
-    """Aggregate session metrics for the last N days from GA4."""
+    """Aggregate session metrics + daily chart data from GA4."""
     project = get_project_as_member(project_id, user["uid"])
     property_id = project.get("ga4PropertyId")
     if not property_id:
         raise HTTPException(status_code=400, detail="GA4 property ID not configured for this project.")
-    if not ga4_service.is_configured():
-        raise HTTPException(status_code=503, detail="GA4 service account not configured on this server.")
-    return await ga4_service.get_overview(property_id, days=days)
-
-
-@router.get("/ga4/sessions")
-async def ga4_sessions_over_time(
-    project_id: str,
-    user: CurrentUser,
-    days: int = Query(30, ge=7, le=90),
-    _tier: None = require_tier("pro"),
-):
-    """Daily sessions time-series from GA4."""
-    project = get_project_as_member(project_id, user["uid"])
-    property_id = project.get("ga4PropertyId")
-    if not property_id:
-        raise HTTPException(status_code=400, detail="GA4 property ID not configured.")
-    if not ga4_service.is_configured():
-        raise HTTPException(status_code=503, detail="GA4 service account not configured.")
-    rows = await ga4_service.get_sessions_over_time(property_id, days=days)
-    return {"rows": rows, "days": days}
-
-
-@router.get("/ga4/sources")
-async def ga4_traffic_sources(
-    project_id: str,
-    user: CurrentUser,
-    days: int = Query(30, ge=7, le=90),
-    _tier: None = require_tier("pro"),
-):
-    """Sessions by channel grouping from GA4."""
-    project = get_project_as_member(project_id, user["uid"])
-    property_id = project.get("ga4PropertyId")
-    if not property_id:
-        raise HTTPException(status_code=400, detail="GA4 property ID not configured.")
-    if not ga4_service.is_configured():
-        raise HTTPException(status_code=503, detail="GA4 service account not configured.")
-    rows = await ga4_service.get_traffic_sources(property_id, days=days)
-    return {"rows": rows, "days": days}
+    return await ga4_service.get_session_metrics(
+        project_id, user["uid"], property_id, start_date, end_date
+    )
 
 
 @router.get("/ga4/pages")
 async def ga4_top_pages(
     project_id: str,
     user: CurrentUser,
-    days: int = Query(30, ge=7, le=90),
     limit: int = Query(10, ge=1, le=25),
     _tier: None = require_tier("pro"),
 ):
-    """Top pages by pageviews from GA4."""
+    """Top pages by sessions from GA4."""
     project = get_project_as_member(project_id, user["uid"])
     property_id = project.get("ga4PropertyId")
     if not property_id:
         raise HTTPException(status_code=400, detail="GA4 property ID not configured.")
-    if not ga4_service.is_configured():
-        raise HTTPException(status_code=503, detail="GA4 service account not configured.")
-    rows = await ga4_service.get_top_pages(property_id, days=days, limit=limit)
-    return {"rows": rows, "days": days}
+    return await ga4_service.get_top_pages(project_id, user["uid"], property_id, limit)
+
+
+@router.get("/ga4/sources")
+async def ga4_traffic_sources(
+    project_id: str,
+    user: CurrentUser,
+    start_date: str = Query("30daysAgo"),
+    end_date: str = Query("today"),
+    _tier: None = require_tier("pro"),
+):
+    """Traffic sources by channel group from GA4."""
+    project = get_project_as_member(project_id, user["uid"])
+    property_id = project.get("ga4PropertyId")
+    if not property_id:
+        raise HTTPException(status_code=400, detail="GA4 property ID not configured.")
+    return await ga4_service.get_traffic_sources(
+        project_id, user["uid"], property_id, start_date, end_date
+    )
+
+
+@router.get("/ga4/conversions")
+async def ga4_conversions(
+    project_id: str,
+    user: CurrentUser,
+    _tier: None = require_tier("pro"),
+):
+    """Key conversion events from GA4."""
+    project = get_project_as_member(project_id, user["uid"])
+    property_id = project.get("ga4PropertyId")
+    if not property_id:
+        raise HTTPException(status_code=400, detail="GA4 property ID not configured.")
+    return await ga4_service.get_conversion_events(project_id, user["uid"], property_id)
+
+
+@router.post("/ga4/refresh-cache")
+async def ga4_refresh_cache(
+    project_id: str,
+    user: CurrentUser,
+    _tier: None = require_tier("pro"),
+):
+    """Invalidate all cached GA4 responses for this project + user."""
+    project = get_project_as_member(project_id, user["uid"])
+    property_id = project.get("ga4PropertyId")
+    if not property_id:
+        return {"ok": True, "cleared": 0}
+    cleared = ga4_service.clear_cache(user["uid"], property_id)
+    return {"ok": True, "cleared": cleared}
 
 
 # ---------------------------------------------------------------------------
@@ -192,11 +284,9 @@ async def _gsc_search_analytics(
     limit: int,
     row_limit: int = 25,
 ) -> list[dict]:
-    """
-    Generic GSC searchAnalytics query.
-    Wraps the existing gsc_service token/refresh infrastructure.
-    """
     from datetime import date, timedelta
+    import httpx as _httpx
+
     tokens = gsc_service.get_tokens(project_id, uid)
     if not tokens:
         return []
@@ -209,10 +299,9 @@ async def _gsc_search_analytics(
     end_date = date.today()
     start_date = end_date - timedelta(days=days)
 
-    import httpx
     try:
         access_token = await gsc_service.refresh_access_token(tokens["refresh_token"])
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with _httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.post(
                 f"https://www.googleapis.com/webmasters/v3/sites/{site_url}/searchAnalytics/query",
                 headers={
@@ -241,16 +330,12 @@ async def gsc_integration_status(
     user: CurrentUser,
     _tier: None = require_tier("pro"),
 ):
-    """
-    Return GSC connection status, the first verified domain, and last sync time.
-    Uses tokens stored by the blog.py OAuth callback.
-    """
+    """Return GSC connection status, first domain, and last sync time."""
     get_project_as_member(project_id, user["uid"])
     tokens = gsc_service.get_tokens(project_id, user["uid"])
     if not tokens:
         return GSCStatus(connected=False)
 
-    # Derive the primary domain from the first listed property
     try:
         properties = await gsc_service.list_properties(project_id, user["uid"])
         domain = properties[0] if properties else None
@@ -272,11 +357,7 @@ async def gsc_top_queries(
     limit: int = Query(50, ge=1, le=200),
     _tier: None = require_tier("pro"),
 ):
-    """
-    Top search queries from GSC ordered by impressions.
-    Returns list of GSCQuery with is_quick_win flag.
-    is_quick_win: impressions > 100 AND raw CTR < 0.02 (< 2%).
-    """
+    """Top search queries from GSC with is_quick_win flag."""
     get_project_as_member(project_id, user["uid"])
     tokens = gsc_service.get_tokens(project_id, user["uid"])
     if not tokens:
@@ -297,7 +378,7 @@ async def gsc_top_queries(
             query=r["keys"][0],
             clicks=int(r.get("clicks", 0)),
             impressions=impressions,
-            ctr=round(raw_ctr * 100, 2),        # returned as percentage for display
+            ctr=round(raw_ctr * 100, 2),
             avg_position=round(r.get("position", 0.0), 1),
             is_quick_win=impressions > 100 and raw_ctr < 0.02,
         ))
@@ -312,10 +393,7 @@ async def gsc_top_pages(
     limit: int = Query(20, ge=1, le=50),
     _tier: None = require_tier("pro"),
 ):
-    """
-    Top pages from GSC ordered by impressions.
-    Returns list of { page, clicks, impressions, ctr, position }.
-    """
+    """Top pages from GSC by impressions."""
     get_project_as_member(project_id, user["uid"])
     tokens = gsc_service.get_tokens(project_id, user["uid"])
     if not tokens:

@@ -3070,45 +3070,64 @@ export const api = {
   },
 
   // ---------------------------------------------------------------------------
-  // Integrations — GA4 + GSC data
+  // GA4 — per-user OAuth integration
   // ---------------------------------------------------------------------------
-  integrations: {
-    // GA4
-    ga4Status: (projectId: string) =>
-      get<{ configured: boolean; property_id: string | null; connected: boolean }>(
+  ga4: {
+    status: (projectId: string) =>
+      get<{ connected: boolean; property_id: string | null; last_synced: string | null }>(
         `/projects/${projectId}/integrations/ga4/status`,
       ),
 
-    setGA4Property: (projectId: string, propertyId: string) =>
+    authUrl: (projectId: string, redirectUri: string) =>
+      get<{ url: string }>(
+        `/auth/ga4/url?project_id=${projectId}&redirect_uri=${encodeURIComponent(redirectUri)}`,
+      ),
+
+    disconnect: (projectId: string) =>
+      del(`/projects/${projectId}/integrations/ga4`),
+
+    saveProperty: (projectId: string, propertyId: string) =>
       post<{ ok: boolean; property_id: string }>(
         `/projects/${projectId}/integrations/ga4/property`,
         { property_id: propertyId },
       ),
 
-    clearGA4Property: (projectId: string) =>
-      del(`/projects/${projectId}/integrations/ga4/property`),
-
-    ga4Overview: (projectId: string, days = 30) =>
+    metrics: (projectId: string, startDate = '30daysAgo', endDate = 'today') =>
       get<{
-        sessions: number; users: number; pageviews: number
-        bounce_rate: number; avg_session_duration: number; days: number
-      }>(`/projects/${projectId}/integrations/ga4/overview?days=${days}`),
+        sessions: number
+        users: number
+        pageviews: number
+        avg_session_duration: number
+        bounce_rate: number
+        daily_sessions: { date: string; sessions: number }[]
+      }>(`/projects/${projectId}/integrations/ga4/metrics?start_date=${startDate}&end_date=${endDate}`),
 
-    ga4Sessions: (projectId: string, days = 30) =>
-      get<{ rows: { date: string; sessions: number }[]; days: number }>(
-        `/projects/${projectId}/integrations/ga4/sessions?days=${days}`,
+    topPages: (projectId: string, limit = 10) =>
+      get<{ page: string; sessions: number; pageviews: number; avg_time_on_page: number }[]>(
+        `/projects/${projectId}/integrations/ga4/pages?limit=${limit}`,
       ),
 
-    ga4Sources: (projectId: string, days = 30) =>
-      get<{ rows: { channel: string; sessions: number; users: number }[]; days: number }>(
-        `/projects/${projectId}/integrations/ga4/sources?days=${days}`,
+    sources: (projectId: string) =>
+      get<{ source: string; medium: string; sessions: number; percentage: number }[]>(
+        `/projects/${projectId}/integrations/ga4/sources`,
       ),
 
-    ga4Pages: (projectId: string, days = 30, limit = 10) =>
-      get<{ rows: { page_path: string; title: string; pageviews: number; avg_time_on_page: number }[]; days: number }>(
-        `/projects/${projectId}/integrations/ga4/pages?days=${days}&limit=${limit}`,
+    conversions: (projectId: string) =>
+      get<{ event_name: string; count: number; value: number }[]>(
+        `/projects/${projectId}/integrations/ga4/conversions`,
       ),
 
+    refreshCache: (projectId: string) =>
+      post<{ ok: boolean; cleared: number }>(
+        `/projects/${projectId}/integrations/ga4/refresh-cache`,
+        {},
+      ),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Integrations — GSC data
+  // ---------------------------------------------------------------------------
+  integrations: {
     // GSC status + data
     gscStatus: (projectId: string) =>
       get<{ connected: boolean; domain: string | null; last_synced: string | null }>(
@@ -3121,7 +3140,7 @@ export const api = {
           query: string
           clicks: number
           impressions: number
-          ctr: number          // percentage, e.g. 1.5 = 1.5%
+          ctr: number
           avg_position: number
           is_quick_win: boolean
         }[]

@@ -1,4 +1,43 @@
 // ---------------------------------------------------------------------------
+// Integrations — GA4
+// ---------------------------------------------------------------------------
+
+export interface GA4Status {
+  connected: boolean
+  propertyId: string | null
+  lastSynced: string | null
+}
+
+export interface GA4Metrics {
+  sessions: number
+  users: number
+  pageviews: number
+  avgSessionDuration: number
+  bounceRate: number
+  dailySessions: { date: string; sessions: number }[]
+}
+
+export interface GA4Page {
+  page: string
+  sessions: number
+  pageviews: number
+  avgTimeOnPage: number
+}
+
+export interface GA4Source {
+  source: string
+  medium: string
+  sessions: number
+  percentage: number
+}
+
+export interface GA4Conversion {
+  eventName: string
+  count: number
+  value: number
+}
+
+// ---------------------------------------------------------------------------
 // Integrations — GSC
 // ---------------------------------------------------------------------------
 

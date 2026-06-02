@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   Layout, ArrowRight, CheckCircle2, AlertCircle, ExternalLink,
-  BarChart2, Search, Loader2, X, Link2,
+  BarChart2, Search, Loader2, X, Link2, RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
@@ -15,10 +15,10 @@ import { cn } from '@/lib/utils'
 // Types
 // ---------------------------------------------------------------------------
 
-interface GA4Status {
-  configured: boolean
-  property_id: string | null
+interface GA4StatusData {
   connected: boolean
+  property_id: string | null
+  last_synced: string | null
 }
 
 interface GSCStatusData {
@@ -28,30 +28,46 @@ interface GSCStatusData {
 }
 
 // ---------------------------------------------------------------------------
-// GA4 Card
+// GA4 Card — per-user OAuth
 // ---------------------------------------------------------------------------
 
 function GA4Card({ projectId }: { projectId: string }) {
-  const [status, setStatus] = useState<GA4Status | null>(null)
+  const [status, setStatus] = useState<GA4StatusData | null>(null)
   const [loading, setLoading] = useState(true)
   const [propertyInput, setPropertyInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const [showInput, setShowInput] = useState(false)
+  const [showPropertyInput, setShowPropertyInput] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
 
-  useEffect(() => {
-    api.integrations.ga4Status(projectId)
+  function loadStatus() {
+    setLoading(true)
+    api.ga4.status(projectId)
       .then(setStatus)
-      .catch(() => setStatus({ configured: false, property_id: null, connected: false }))
+      .catch(() => setStatus({ connected: false, property_id: null, last_synced: null }))
       .finally(() => setLoading(false))
-  }, [projectId])
+  }
 
-  async function handleSave() {
+  useEffect(() => { loadStatus() }, [projectId])
+
+  async function handleConnect() {
+    if (!window) return
+    try {
+      // Build the canonical callback URL — proxied through Next.js rewrite
+      const redirectUri = `${window.location.origin}/api/backend/auth/ga4/callback`
+      const { url } = await api.ga4.authUrl(projectId, redirectUri)
+      window.location.href = url   // same-tab redirect — required by GA4 OAuth
+    } catch {
+      toast.error('Failed to start Google authorisation')
+    }
+  }
+
+  async function handleSaveProperty() {
     if (!propertyInput.trim()) return
     setSaving(true)
     try {
-      await api.integrations.setGA4Property(projectId, propertyInput.trim())
-      setStatus((s) => s ? { ...s, property_id: propertyInput.trim(), connected: s.configured } : s)
-      setShowInput(false)
+      await api.ga4.saveProperty(projectId, propertyInput.trim())
+      setStatus((s) => s ? { ...s, property_id: propertyInput.trim() } : s)
+      setShowPropertyInput(false)
       setPropertyInput('')
       toast.success('GA4 property saved')
     } catch (err) {
@@ -62,122 +78,178 @@ function GA4Card({ projectId }: { projectId: string }) {
   }
 
   async function handleDisconnect() {
+    setDisconnecting(true)
     try {
-      await api.integrations.clearGA4Property(projectId)
-      setStatus((s) => s ? { ...s, property_id: null, connected: false } : s)
-      toast.success('GA4 property removed')
+      await api.ga4.disconnect(projectId)
+      setStatus({ connected: false, property_id: null, last_synced: null })
+      toast.success('Google Analytics 4 disconnected')
     } catch {
       toast.error('Failed to disconnect')
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
+  async function handleRefreshCache() {
+    try {
+      const { cleared } = await api.ga4.refreshCache(projectId)
+      toast.success(`Cache cleared — ${cleared} entries removed`)
+    } catch {
+      toast.error('Failed to clear cache')
     }
   }
 
   const isConnected = status?.connected
-  const isConfigured = status?.configured
+  const hasProperty = Boolean(status?.property_id)
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
       <div className="flex items-start gap-4">
         <div className={cn(
           'p-2.5 rounded-xl shrink-0',
-          isConnected ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground',
+          isConnected && hasProperty
+            ? 'bg-green-500/10 text-green-600'
+            : isConnected
+            ? 'bg-amber-500/10 text-amber-600'
+            : 'bg-muted text-muted-foreground',
         )}>
           <BarChart2 className="w-6 h-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className="font-medium text-sm">Google Analytics 4</p>
             {loading ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-            ) : isConnected ? (
+            ) : isConnected && hasProperty ? (
               <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
                 <CheckCircle2 className="w-3 h-3" /> Connected
               </span>
+            ) : isConnected ? (
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                <AlertCircle className="w-3 h-3" /> Property needed
+              </span>
             ) : (
-              <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                 Not connected
               </span>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-            Pull live sessions, traffic sources, and top-pages data directly from your GA4 property into Leo analytics.
+            Live session data, traffic sources, and conversion events from your GA4 property.
           </p>
         </div>
       </div>
 
-      {!loading && !isConfigured && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40">
-          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
-            <p className="font-medium">Service account not configured</p>
-            <p>Ask your administrator to set <code className="bg-amber-100 dark:bg-amber-900/50 px-1 rounded">GA4_SERVICE_ACCOUNT_KEY</code> in the server environment.</p>
+      {/* Connected + property set */}
+      {!loading && isConnected && hasProperty && (
+        <div className="space-y-2">
+          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-green-800 dark:text-green-300">
+                Property {status?.property_id}
+              </p>
+              {status?.last_synced && (
+                <p className="text-[11px] text-green-700 dark:text-green-400 mt-0.5">
+                  Connected {new Date(status.last_synced).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleRefreshCache}
+                className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                title="Clear 6h data cache"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+                title="Disconnect"
+              >
+                {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {!loading && isConfigured && (
-        <div className="space-y-2">
-          {isConnected ? (
-            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40">
-              <div className="flex items-center gap-2 min-w-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                <span className="text-xs font-mono text-green-800 dark:text-green-300 truncate">
-                  Property {status?.property_id}
-                </span>
+      {/* Connected but no property set yet */}
+      {!loading && isConnected && !hasProperty && (
+        <div className="space-y-3">
+          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-200">Google account connected</p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+              Enter your GA4 Property ID to start pulling live data.
+            </p>
+          </div>
+
+          {showPropertyInput ? (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  value={propertyInput}
+                  onChange={(e) => setPropertyInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Property ID (e.g. 123456789)"
+                  className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProperty() }}
+                />
+                <button
+                  onClick={handleSaveProperty}
+                  disabled={saving || !propertyInput.trim()}
+                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setShowPropertyInput(false); setPropertyInput('') }}
+                  className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
-              <button
-                onClick={handleDisconnect}
-                className="shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors"
-                title="Remove property"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : showInput ? (
-            <div className="flex gap-2">
-              <input
-                value={propertyInput}
-                onChange={(e) => setPropertyInput(e.target.value.replace(/\D/g, ''))}
-                placeholder="GA4 Property ID (e.g. 123456789)"
-                className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary font-mono"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-              />
-              <button
-                onClick={handleSave}
-                disabled={saving || !propertyInput.trim()}
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-              </button>
-              <button
-                onClick={() => { setShowInput(false); setPropertyInput('') }}
-                className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
+              <p className="text-[11px] text-muted-foreground">
+                Find in GA4 → Admin → Property Settings → Property ID.
+              </p>
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setShowInput(true)}
+                onClick={() => setShowPropertyInput(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <Link2 className="w-3.5 h-3.5" /> Enter Property ID
               </button>
-              <a
-                href="https://analytics.google.com/analytics/web/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
               >
-                Open GA4 <ExternalLink className="w-3 h-3" />
-              </a>
+                Disconnect
+              </button>
             </div>
           )}
-          {!isConnected && !showInput && (
-            <p className="text-[11px] text-muted-foreground">
-              Find your Property ID in GA4 → Admin → Property Settings. Grant the Leo service account email Viewer access.
-            </p>
-          )}
+        </div>
+      )}
+
+      {/* Not connected */}
+      {!loading && !isConnected && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleConnect}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Link2 className="w-3.5 h-3.5" /> Connect Google Analytics 4
+          </button>
+          <a
+            href="https://analytics.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Open GA4 <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       )}
     </div>
@@ -213,7 +285,7 @@ function GSCCard({ projectId }: { projectId: string }) {
     setDisconnecting(true)
     try {
       await api.blog.disconnectGSC(projectId)
-      setStatus({ connected: false })
+      setStatus({ connected: false, domain: null, last_synced: null })
       toast.success('Google Search Console disconnected')
     } catch {
       toast.error('Failed to disconnect')
@@ -247,7 +319,7 @@ function GSCCard({ projectId }: { projectId: string }) {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-            Access real keyword rankings, click-through rates, and impression data from Google's own index for your verified domains.
+            Keyword rankings, impressions, and click data from Google's own index.
           </p>
         </div>
       </div>
@@ -307,13 +379,22 @@ export default function IntegrationsPage() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
+    const connected = searchParams.get('connected')
     const gscConnected = searchParams.get('gsc_connected')
     const gscError = searchParams.get('gsc_error')
-    if (gscConnected) {
+    const ga4Error = searchParams.get('ga4_error')
+
+    if (connected === 'ga4') {
+      toast.success('Google Analytics 4 connected! Enter your Property ID below.')
+      router.replace(`/projects/${projectId}/settings/integrations`)
+    } else if (gscConnected) {
       toast.success('Google Search Console connected!')
       router.replace(`/projects/${projectId}/settings/integrations`)
     } else if (gscError) {
       toast.error('Google Search Console connection failed')
+      router.replace(`/projects/${projectId}/settings/integrations`)
+    } else if (ga4Error) {
+      toast.error('Google Analytics 4 connection failed')
       router.replace(`/projects/${projectId}/settings/integrations`)
     }
   }, [searchParams, projectId, router])
@@ -324,7 +405,7 @@ export default function IntegrationsPage() {
         <SidebarToggle />
         <div>
           <h1 className="font-semibold">Integrations</h1>
-          <p className="text-xs text-muted-foreground">Connect Leo to your publishing and marketing stack</p>
+          <p className="text-xs text-muted-foreground">Connect Leo to your analytics and publishing stack</p>
         </div>
       </div>
 

@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     GOOGLE_SEARCH_CONSOLE_CLIENT_ID: Optional[str] = None     # GSC API (free, OAuth2)
     GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET: Optional[str] = None # GSC API (free, OAuth2)
 
+    # --- Google Analytics 4 OAuth (per-user, mirrors GSC pattern) ---
+    GA4_OAUTH_CLIENT_ID: Optional[str] = None      # GCP Console → Credentials → OAuth 2.0 Client ID
+    GA4_OAUTH_CLIENT_SECRET: Optional[str] = None  # Same client secret
+
     # --- Search Cost Controls ---
     EXA_DAILY_SEARCH_LIMIT: int = 100
     TAVILY_DAILY_SEARCH_LIMIT: int = 200
