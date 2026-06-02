@@ -249,6 +249,90 @@ def check_and_deduct(uid: str, action: str, quantity: int = 1) -> None:
         logger.warning("Failed to deduct %d credits for uid %s: %s", total_cost, uid, exc)
 
 
+def check_and_deduct_atomic(uid: str, action: str, quantity: int = 1) -> None:
+    """
+    Atomically verify the user has enough credits for `action` × `quantity`,
+    then deduct if sufficient. Raises HTTP 402 if the balance is insufficient.
+    Non-fatal errors (Firestore write failure) are logged but not raised.
+
+    # TOCTOU fix: check and deduct must be atomic. Without a
+    # transaction, two concurrent requests can both pass the
+    # balance check at balance=1 and both deduct, leaving balance=-1.
+    """
+    from google.cloud import firestore as _gcf
+
+    cost_per = CREDIT_COSTS.get(action, 1)
+    total_cost = cost_per * quantity
+
+    # Bootstrap / auto-reset outside the transaction.
+    # The reset is not race-critical; the critical section is the check-and-deduct.
+    user = firebase_service.get_user(uid) or {}
+    plan = user.get("tier", "free")
+    config = PLAN_CREDITS.get(plan, PLAN_CREDITS["free"])
+    credits = user.get("credits", {})
+
+    if not credits or "balance" not in credits:
+        credits = _bootstrap_credits(uid, plan)
+    else:
+        try:
+            if int(credits.get("resetsAt", 0)) < int(time.time()):
+                firebase_service.update_user_credits(uid, {
+                    "balance": config["amount"],
+                    "resetsAt": _next_reset_ts(config["period"]),
+                })
+        except (ValueError, TypeError):
+            pass
+
+    db = firebase_service.get_db()
+    user_ref = db.collection("users").document(uid)
+
+    @_gcf.transactional
+    def _txn(transaction, ref):
+        snapshot = ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict()
+        balance = data.get("credits", {}).get("balance", 0)
+        if balance < total_cost:
+            return balance  # Return current balance; caller raises HTTP 402
+        transaction.update(ref, {
+            "credits.balance": _gcf.Increment(-total_cost),
+            "credits.lifetimeUsed": _gcf.Increment(total_cost),
+        })
+        return True
+
+    result = _txn(db.transaction(), user_ref)
+
+    if result is not True:
+        current_balance = result if isinstance(result, int) else 0
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "insufficient_credits",
+                "message": (
+                    f"Not enough credits. This action costs {total_cost} credits "
+                    f"but you only have {current_balance}."
+                ),
+                "needed": total_cost,
+                "have": current_balance,
+                "action": action,
+                "plan": plan,
+            },
+        )
+
+    # Log the credit transaction (best-effort, non-fatal — same as deduct_user_credits).
+    try:
+        import datetime as _dt
+        db.collection("users").document(uid).collection("creditTransactions").add({
+            "type": "debit",
+            "amount": total_cost,
+            "action": action,
+            "createdAt": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("Failed to log credit deduction for uid %s: %s", uid, exc)
+
+
 def add_credits(uid: str, amount: int, reason: str = "") -> None:
     """Add credits to a user's balance (admin override, top-up, promotional)."""
     try:
