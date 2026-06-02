@@ -2,21 +2,25 @@
 Blog Module routes.
 
 Endpoints:
-  POST /projects/{id}/blog/serp-analysis        - stream SERP content analysis (SSE)
-  POST /projects/{id}/blog/brief                - stream brief generation (SSE)
-  GET  /projects/{id}/blog/briefs               - list saved briefs
-  GET  /projects/{id}/blog/briefs/{brief_id}    - get a single brief
-  GET  /projects/{id}/blog/cms-connections      - list WordPress connections
-  POST /projects/{id}/blog/cms-connections      - add connection (test + save)
-  DELETE /projects/{id}/blog/cms-connections/{conn_id} - remove connection
-  POST /projects/{id}/blog/publish              - publish to CMS
-  GET  /projects/{id}/blog/rank-history         - list rank records
-  POST /projects/{id}/blog/rank-history         - start tracking a post
-  POST /projects/{id}/blog/rank-history/snapshot - take a fresh snapshot
-  GET  /auth/gsc/url                            - get GSC OAuth URL
-  GET  /auth/gsc/callback                       - OAuth callback
-  GET  /projects/{id}/blog/gsc-status           - check GSC connection status
-  DELETE /projects/{id}/blog/gsc-disconnect     - remove GSC tokens
+  POST /projects/{id}/blog/serp-analysis          - stream SERP content analysis (SSE)
+  POST /projects/{id}/blog/brief                  - stream brief generation (SSE)
+  GET  /projects/{id}/blog/briefs                 - list saved briefs
+  GET  /projects/{id}/blog/briefs/{brief_id}      - get a single brief
+  GET  /projects/{id}/blog/cms-connections        - list WordPress connections
+  POST /projects/{id}/blog/cms-connections        - add connection (test + save)
+  DELETE /projects/{id}/blog/cms-connections/{id} - remove connection
+  POST /projects/{id}/blog/publish                - publish to CMS
+  GET  /projects/{id}/blog/rank-history           - list rank records
+  POST /projects/{id}/blog/rank-history           - start tracking a post
+  POST /projects/{id}/blog/rank-history/snapshot  - take a fresh snapshot
+  GET  /auth/gsc/url                              - get GSC OAuth URL
+  GET  /auth/gsc/callback                         - OAuth callback
+  GET  /projects/{id}/blog/gsc-status             - check GSC connection status
+  DELETE /projects/{id}/blog/gsc-disconnect       - remove GSC tokens
+
+  SEO/GEO/AEO:
+  POST /projects/{id}/blog/content-score          - combined SEO+GEO+AEO score for content
+  POST /projects/{id}/blog/competitor-analysis    - crawl competitor blogs + gap analysis
 """
 import asyncio
 import logging
@@ -33,10 +37,12 @@ from backend.middleware.auth import CurrentUser
 from backend.services.blog import (
     brief_service,
     cms_publishing_service,
+    competitor_blog_service,
     gsc_service,
     rank_tracker_service,
     serp_content_service,
 )
+from backend.services import geo_aeo_service
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,17 @@ class SnapshotRequest(BaseModel):
     post_url: str = Field(...)
     target_keyword: str = Field(...)
     gsc_site_url: Optional[str] = None
+
+
+class ContentScoreRequest(BaseModel):
+    content: str = Field(..., min_length=100, max_length=50000)
+    keyword: str = Field(..., min_length=1, max_length=200)
+    seo_score: Optional[int] = Field(default=None, ge=0, le=100)
+
+
+class CompetitorBlogRequest(BaseModel):
+    competitor_urls: list[str] = Field(..., min_length=1, max_length=4)
+    topic_focus: Optional[str] = Field(default=None, max_length=200)
 
 
 # ---------------------------------------------------------------------------
@@ -366,3 +383,56 @@ async def gsc_disconnect(
     get_project_as_editor(project_id, user["uid"])
     await asyncio.to_thread(gsc_service.delete_tokens, project_id, user["uid"])
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# SEO / GEO / AEO Content Scoring
+# ---------------------------------------------------------------------------
+
+@router.post("/projects/{project_id}/blog/content-score")
+async def score_content(
+    project_id: str,
+    body: ContentScoreRequest,
+    user: CurrentUser,
+):
+    """
+    Score a piece of content across SEO, GEO (Generative Engine Optimization),
+    and AEO (Answer Engine Optimization).
+
+    Returns combined_score (0-100) + per-dimension breakdowns + improvement suggestions.
+    """
+    get_project_as_member(project_id, user["uid"])
+    result = await geo_aeo_service.combined_content_score(
+        content=body.content,
+        keyword=body.keyword,
+        project_id=project_id,
+        seo_score=body.seo_score,
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Competitor Blog Analysis
+# ---------------------------------------------------------------------------
+
+@router.post("/projects/{project_id}/blog/competitor-analysis")
+async def competitor_blog_analysis(
+    project_id: str,
+    body: CompetitorBlogRequest,
+    user: CurrentUser,
+):
+    """
+    Crawl competitor blog indexes and analyse their content strategy.
+    Returns topic gaps the brand should fill, format recommendations,
+    and per-competitor theme breakdowns.
+    """
+    project = get_project_as_member(project_id, user["uid"])
+    brand_core = project.get("brandCore") or {}
+
+    result = await competitor_blog_service.analyse_competitor_blogs(
+        project_id=project_id,
+        brand_core=brand_core,
+        competitor_urls=body.competitor_urls,
+        topic_focus=body.topic_focus,
+    )
+    return result

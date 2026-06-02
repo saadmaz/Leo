@@ -20,9 +20,13 @@ GA4 data (per-user OAuth, require_tier pro):
   POST /projects/{id}/integrations/ga4/refresh-cache — invalidate 6h cache
 
 GSC data (OAuth auth lives in blog.py, data here):
-  GET  /projects/{id}/integrations/gsc/status   — connected?, domain, last_synced
-  GET  /projects/{id}/integrations/gsc/queries  — top queries with is_quick_win
-  GET  /projects/{id}/integrations/gsc/pages    — top pages
+  GET  /projects/{id}/integrations/gsc/status          — connected?, domain, last_synced
+  GET  /projects/{id}/integrations/gsc/queries         — top queries with is_quick_win
+  GET  /projects/{id}/integrations/gsc/pages           — top pages
+  GET  /projects/{id}/integrations/gsc/freshness-audit — page-level impression delta (90d vs prior 90d)
+
+AI Insights:
+  POST /projects/{id}/integrations/insights — Claude analysis of combined GA4+GSC data
 """
 from __future__ import annotations
 
@@ -552,3 +556,144 @@ async def gsc_freshness_audit(
     ))
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# AI Insights — Claude analysis of combined GA4 + GSC data
+# ---------------------------------------------------------------------------
+
+@router.post("/insights")
+async def generate_analytics_insights(
+    project_id: str,
+    user: CurrentUser,
+    _tier: None = require_tier("pro"),
+):
+    """
+    Fetch GA4 metrics + GSC top queries in parallel, then ask Claude to
+    surface the 3-5 most actionable insights for the brand.
+
+    Returns:
+      { insights: [{ title, body, type, priority }], generated_at }
+    """
+    get_project_as_member(project_id, user["uid"])
+
+    from backend.services import cache_service
+    from backend.services.llm_service import get_client
+    from datetime import datetime, timezone
+
+    cache_key = f"analytics_insights:{user['uid']}:{project_id}"
+    cached = cache_service.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # --- Gather GA4 data (if connected) ---
+    project = await asyncio.to_thread(firebase_service.get_project, project_id) or {}
+    property_id = project.get("ga4PropertyId")
+
+    ga4_summary = ""
+    gsc_summary = ""
+
+    if property_id:
+        try:
+            metrics, sources, pages = await asyncio.gather(
+                ga4_service.get_session_metrics(project_id, user["uid"], property_id),
+                ga4_service.get_traffic_sources(project_id, user["uid"], property_id),
+                ga4_service.get_top_pages(project_id, user["uid"], property_id, limit=5),
+                return_exceptions=True,
+            )
+            if isinstance(metrics, dict):
+                ga4_summary = (
+                    f"GA4 (last 30 days):\n"
+                    f"- Sessions: {metrics.get('sessions', 0):,}\n"
+                    f"- Users: {metrics.get('users', 0):,}\n"
+                    f"- Pageviews: {metrics.get('pageviews', 0):,}\n"
+                    f"- Bounce rate: {metrics.get('bounce_rate', 0)}%\n"
+                    f"- Avg session duration: {metrics.get('avg_session_duration', 0)}s\n"
+                )
+            if isinstance(sources, list) and sources:
+                top_src = ", ".join(f"{s['source']} ({s['percentage']}%)" for s in sources[:4])
+                ga4_summary += f"- Top traffic sources: {top_src}\n"
+            if isinstance(pages, list) and pages:
+                top_pages = ", ".join(p["page"] for p in pages[:3])
+                ga4_summary += f"- Top pages: {top_pages}\n"
+        except Exception:
+            pass
+
+    # --- Gather GSC data (if connected) ---
+    try:
+        gsc_tokens = gsc_service.get_tokens(project_id, user["uid"])
+        if gsc_tokens:
+            raw_queries = await _gsc_search_analytics(
+                project_id, user["uid"],
+                dimensions=["query"],
+                days=90,
+                limit=20,
+                row_limit=20,
+            )
+            if raw_queries:
+                quick_wins = [
+                    r["keys"][0]
+                    for r in raw_queries
+                    if int(r.get("impressions", 0)) > 100 and r.get("ctr", 0) < 0.02
+                ]
+                low_pos = [
+                    f"{r['keys'][0]} (pos {round(r.get('position', 0), 1)})"
+                    for r in raw_queries
+                    if r.get("position", 99) > 10
+                ]
+                gsc_summary = (
+                    f"GSC (last 90 days):\n"
+                    f"- Total tracked queries: {len(raw_queries)}\n"
+                )
+                if quick_wins:
+                    gsc_summary += f"- Quick win keywords (high impressions, low CTR): {', '.join(quick_wins[:5])}\n"
+                if low_pos:
+                    gsc_summary += f"- Keywords ranking page 2+: {', '.join(low_pos[:5])}\n"
+    except Exception:
+        pass
+
+    if not ga4_summary and not gsc_summary:
+        return {
+            "insights": [],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "message": "Connect Google Analytics 4 or Search Console to generate insights.",
+        }
+
+    brand_name = project.get("name", "this brand")
+
+    prompt = f"""You are a growth analyst. Based on the following website analytics data for "{brand_name}", \
+identify the 3-5 most actionable insights. Be specific and concrete — name metrics, percentages, and pages.
+
+{ga4_summary}
+{gsc_summary}
+
+Return ONLY valid JSON:
+{{
+  "insights": [
+    {{
+      "title": "<short insight headline>",
+      "body": "<2-3 sentence explanation with specific data points and a recommended action>",
+      "type": "opportunity" | "warning" | "win",
+      "priority": "high" | "medium" | "low"
+    }}
+  ]
+}}
+
+Order by priority. Focus on what the brand can actually do this week."""
+
+    client = get_client()
+    try:
+        response = await client.messages.create(
+            model=settings.LLM_CLASSIFICATION_MODEL,
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        from backend.services.intelligence_service import _parse_json_response
+        result = _parse_json_response(response.content[0].text)
+    except Exception as exc:
+        logger.error("Analytics insights generation failed: %s", exc)
+        return {"insights": [], "generated_at": datetime.now(timezone.utc).isoformat()}
+
+    output = {**result, "generated_at": datetime.now(timezone.utc).isoformat()}
+    cache_service.set(cache_key, output, ttl=3600 * 6)
+    return output

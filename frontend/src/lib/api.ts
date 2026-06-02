@@ -3067,6 +3067,58 @@ export const api = {
 
     disconnectGSC: (projectId: string) =>
       del(`/projects/${projectId}/blog/gsc-disconnect`),
+
+    scoreContent: (projectId: string, content: string, keyword: string, seoScore?: number) =>
+      post<{
+        combined_score: number
+        seo_score: number
+        geo_score: number
+        aeo_score: number
+        geo: {
+          geo_score: number
+          dimensions: Record<string, number>
+          suggestions: { type: string; issue: string; fix: string }[]
+          summary: string
+        }
+        aeo: {
+          aeo_score: number
+          dimensions: Record<string, number>
+          faq_pairs: { question: string; answer: string }[]
+          faq_schema: object
+          suggested_questions: string[]
+          suggestions: { type: string; issue: string; fix: string }[]
+          summary: string
+        }
+        top_priorities: { title: string; body: string; score_area: string }[]
+      }>(`/projects/${projectId}/blog/content-score`, {
+        content,
+        keyword,
+        seo_score: seoScore,
+      }),
+
+    analyseCompetitorBlogs: (projectId: string, competitorUrls: string[], topicFocus?: string) =>
+      post<{
+        competitors: {
+          domain: string
+          posts: { title: string; url: string }[]
+          top_formats: string[]
+          top_topics: string[]
+          posting_frequency: string
+          content_style: string
+        }[]
+        gap_opportunities: {
+          topic: string
+          angle: string
+          why_now: string
+          target_format: string
+          priority: 'high' | 'medium' | 'low'
+        }[]
+        recommended_formats: string[]
+        summary: string
+      }>(`/projects/${projectId}/blog/competitor-analysis`, {
+        competitor_urls: competitorUrls,
+        topic_focus: topicFocus,
+      }),
   },
 
   // ---------------------------------------------------------------------------
@@ -3169,6 +3221,18 @@ export const api = {
         avg_position: number
         refresh_priority: 'urgent' | 'moderate' | 'low'
       }[]>(`/projects/${projectId}/integrations/gsc/freshness-audit`),
+
+    generateInsights: (projectId: string) =>
+      post<{
+        insights: {
+          title: string
+          body: string
+          type: 'opportunity' | 'warning' | 'win'
+          priority: 'high' | 'medium' | 'low'
+        }[]
+        generated_at: string
+        message?: string
+      }>(`/projects/${projectId}/integrations/insights`, {}),
   },
 
   // ---------------------------------------------------------------------------

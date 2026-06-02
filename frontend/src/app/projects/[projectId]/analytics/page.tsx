@@ -496,8 +496,13 @@ export default function AnalyticsPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Live Data tab (GA4 + GSC)
+// Live Data tab (GA4 + GSC) — enhanced with AI Insights, Quick Wins, Freshness Audit
 // ---------------------------------------------------------------------------
+
+type LiveSubTab = 'traffic' | 'search' | 'insights'
+
+type Insight = { title: string; body: string; type: 'opportunity' | 'warning' | 'win'; priority: 'high' | 'medium' | 'low' }
+type FreshnessRow = { page: string; current_impressions: number; prior_impressions: number; delta_percent: number; current_clicks: number; avg_position: number; refresh_priority: 'urgent' | 'moderate' | 'low' }
 
 function LiveDataTab({ projectId }: { projectId: string }) {
   const [ga4Status, setGA4Status] = useState<{ connected: boolean; property_id: string | null } | null>(null)
@@ -510,8 +515,13 @@ function LiveDataTab({ projectId }: { projectId: string }) {
   const [sources, setSources] = useState<{ source: string; medium: string; sessions: number; percentage: number }[]>([])
   const [pages, setPages] = useState<{ page: string; sessions: number; pageviews: number; avg_time_on_page: number }[]>([])
   const [gscQueries, setGscQueries] = useState<{ query: string; clicks: number; impressions: number; ctr: number; avg_position: number; is_quick_win: boolean }[]>([])
+  const [freshnessRows, setFreshnessRows] = useState<FreshnessRow[]>([])
+  const [insights, setInsights] = useState<Insight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [insightsGenerated, setInsightsGenerated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
+  const [subTab, setSubTab] = useState<LiveSubTab>('traffic')
 
   useEffect(() => {
     Promise.all([
@@ -538,9 +548,27 @@ function LiveDataTab({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (!gscStatus?.connected) return
-    api.integrations.gscQueries(projectId, days).catch(() => ({ queries: [] }))
-      .then((r) => setGscQueries(r.queries ?? []))
+    Promise.all([
+      api.integrations.gscQueries(projectId, days).catch(() => ({ queries: [] })),
+      api.integrations.gscFreshnessAudit(projectId).catch(() => []),
+    ]).then(([qr, fr]) => {
+      setGscQueries(qr.queries ?? [])
+      setFreshnessRows(Array.isArray(fr) ? fr : [])
+    })
   }, [projectId, gscStatus, days])
+
+  async function handleGenerateInsights() {
+    setInsightsLoading(true)
+    try {
+      const data = await api.integrations.generateInsights(projectId)
+      setInsights(data.insights ?? [])
+      setInsightsGenerated(true)
+    } catch {
+      toast.error('Failed to generate insights')
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -575,160 +603,351 @@ function LiveDataTab({ projectId }: { projectId: string }) {
     )
   }
 
-  return (
-    <div className="p-4 space-y-6 max-w-5xl">
+  const quickWins = gscQueries.filter((q) => q.is_quick_win)
 
-      {/* Day range picker */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Period:</span>
-        {[7, 30, 90].map((d) => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            className={cn(
-              'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
-              days === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {d}d
-          </button>
-        ))}
+  return (
+    <div className="p-4 space-y-4 max-w-5xl">
+
+      {/* Sub-tab nav + day picker */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5 bg-muted/40">
+          {([
+            { key: 'traffic', label: 'Traffic', icon: <Globe className="w-3 h-3" /> },
+            { key: 'search', label: 'Search', icon: <Search className="w-3 h-3" /> },
+            { key: 'insights', label: 'AI Insights', icon: <Sparkles className="w-3 h-3" /> },
+          ] as { key: LiveSubTab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setSubTab(key)}
+              className={cn(
+                'flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                subTab === key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {icon} {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Period:</span>
+          {[7, 30, 90].map((d) => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                days === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* GA4 Section */}
-      {ga4Connected && (
+      {/* --- Traffic tab --- */}
+      {subTab === 'traffic' && (
         <>
-          {/* Overview stat cards */}
-          {ga4Metrics && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {[
-                { label: 'Sessions', value: ga4Metrics.sessions.toLocaleString() },
-                { label: 'Users', value: ga4Metrics.users.toLocaleString() },
-                { label: 'Pageviews', value: ga4Metrics.pageviews.toLocaleString() },
-                { label: 'Bounce Rate', value: `${ga4Metrics.bounce_rate}%` },
-                { label: 'Avg Duration', value: `${Math.round(ga4Metrics.avg_session_duration)}s` },
-              ].map(({ label, value }) => (
-                <div key={label} className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
-                  <p className="text-xl font-bold tabular-nums mt-0.5">{value}</p>
-                </div>
-              ))}
+          {!ga4Connected ? (
+            <div className="rounded-xl border border-border p-6 text-center space-y-2">
+              <p className="text-sm font-medium">Google Analytics 4 not connected</p>
+              <p className="text-xs text-muted-foreground">Connect GA4 in Settings → Integrations to see traffic data.</p>
+              <a href={`/projects/${projectId}/settings/integrations`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                Connect GA4 <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
-          )}
-
-          {/* Sessions chart + Traffic sources */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Sessions over time */}
-            <div className="lg:col-span-2 bg-card border border-border rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Globe className="w-3.5 h-3.5 text-primary" />
-                <p className="text-sm font-semibold">Sessions Over Time</p>
-              </div>
-              {ga4Metrics && ga4Metrics.daily_sessions.length > 0 ? (
-                <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={ga4Metrics.daily_sessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(d) => d.slice(5)} />
-                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
-                    <Tooltip contentStyle={{ fontSize: 11 }} />
-                    <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">No data</div>
-              )}
-            </div>
-
-            {/* Traffic sources */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm font-semibold mb-3">Traffic Sources</p>
-              {sources.length > 0 ? (
-                <div className="space-y-2">
-                  {sources.map((s) => (
-                    <div key={s.medium}>
-                      <div className="flex justify-between text-xs mb-0.5">
-                        <span className="text-muted-foreground truncate max-w-[120px]">{s.source}</span>
-                        <span className="font-medium tabular-nums">{s.percentage}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-border overflow-hidden">
-                        <div className="h-full rounded-full bg-primary/70" style={{ width: `${s.percentage}%` }} />
-                      </div>
+          ) : (
+            <>
+              {ga4Metrics && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {[
+                    { label: 'Sessions', value: ga4Metrics.sessions.toLocaleString() },
+                    { label: 'Users', value: ga4Metrics.users.toLocaleString() },
+                    { label: 'Pageviews', value: ga4Metrics.pageviews.toLocaleString() },
+                    { label: 'Bounce Rate', value: `${ga4Metrics.bounce_rate}%` },
+                    { label: 'Avg Duration', value: `${Math.round(ga4Metrics.avg_session_duration)}s` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-card border border-border rounded-lg p-3">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                      <p className="text-xl font-bold tabular-nums mt-0.5">{value}</p>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">No data</div>
               )}
-            </div>
-          </div>
 
-          {/* Top pages */}
-          {pages.length > 0 && (
-            <div className="bg-card border border-border rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-border">
-                <p className="text-sm font-semibold">Top Pages</p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-card border border-border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Globe className="w-3.5 h-3.5 text-primary" />
+                    <p className="text-sm font-semibold">Sessions Over Time</p>
+                  </div>
+                  {ga4Metrics && ga4Metrics.daily_sessions.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={ga4Metrics.daily_sessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                        <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(d) => d.slice(5)} />
+                        <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+                        <Tooltip contentStyle={{ fontSize: 11 }} />
+                        <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">No data</div>
+                  )}
+                </div>
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-sm font-semibold mb-3">Traffic Sources</p>
+                  {sources.length > 0 ? (
+                    <div className="space-y-2">
+                      {sources.map((s) => (
+                        <div key={s.medium}>
+                          <div className="flex justify-between text-xs mb-0.5">
+                            <span className="text-muted-foreground truncate max-w-[120px]">{s.source}</span>
+                            <span className="font-medium tabular-nums">{s.percentage}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                            <div className="h-full rounded-full bg-primary/70" style={{ width: `${s.percentage}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">No data</div>
+                  )}
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Page</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Sessions</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Pageviews</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Avg Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pages.map((p, i) => (
-                      <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                        <td className="px-4 py-2">
-                          <p className="font-medium truncate max-w-xs">{p.page}</p>
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums">{p.sessions.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{p.pageviews.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(p.avg_time_on_page)}s</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+
+              {pages.length > 0 && (
+                <div className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold">Top Pages</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Page</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Sessions</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Pageviews</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Avg Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pages.map((p, i) => (
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="px-4 py-2 font-medium truncate max-w-xs">{p.page}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{p.sessions.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{p.pageviews.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(p.avg_time_on_page)}s</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
 
-      {/* GSC Section */}
-      {gscStatus?.connected && gscQueries.length > 0 && (
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-            <Search className="w-3.5 h-3.5 text-primary" />
-            <p className="text-sm font-semibold">Top Search Queries (GSC)</p>
+      {/* --- Search tab --- */}
+      {subTab === 'search' && (
+        <>
+          {!gscStatus?.connected ? (
+            <div className="rounded-xl border border-border p-6 text-center space-y-2">
+              <p className="text-sm font-medium">Google Search Console not connected</p>
+              <p className="text-xs text-muted-foreground">Connect GSC in Settings → Integrations to see keyword rankings.</p>
+              <a href={`/projects/${projectId}/settings/integrations`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                Connect GSC <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          ) : (
+            <>
+              {/* Quick wins banner */}
+              {quickWins.length > 0 && (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="w-4 h-4 text-amber-600" />
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      {quickWins.length} Quick Win{quickWins.length > 1 ? 's' : ''} Found
+                    </p>
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+                    High impressions but low CTR — small title/meta improvements could unlock significant clicks.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickWins.slice(0, 8).map((q, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-800">
+                        {q.query}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Queries table */}
+              {gscQueries.length > 0 && (
+                <div className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                    <Search className="w-3.5 h-3.5 text-primary" />
+                    <p className="text-sm font-semibold">Top Search Queries (GSC)</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Query</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Clicks</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Impressions</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">CTR</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Position</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gscQueries.slice(0, 25).map((q, i) => (
+                          <tr key={i} className={cn('border-b border-border/50 hover:bg-muted/20', q.is_quick_win && 'bg-amber-50/50 dark:bg-amber-900/10')}>
+                            <td className="px-4 py-2 font-medium">
+                              <span>{q.query}</span>
+                              {q.is_quick_win && (
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                                  quick win
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums">{q.clicks}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{q.impressions.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{q.ctr}%</td>
+                            <td className={cn('px-4 py-2 text-right tabular-nums font-medium', q.avg_position <= 3 ? 'text-green-600' : q.avg_position <= 10 ? 'text-amber-600' : 'text-muted-foreground')}>
+                              {q.avg_position}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Freshness audit */}
+              {freshnessRows.length > 0 && (
+                <div className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold">Content Freshness Audit</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Impression change vs prior 90 days — pages losing visibility need a content refresh.</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Page</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Impressions</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Delta</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Position</th>
+                          <th className="text-right px-4 py-2 font-medium text-muted-foreground">Priority</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {freshnessRows.slice(0, 20).map((r, i) => (
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="px-4 py-2 font-medium truncate max-w-xs">{r.page}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{r.current_impressions.toLocaleString()}</td>
+                            <td className={cn('px-4 py-2 text-right tabular-nums font-medium', r.delta_percent >= 0 ? 'text-green-600' : 'text-red-500')}>
+                              {r.delta_percent >= 0 ? '+' : ''}{r.delta_percent}%
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.avg_position}</td>
+                            <td className="px-4 py-2 text-right">
+                              <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                                r.refresh_priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                r.refresh_priority === 'moderate' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                'bg-muted text-muted-foreground'
+                              )}>
+                                {r.refresh_priority}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* --- AI Insights tab --- */}
+      {subTab === 'insights' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">AI Analytics Insights</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Claude analyses your GA4 + GSC data and surfaces actionable priorities.</p>
+            </div>
+            <button
+              onClick={handleGenerateInsights}
+              disabled={insightsLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {insightsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {insightsGenerated ? 'Regenerate' : 'Generate Insights'}
+            </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Query</th>
-                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Clicks</th>
-                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Impressions</th>
-                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">CTR</th>
-                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Position</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gscQueries.slice(0, 20).map((q, i) => (
-                  <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                    <td className="px-4 py-2 font-medium">{q.query}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{q.clicks}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{q.impressions.toLocaleString()}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{q.ctr}%</td>
-                    <td className={cn('px-4 py-2 text-right tabular-nums font-medium', q.avg_position <= 3 ? 'text-green-600' : q.avg_position <= 10 ? 'text-amber-600' : 'text-muted-foreground')}>
-                      {q.avg_position}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+          {!insightsGenerated && !insightsLoading && (
+            <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2">
+              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto" />
+              <p className="text-sm font-medium">No insights generated yet</p>
+              <p className="text-xs text-muted-foreground">Click "Generate Insights" to get an AI-powered analysis of your traffic and search data.</p>
+            </div>
+          )}
+
+          {insightsLoading && (
+            <div className="flex items-center justify-center h-32 gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Analysing your data…</p>
+            </div>
+          )}
+
+          {insightsGenerated && !insightsLoading && insights.length === 0 && (
+            <div className="rounded-xl border border-border p-6 text-center">
+              <p className="text-sm text-muted-foreground">Not enough data to generate insights yet. Connect GA4 or GSC first.</p>
+            </div>
+          )}
+
+          {insights.map((ins, i) => {
+            const colors = {
+              opportunity: 'border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/50',
+              warning: 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900/50',
+              win: 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-900/50',
+            }
+            const labelColors = {
+              opportunity: 'text-blue-700 dark:text-blue-300',
+              warning: 'text-red-700 dark:text-red-300',
+              win: 'text-green-700 dark:text-green-300',
+            }
+            const priorityBadge = {
+              high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+              medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+              low: 'bg-muted text-muted-foreground',
+            }
+            return (
+              <div key={i} className={cn('rounded-xl border p-4 space-y-1.5', colors[ins.type])}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className={cn('text-sm font-semibold', labelColors[ins.type])}>{ins.title}</p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold', priorityBadge[ins.priority])}>
+                      {ins.priority}
+                    </span>
+                    <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize', labelColors[ins.type], 'bg-white/50 dark:bg-black/20')}>
+                      {ins.type}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-foreground/80 leading-relaxed">{ins.body}</p>
+              </div>
+            )
+          })}
         </div>
       )}
 
