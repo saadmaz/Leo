@@ -915,7 +915,7 @@ function LiveDataTab({ projectId }: { projectId: string }) {
             <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2">
               <Sparkles className="w-8 h-8 text-muted-foreground mx-auto" />
               <p className="text-sm font-medium">No insights generated yet</p>
-              <p className="text-xs text-muted-foreground">Click "Generate Insights" to get an AI-powered analysis of your traffic and search data.</p>
+              <p className="text-xs text-muted-foreground">Click &quot;Generate Insights&quot; to get an AI-powered analysis of your traffic and search data.</p>
             </div>
           )}
 
@@ -1225,8 +1225,6 @@ function LeoTagTab({ projectId }: { projectId: string }) {
       </div>
     )
   }
-
-  const maxPageviews = Math.max(...(stats?.daily.map((d) => d.pageviews) ?? [1]), 1)
 
   return (
     <div className="p-4 space-y-5 max-w-4xl">

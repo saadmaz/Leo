@@ -120,7 +120,6 @@ function ScorePanel({ score, loading }: { score: ContentScore | null; loading: b
     )
   }
 
-  const priorityColor = { high: 'text-red-600', medium: 'text-amber-600', low: 'text-muted-foreground' }
   const areaColor = { SEO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', GEO: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', AEO: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' }
 
   return (
