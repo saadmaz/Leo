@@ -9,8 +9,9 @@ GA4 endpoints:
   GET  /projects/{id}/integrations/ga4/sources    — traffic source breakdown
   GET  /projects/{id}/integrations/ga4/pages      — top pages by pageviews
 
-GSC extra endpoints (extends blog.py GSC auth which lives there):
-  GET  /projects/{id}/integrations/gsc/queries    — top search queries with impressions/clicks/CTR
+GSC endpoints (OAuth auth lives in blog.py; data lives here):
+  GET  /projects/{id}/integrations/gsc/status     — connection status, domain, last sync
+  GET  /projects/{id}/integrations/gsc/queries    — top search queries with is_quick_win flag
   GET  /projects/{id}/integrations/gsc/pages      — top pages from GSC
 """
 from __future__ import annotations
@@ -33,11 +34,26 @@ router = APIRouter(prefix="/projects/{project_id}/integrations", tags=["integrat
 
 
 # ---------------------------------------------------------------------------
-# Request schemas
+# Schemas
 # ---------------------------------------------------------------------------
 
 class SetGA4PropertyRequest(BaseModel):
     property_id: str = Field(..., min_length=1, max_length=50, pattern=r"^\d+$")
+
+
+class GSCStatus(BaseModel):
+    connected: bool
+    domain: Optional[str] = None
+    last_synced: Optional[str] = None
+
+
+class GSCQuery(BaseModel):
+    query: str
+    impressions: int
+    clicks: int
+    ctr: float
+    avg_position: float
+    is_quick_win: bool
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +181,7 @@ async def ga4_top_pages(
 
 
 # ---------------------------------------------------------------------------
-# GSC extra data (auth lives in blog.py)
+# GSC — status + data (OAuth auth lives in blog.py)
 # ---------------------------------------------------------------------------
 
 async def _gsc_search_analytics(
@@ -219,17 +235,47 @@ async def _gsc_search_analytics(
         return []
 
 
+@router.get("/gsc/status", response_model=GSCStatus)
+async def gsc_integration_status(
+    project_id: str,
+    user: CurrentUser,
+    _tier: None = require_tier("pro"),
+):
+    """
+    Return GSC connection status, the first verified domain, and last sync time.
+    Uses tokens stored by the blog.py OAuth callback.
+    """
+    get_project_as_member(project_id, user["uid"])
+    tokens = gsc_service.get_tokens(project_id, user["uid"])
+    if not tokens:
+        return GSCStatus(connected=False)
+
+    # Derive the primary domain from the first listed property
+    try:
+        properties = await gsc_service.list_properties(project_id, user["uid"])
+        domain = properties[0] if properties else None
+    except Exception:
+        domain = None
+
+    return GSCStatus(
+        connected=True,
+        domain=domain,
+        last_synced=tokens.get("updated_at") or tokens.get("connected_at"),
+    )
+
+
 @router.get("/gsc/queries")
 async def gsc_top_queries(
     project_id: str,
     user: CurrentUser,
-    days: int = Query(28, ge=7, le=90),
-    limit: int = Query(20, ge=1, le=50),
+    days: int = Query(90, ge=7, le=365),
+    limit: int = Query(50, ge=1, le=200),
     _tier: None = require_tier("pro"),
 ):
     """
     Top search queries from GSC ordered by impressions.
-    Returns list of { query, clicks, impressions, ctr, position }.
+    Returns list of GSCQuery with is_quick_win flag.
+    is_quick_win: impressions > 100 AND raw CTR < 0.02 (< 2%).
     """
     get_project_as_member(project_id, user["uid"])
     tokens = gsc_service.get_tokens(project_id, user["uid"])
@@ -241,21 +287,21 @@ async def gsc_top_queries(
         dimensions=["query"],
         days=days,
         limit=limit,
-        row_limit=50,
+        row_limit=min(limit, 200),
     )
-    return {
-        "queries": [
-            {
-                "query": r["keys"][0],
-                "clicks": r.get("clicks", 0),
-                "impressions": r.get("impressions", 0),
-                "ctr": round(r.get("ctr", 0) * 100, 2),
-                "position": round(r.get("position", 0), 1),
-            }
-            for r in raw
-        ],
-        "days": days,
-    }
+    queries = []
+    for r in raw:
+        raw_ctr = r.get("ctr", 0.0)
+        impressions = int(r.get("impressions", 0))
+        queries.append(GSCQuery(
+            query=r["keys"][0],
+            clicks=int(r.get("clicks", 0)),
+            impressions=impressions,
+            ctr=round(raw_ctr * 100, 2),        # returned as percentage for display
+            avg_position=round(r.get("position", 0.0), 1),
+            is_quick_win=impressions > 100 and raw_ctr < 0.02,
+        ))
+    return {"queries": [q.model_dump() for q in queries], "days": days}
 
 
 @router.get("/gsc/pages")
@@ -280,16 +326,16 @@ async def gsc_top_pages(
         dimensions=["page"],
         days=days,
         limit=limit,
-        row_limit=50,
+        row_limit=min(limit, 200),
     )
     return {
         "pages": [
             {
                 "page": r["keys"][0],
-                "clicks": r.get("clicks", 0),
-                "impressions": r.get("impressions", 0),
+                "clicks": int(r.get("clicks", 0)),
+                "impressions": int(r.get("impressions", 0)),
                 "ctr": round(r.get("ctr", 0) * 100, 2),
-                "position": round(r.get("position", 0), 1),
+                "avg_position": round(r.get("position", 0.0), 1),
             }
             for r in raw
         ],

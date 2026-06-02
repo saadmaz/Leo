@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { FileText, Search, ChevronRight, AlertTriangle, CheckCircle, Loader2, ExternalLink, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, type BlogSERPAnalysis, type BlogBrief } from '@/lib/api'
@@ -48,10 +48,17 @@ function ProgressPanel({ steps }: { steps: StepProgress[] }) {
 export default function BlogBriefPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [step, setStep] = useState<Step>('keyword')
   const [keyword, setKeyword] = useState('')
   const [locationCode, setLocationCode] = useState(2840)
+
+  // Pre-fill keyword from URL param (e.g. linked from GSC quick-wins)
+  useEffect(() => {
+    const prefilled = searchParams.get('keyword')
+    if (prefilled) setKeyword(prefilled)
+  }, [searchParams])
   const [serpSteps, setSerpSteps] = useState<StepProgress[]>([])
   const [briefSteps, setBriefSteps] = useState<StepProgress[]>([])
   const [serpAnalysis, setSerpAnalysis] = useState<BlogSERPAnalysis | null>(null)

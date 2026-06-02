@@ -1,4 +1,23 @@
 // ---------------------------------------------------------------------------
+// Integrations — GSC
+// ---------------------------------------------------------------------------
+
+export interface GSCStatusResponse {
+  connected: boolean
+  domain: string | null
+  lastSynced: string | null
+}
+
+export interface GSCQuery {
+  query: string
+  impressions: number
+  clicks: number
+  ctr: number      // percentage value, e.g. 1.5 means 1.5%
+  avgPosition: number
+  isQuickWin: boolean
+}
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 

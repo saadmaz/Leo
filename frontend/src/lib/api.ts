@@ -3109,16 +3109,34 @@ export const api = {
         `/projects/${projectId}/integrations/ga4/pages?days=${days}&limit=${limit}`,
       ),
 
-    // GSC extra data
-    gscQueries: (projectId: string, days = 28, limit = 20) =>
+    // GSC status + data
+    gscStatus: (projectId: string) =>
+      get<{ connected: boolean; domain: string | null; last_synced: string | null }>(
+        `/projects/${projectId}/integrations/gsc/status`,
+      ),
+
+    gscQueries: (projectId: string, days = 90, limit = 50) =>
       get<{
-        queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[]
+        queries: {
+          query: string
+          clicks: number
+          impressions: number
+          ctr: number          // percentage, e.g. 1.5 = 1.5%
+          avg_position: number
+          is_quick_win: boolean
+        }[]
         days: number
       }>(`/projects/${projectId}/integrations/gsc/queries?days=${days}&limit=${limit}`),
 
     gscPages: (projectId: string, days = 28, limit = 20) =>
       get<{
-        pages: { page: string; clicks: number; impressions: number; ctr: number; position: number }[]
+        pages: {
+          page: string
+          clicks: number
+          impressions: number
+          ctr: number
+          avg_position: number
+        }[]
         days: number
       }>(`/projects/${projectId}/integrations/gsc/pages?days=${days}&limit=${limit}`),
   },

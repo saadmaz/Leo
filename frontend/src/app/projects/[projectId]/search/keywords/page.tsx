@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
-import { Search, TrendingUp, Loader2, AlertCircle, ExternalLink, FileText } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { Search, TrendingUp, Loader2, AlertCircle, ExternalLink, FileText, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'
 import { SidebarToggle } from '@/components/layout/sidebar'
@@ -49,17 +49,25 @@ function DifficultyBar({ score }: { score: number | null }) {
 // ---------------------------------------------------------------------------
 
 function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
-  type GSCQuery = { query: string; clicks: number; impressions: number; ctr: number; position: number }
+  type GSCQuery = {
+    query: string
+    clicks: number
+    impressions: number
+    ctr: number
+    avg_position: number
+    is_quick_win: boolean
+  }
 
-  const [gscStatus, setGscStatus] = useState<{ connected: boolean } | null>(null)
+  const router = useRouter()
+  const [gscStatus, setGscStatus] = useState<{ connected: boolean; domain: string | null } | null>(null)
   const [queries, setQueries] = useState<GSCQuery[]>([])
   const [loading, setLoading] = useState(true)
-  const [days, setDays] = useState(28)
+  const [days, setDays] = useState(90)
 
   useEffect(() => {
-    api.blog.getGSCStatus(projectId)
-      .then(setGscStatus)
-      .catch(() => setGscStatus({ connected: false }))
+    api.integrations.gscStatus(projectId)
+      .then((s) => setGscStatus({ connected: s.connected, domain: s.domain }))
+      .catch(() => setGscStatus({ connected: false, domain: null }))
       .finally(() => setLoading(false))
   }, [projectId])
 
@@ -72,13 +80,11 @@ function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
       .finally(() => setLoading(false))
   }, [projectId, gscStatus, days])
 
-  // "Quick win" = position 4-20 with impressions > 500 and CTR below average
-  const avgCtr = queries.length > 0 ? queries.reduce((s, q) => s + q.ctr, 0) / queries.length : 0
-  const quickWins = queries.filter((q) => q.position >= 4 && q.position <= 20 && q.impressions > 500 && q.ctr < avgCtr)
+  // Quick wins come from the backend (impressions > 100 AND raw CTR < 2%)
+  const quickWins = queries.filter((q) => q.is_quick_win)
 
   function handleWritePost(query: string) {
-    toast.info(`Opening Blog Brief for "${query}"`)
-    window.location.href = `/projects/${projectId}/search/blog-brief?keyword=${encodeURIComponent(query)}`
+    router.push(`/projects/${projectId}/search/blog-brief?keyword=${encodeURIComponent(query)}`)
   }
 
   if (loading) {
@@ -113,6 +119,15 @@ function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+      {/* Connected domain banner */}
+      {gscStatus?.domain && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/5 border border-green-500/20 text-xs text-green-700 dark:text-green-400">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          <span>Showing data for <span className="font-medium">{gscStatus.domain}</span></span>
+        </div>
+      )}
+
       {/* Period selector */}
       <div className="flex items-center gap-3">
         <span className="text-xs text-muted-foreground">Period:</span>
@@ -140,7 +155,7 @@ function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
             </p>
           </div>
           <p className="text-xs text-amber-700 dark:text-amber-300">
-            These keywords already rank on page 1–2 but have below-average click-through rates. A targeted blog post could move the needle fast.
+            These keywords get impressions (&gt;100) but under 2% CTR — a targeted blog post optimised for these terms could move the needle fast.
           </p>
           <div className="space-y-2">
             {quickWins.slice(0, 5).map((q, i) => (
@@ -148,7 +163,7 @@ function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{q.query}</p>
                   <p className="text-xs text-muted-foreground">
-                    Pos {q.position} · {q.impressions.toLocaleString()} impressions · {q.ctr}% CTR
+                    Pos {q.avg_position} · {q.impressions.toLocaleString()} impressions · {q.ctr}% CTR
                   </p>
                 </div>
                 <button
@@ -183,37 +198,41 @@ function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {queries.map((q, i) => {
-                  const isWin = quickWins.includes(q)
-                  return (
-                    <tr key={i} className={cn('border-b border-border/50 hover:bg-muted/20', isWin && 'bg-amber-50/50 dark:bg-amber-900/10')}>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          {isWin && <span className="text-amber-500 shrink-0" title="Quick win opportunity">⚡</span>}
-                          <span className="font-medium">{q.query}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{q.clicks}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{q.impressions.toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{q.ctr}%</td>
-                      <td className={cn(
-                        'px-4 py-2.5 text-right tabular-nums font-medium',
-                        q.position <= 3 ? 'text-green-600' : q.position <= 10 ? 'text-amber-600' : 'text-muted-foreground',
-                      )}>
-                        {q.position}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <button
-                          onClick={() => handleWritePost(q.query)}
-                          className="text-muted-foreground hover:text-primary transition-colors"
-                          title="Write blog post for this keyword"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {queries.map((q, i) => (
+                  <tr key={i} className={cn('border-b border-border/50 hover:bg-muted/20', q.is_quick_win && 'bg-amber-50/50 dark:bg-amber-900/10')}>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        {q.is_quick_win && (
+                          <span
+                            className="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 whitespace-nowrap shrink-0"
+                            title="Quick win: high impressions, low CTR"
+                          >
+                            Quick win
+                          </span>
+                        )}
+                        <span className="font-medium">{q.query}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{q.clicks}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{q.impressions.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{q.ctr}%</td>
+                    <td className={cn(
+                      'px-4 py-2.5 text-right tabular-nums font-medium',
+                      q.avg_position <= 3 ? 'text-green-600' : q.avg_position <= 10 ? 'text-amber-600' : 'text-muted-foreground',
+                    )}>
+                      {q.avg_position}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => handleWritePost(q.query)}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="Write blog post for this keyword"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

@@ -21,9 +21,10 @@ interface GA4Status {
   connected: boolean
 }
 
-interface GSCStatus {
+interface GSCStatusData {
   connected: boolean
-  properties?: string[]
+  domain: string | null
+  last_synced: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -188,14 +189,14 @@ function GA4Card({ projectId }: { projectId: string }) {
 // ---------------------------------------------------------------------------
 
 function GSCCard({ projectId }: { projectId: string }) {
-  const [status, setStatus] = useState<GSCStatus | null>(null)
+  const [status, setStatus] = useState<GSCStatusData | null>(null)
   const [loading, setLoading] = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
 
   useEffect(() => {
-    api.blog.getGSCStatus(projectId)
-      .then(setStatus)
-      .catch(() => setStatus({ connected: false }))
+    api.integrations.gscStatus(projectId)
+      .then((s) => setStatus({ connected: s.connected, domain: s.domain, last_synced: s.last_synced }))
+      .catch(() => setStatus({ connected: false, domain: null, last_synced: null }))
       .finally(() => setLoading(false))
   }, [projectId])
 
@@ -251,16 +252,17 @@ function GSCCard({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {!loading && status?.connected && status.properties && status.properties.length > 0 && (
+      {!loading && status?.connected && (
         <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs font-medium text-green-800 dark:text-green-300">
-              {status.properties.length} propert{status.properties.length === 1 ? 'y' : 'ies'} connected
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-green-800 dark:text-green-300 truncate">
+              {status.domain ?? 'Connected'}
             </p>
-            <p className="text-[11px] text-green-700 dark:text-green-400 mt-0.5">
-              {status.properties.slice(0, 2).join(', ')}
-              {status.properties.length > 2 ? ` +${status.properties.length - 2} more` : ''}
-            </p>
+            {status.last_synced && (
+              <p className="text-[11px] text-green-700 dark:text-green-400 mt-0.5">
+                Last synced {new Date(status.last_synced).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
           </div>
           <button
             onClick={handleDisconnect}
