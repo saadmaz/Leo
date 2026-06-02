@@ -15,6 +15,7 @@ import { BackButton } from '@/components/layout/back-button'
 import { SectionProgressTracker } from '@/components/blog/SectionProgressTracker'
 import { NLPTermTracker } from '@/components/blog/NLPTermTracker'
 import { BlogScorePanel } from '@/components/blog/BlogScorePanel'
+import { InlineSEOScore } from '@/components/blog/InlineSEOScore'
 import { ContextPanel } from '@/components/layout/ContextPanel'
 import type { BlogPostMeta, MetaTagsResult, WebsiteCopySection, ContentGap, ContentTopic } from '@/types'
 
@@ -42,6 +43,7 @@ export default function SEOPage() {
   const searchParams = useSearchParams()
   const { activeProject } = useAppStore()
   const briefId = searchParams.get('brief_id') ?? undefined
+  const extraKeywords = searchParams.get('extra_keywords') ?? undefined
   const [tab, setTab] = useState<Tab>(briefId ? 'blog' : 'blog')
 
   return (
@@ -77,7 +79,7 @@ export default function SEOPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-        {tab === 'blog'    && <BlogPostTab projectId={params.projectId} briefId={briefId} />}
+        {tab === 'blog'    && <BlogPostTab projectId={params.projectId} briefId={briefId} extraKeywords={extraKeywords} />}
         {tab === 'meta'    && <MetaTagsTab projectId={params.projectId} />}
         {tab === 'website' && <WebsiteCopyTab projectId={params.projectId} />}
         {tab === 'gaps'    && <ContentGapTab projectId={params.projectId} />}
@@ -96,7 +98,7 @@ interface SectionState {
   nlpTermsCovered: string[]
 }
 
-function BlogPostTab({ projectId, briefId }: { projectId: string; briefId?: string }) {
+function BlogPostTab({ projectId, briefId, extraKeywords }: { projectId: string; briefId?: string; extraKeywords?: string }) {
   const [topic, setTopic]         = useState('')
   const [keywords, setKeywords]   = useState('')
   const [tone, setTone]           = useState('informative and engaging')
@@ -122,7 +124,10 @@ function BlogPostTab({ projectId, briefId }: { projectId: string; briefId?: stri
       .then((b) => {
         setBrief(b)
         setTopic(b.target_keyword)
-        setKeywords(b.target_keyword)
+        // Merge extra keywords selected from keyword expansion map
+        const base = b.target_keyword
+        const extras = extraKeywords ? extraKeywords.split(',').map((k) => k.trim()).filter(Boolean) : []
+        setKeywords(extras.length > 0 ? [base, ...extras].join(', ') : base)
         setWordCount(b.recommended_word_count)
       })
       .catch(() => toast.error('Failed to load brief'))
@@ -377,6 +382,15 @@ function BlogPostTab({ projectId, briefId }: { projectId: string; briefId?: stri
               projectId={projectId}
               targetKeyword={!isBriefMode ? keywords.split(',')[0]?.trim() : undefined}
               targetWordCount={!isBriefMode ? wordCount : undefined}
+            />
+          )}
+
+          {/* Inline SEO score — keyword-focused client-side check */}
+          {hasDraft && !loading && (
+            <InlineSEOScore
+              draftText={body}
+              targetKeyword={isBriefMode ? (brief?.target_keyword ?? '') : (keywords.split(',')[0]?.trim() ?? '')}
+              serpWordCount={isBriefMode ? (brief?.recommended_word_count ?? 0) : 0}
             />
           )}
         </div>

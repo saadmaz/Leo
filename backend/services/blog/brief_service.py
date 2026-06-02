@@ -18,6 +18,105 @@ from typing import AsyncGenerator, Optional
 from backend.config import settings
 from backend.services.llm_service import get_client, build_brand_core_context
 
+# ---------------------------------------------------------------------------
+# Keyword expansion (Exa + Claude)
+# ---------------------------------------------------------------------------
+
+async def expand_keywords(
+    primary_keyword: str,
+    serp_titles: list[str],
+    project_id: str,
+) -> dict:
+    """
+    Discover additional related keywords and LSI terms via Exa semantic search
+    + Claude classification.
+
+    Returns:
+      {
+        "related_keywords": [{"keyword": str, "intent": str, "estimated_volume": str}],
+        "lsi_terms": [str]
+      }
+
+    Falls back gracefully if Exa or Claude are unavailable.
+    """
+    try:
+        from backend.services.integrations import exa_client
+
+        # Exa semantic search for related content
+        results = await exa_client.search(
+            query=f"articles about {primary_keyword}",
+            num_results=10,
+            include_highlights=True,
+            project_id=project_id,
+        )
+
+        candidate_text = "\n".join(
+            f"{r.get('title', '')}: {'; '.join(r.get('highlights', []))}"
+            for r in results[:10]
+            if r.get("title")
+        )
+
+        # Also include SERP titles for richer context
+        if serp_titles:
+            candidate_text = "SERP titles: " + " | ".join(serp_titles[:5]) + "\n\n" + candidate_text
+
+        if not candidate_text.strip():
+            return {"related_keywords": [], "lsi_terms": []}
+
+    except Exception as exc:
+        logger.warning("Exa search failed for keyword expansion: %s", exc)
+        return {"related_keywords": [], "lsi_terms": []}
+
+    prompt = f"""Primary keyword: {primary_keyword}
+
+Related content titles and snippets:
+{candidate_text[:3000]}
+
+Extract 12-15 semantically related keywords or phrases that a blog post on "{primary_keyword}" should target or mention.
+Classify each by search intent:
+- informational (how/what/why questions)
+- navigational (brand/tool searches)
+- commercial (comparison/best/review)
+- transactional (buy/get/sign up)
+
+Also identify 8-10 LSI terms (Latent Semantic Indexing) — words and phrases that should appear naturally in a post on this topic.
+
+Return JSON only:
+{{
+  "related_keywords": [
+    {{"keyword": "<str>", "intent": "<informational|navigational|commercial|transactional>", "estimated_volume": "<high|medium|low>"}}
+  ],
+  "lsi_terms": ["<term>"]
+}}"""
+
+    client = get_client()
+    raw_parts: list[str] = []
+    try:
+        async with client.messages.stream(
+            model=settings.LLM_CLASSIFICATION_MODEL,
+            max_tokens=800,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                raw_parts.append(text)
+    except Exception as exc:
+        logger.warning("Claude keyword expansion failed: %s", exc)
+        return {"related_keywords": [], "lsi_terms": []}
+
+    raw = "".join(raw_parts).strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1] if len(parts) > 1 else raw
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Keyword expansion JSON parse failed")
+        return {"related_keywords": [], "lsi_terms": []}
+
 logger = logging.getLogger(__name__)
 
 _BRIEF_COLLECTION = "blog_briefs"
@@ -251,8 +350,24 @@ Rules:
         yield _sse({"type": "error", "error": "Failed to parse brief JSON from Claude output"})
         return
 
-    yield _sse({"type": "step", "label": "Brief generated — saving", "status": "done"})
+    yield _sse({"type": "step", "label": "Brief generated", "status": "done"})
 
+    # Step 3: Keyword expansion via Exa + Claude
+    yield _sse({"type": "step", "label": "Expanding keyword universe", "status": "running"})
+    serp_titles = [u.get("title", "") for u in competing_urls if u.get("title")]
+    try:
+        keyword_expansion = await expand_keywords(keyword, serp_titles, project_id)
+    except Exception as exc:
+        logger.warning("Keyword expansion skipped: %s", exc)
+        keyword_expansion = {"related_keywords": [], "lsi_terms": []}
+
+    brief_data["keyword_expansion"] = keyword_expansion
+    yield _sse({"type": "step", "label": "Keyword expansion complete", "status": "done"})
+
+    # Save final brief
+    yield _sse({"type": "step", "label": "Saving brief", "status": "running"})
     saved = save_brief(project_id, brief_data)
+    yield _sse({"type": "step", "label": "Saving brief", "status": "done"})
+
     yield _sse({"type": "done", "brief": saved})
     yield "data: [DONE]\n\n"

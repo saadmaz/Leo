@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { FileText, Search, ChevronRight, AlertTriangle, CheckCircle, Loader2, ExternalLink, ArrowRight } from 'lucide-react'
+import { FileText, Search, ChevronRight, AlertTriangle, CheckCircle, Loader2, ExternalLink, ArrowRight, Plus } from 'lucide-react'
+import type { BlogKeywordExpansionItem } from '@/lib/api'
 import { toast } from 'sonner'
 import { api, type BlogSERPAnalysis, type BlogBrief } from '@/lib/api'
 import { SidebarToggle } from '@/components/layout/sidebar'
@@ -65,6 +66,7 @@ export default function BlogBriefPage() {
   const [brief, setBrief] = useState<BlogBrief | null>(null)
   const [cannibalizationWarning, setCannibalizationWarning] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
 
   function upsertStep(
@@ -158,7 +160,20 @@ export default function BlogBriefPage() {
 
   function goToDraft() {
     if (!brief) return
-    router.push(`/projects/${projectId}/seo?brief_id=${brief.id}`)
+    const params = new URLSearchParams({ brief_id: brief.id })
+    if (selectedKeywords.size > 0) {
+      params.set('extra_keywords', Array.from(selectedKeywords).join(','))
+    }
+    router.push(`/projects/${projectId}/seo?${params.toString()}`)
+  }
+
+  function toggleKeyword(kw: string) {
+    setSelectedKeywords((prev) => {
+      const next = new Set(prev)
+      if (next.has(kw)) next.delete(kw)
+      else next.add(kw)
+      return next
+    })
   }
 
   return (
@@ -432,6 +447,107 @@ export default function BlogBriefPage() {
                     )
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Keyword Expansion — interactive map */}
+            {brief.keyword_expansion && (
+              brief.keyword_expansion.related_keywords.length > 0 ||
+              brief.keyword_expansion.lsi_terms.length > 0
+            ) && (
+              <div className="rounded-xl border border-border p-4 space-y-4 bg-card">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Related Keywords
+                  </p>
+                  {selectedKeywords.size > 0 && (
+                    <button
+                      onClick={goToDraft}
+                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add {selectedKeywords.size} to draft
+                    </button>
+                  )}
+                </div>
+
+                {/* Grouped by intent */}
+                {brief.keyword_expansion.related_keywords.length > 0 && (() => {
+                  const intents = ['informational', 'commercial', 'navigational', 'transactional'] as const
+                  const intentLabels: Record<string, string> = {
+                    informational: 'Informational',
+                    commercial: 'Commercial',
+                    navigational: 'Navigational',
+                    transactional: 'Transactional',
+                  }
+                  const intentColors: Record<string, string> = {
+                    informational: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20',
+                    commercial: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
+                    navigational: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20',
+                    transactional: 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20',
+                  }
+                  const selectedColors: Record<string, string> = {
+                    informational: 'bg-blue-500/20 text-blue-800 dark:text-blue-300 border-blue-500',
+                    commercial: 'bg-orange-500/20 text-orange-800 dark:text-orange-300 border-orange-500',
+                    navigational: 'bg-violet-500/20 text-violet-800 dark:text-violet-300 border-violet-500',
+                    transactional: 'bg-green-500/20 text-green-800 dark:text-green-300 border-green-500',
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {intents.map((intent) => {
+                        const kws = brief.keyword_expansion!.related_keywords.filter(
+                          (k: BlogKeywordExpansionItem) => k.intent === intent,
+                        )
+                        if (kws.length === 0) return null
+                        return (
+                          <div key={intent}>
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
+                              {intentLabels[intent]}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {kws.map((k: BlogKeywordExpansionItem, i: number) => {
+                                const isSelected = selectedKeywords.has(k.keyword)
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => toggleKeyword(k.keyword)}
+                                    className={cn(
+                                      'text-[10px] px-2.5 py-1 rounded-full border font-medium transition-all',
+                                      isSelected
+                                        ? selectedColors[intent]
+                                        : intentColors[intent],
+                                    )}
+                                  >
+                                    {isSelected && '✓ '}{k.keyword}
+                                    {k.estimated_volume === 'high' && (
+                                      <span className="ml-1 opacity-60">↑</span>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+
+                {/* LSI terms */}
+                {brief.keyword_expansion.lsi_terms.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      LSI Terms — include these naturally
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {brief.keyword_expansion.lsi_terms.map((t: string, i: number) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 bg-muted rounded-full text-muted-foreground">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

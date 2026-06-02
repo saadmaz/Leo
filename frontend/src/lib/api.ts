@@ -3158,6 +3158,17 @@ export const api = {
         }[]
         days: number
       }>(`/projects/${projectId}/integrations/gsc/pages?days=${days}&limit=${limit}`),
+
+    gscFreshnessAudit: (projectId: string) =>
+      get<{
+        page: string
+        current_impressions: number
+        prior_impressions: number
+        delta_percent: number
+        current_clicks: number
+        avg_position: number
+        refresh_priority: 'urgent' | 'moderate' | 'low'
+      }[]>(`/projects/${projectId}/integrations/gsc/freshness-audit`),
   },
 
   // ---------------------------------------------------------------------------
@@ -3248,6 +3259,17 @@ export interface BlogSemanticKeyword {
   why_relevant: string
 }
 
+export interface BlogKeywordExpansionItem {
+  keyword: string
+  intent: 'informational' | 'navigational' | 'commercial' | 'transactional'
+  estimated_volume: 'high' | 'medium' | 'low'
+}
+
+export interface BlogKeywordExpansion {
+  related_keywords: BlogKeywordExpansionItem[]
+  lsi_terms: string[]
+}
+
 export interface BlogBrief {
   id: string
   project_id: string
@@ -3258,6 +3280,7 @@ export interface BlogBrief {
   nlp_terms_required: string[]
   lsi_terms?: string[]
   semantic_keywords?: BlogSemanticKeyword[]
+  keyword_expansion?: BlogKeywordExpansion
   content_angle: string
   brand_angle: string
   intro_hook: string
