@@ -181,8 +181,8 @@ async def send_message(
                     pass
 
         except Exception as exc:
-            logger.exception("Streaming error in send_message: %s", exc)
-            yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+            logger.error("Stream error", exc_info=exc)
+            yield f"data: {json.dumps({'type': 'error', 'error': 'An error occurred. Please try again.'})}\n\n"
             return
 
         # Persist the complete assistant response and count the message.

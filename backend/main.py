@@ -166,9 +166,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    tb = traceback.format_exc()
-    logger.error("Unhandled exception on %s %s: %s\n%s", request.method, request.url.path, exc, tb)
-    return JSONResponse(status_code=500, content={"detail": str(exc) or "Internal Server Error"})
+    logger.error("Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred."})
 
 # ---------------------------------------------------------------------------
 # CORS
@@ -181,6 +180,27 @@ if settings.EXTRA_FRONTEND_URLS:
     _origins += [u.strip() for u in settings.EXTRA_FRONTEND_URLS.split(",") if u.strip()]
 if settings.ENVIRONMENT == "development":
     _origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, max_bytes: int = 10 * 1024 * 1024):
+        super().__init__(app)
+        self.max_bytes = max_bytes  # 10MB default
+
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            if int(content_length) > self.max_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large. Maximum size is 10MB."}
+                )
+        return await call_next(request)
+
+
+app.add_middleware(RequestSizeLimitMiddleware, max_bytes=10 * 1024 * 1024)
 
 app.add_middleware(
     CORSMiddleware,
