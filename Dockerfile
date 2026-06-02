@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install Python dependencies first (layer caching)
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
 
 # Copy the full project source (needed for `backend.xxx` imports)
 COPY . .
