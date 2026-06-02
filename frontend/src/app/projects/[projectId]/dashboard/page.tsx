@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, Loader2, Library, CalendarDays, BarChart2,
+  LayoutDashboard, Loader2, Library, CalendarDays,
   Brain, TrendingUp, Zap, ChevronRight, RefreshCw,
   AlertTriangle, Lightbulb, Star, Info, ArrowUpRight, ArrowDownRight,
   Target, MessageSquare, Search, Megaphone,
