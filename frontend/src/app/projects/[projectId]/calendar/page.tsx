@@ -621,7 +621,7 @@ function ContentFields({
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Blog title</label>
             <input value={state.title} onChange={e=>setState({title:e.target.value})}
-              placeholder="How to grow your brand in 2025"
+              placeholder="How to grow your brand in 2026"
               className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"/>
           </div>
           <div className="space-y-1.5">

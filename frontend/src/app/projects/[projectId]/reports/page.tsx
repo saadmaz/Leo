@@ -208,7 +208,7 @@ function ResearchReportsTab({ projectId }: { projectId: string }) {
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleStart()}
-            placeholder="e.g. AI tools for small business marketing in 2025"
+            placeholder="e.g. AI tools for small business marketing in 2026"
             className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <select
@@ -385,6 +385,7 @@ function BoardReportTab({ projectId }: { projectId: string }) {
   const [wins, setWins] = useState<ListItem[]>([{ id: '1', text: '' }])
   const [challenges, setChallenges] = useState<ListItem[]>([{ id: '1', text: '' }])
   const [priorities, setPriorities] = useState<ListItem[]>([{ id: '1', text: '' }])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState('')
@@ -434,7 +435,7 @@ function BoardReportTab({ projectId }: { projectId: string }) {
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Report Period</label>
-            <input value={reportPeriod} onChange={(e) => setReportPeriod(e.target.value)} placeholder="Q1 2025 / March 2025 / FY2024" className={inputCls} />
+            <input value={reportPeriod} onChange={(e) => setReportPeriod(e.target.value)} placeholder="Q1 2026 / March 2026 / FY2024" className={inputCls} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">

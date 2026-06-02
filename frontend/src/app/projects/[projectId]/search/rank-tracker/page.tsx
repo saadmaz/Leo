@@ -279,7 +279,7 @@ export default function RankTrackerPage() {
           <div className="text-center py-16 space-y-3">
             <Search className="w-10 h-10 text-muted-foreground/30 mx-auto" />
             <p className="text-sm text-muted-foreground">No URLs tracked yet.</p>
-            <p className="text-xs text-muted-foreground">Click "Track URL" to start monitoring a page's position.</p>
+            <p className="text-xs text-muted-foreground">Click &quot;Track URL&quot; to start monitoring a page&apos;s position.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

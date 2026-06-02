@@ -264,7 +264,7 @@ export default function PressReleasePage() {
         {result.quote && (
           <div className="p-4 rounded-lg bg-muted/50 border-l-4 border-primary">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm italic">"{result.quote.text}"</p>
+              <p className="text-sm italic">&quot;{result.quote.text}&quot;</p>
               <CopyButton text={`"${result.quote.text}" - ${result.quote.speaker_name}, ${result.quote.speaker_title}`} />
             </div>
             <p className="text-xs text-muted-foreground mt-2">- {result.quote.speaker_name}, {result.quote.speaker_title}</p>

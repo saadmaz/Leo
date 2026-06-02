@@ -13,7 +13,7 @@
  * Users can also skip to manual setup at any time.
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Globe, Instagram, Linkedin, CheckCircle2, ArrowRight, X, Loader2 } from 'lucide-react'
@@ -72,7 +72,7 @@ export function OnboardingGate({ projectId, projectName }: Props) {
 
   const goToFirstChat = async () => {
     try {
-      const { chat } = await api.chats.create(projectId, 'My first chat')
+      const chat = await api.chats.create(projectId, 'My first chat')
       router.push(`/projects/${projectId}/chats/${chat.id}`)
     } catch {
       router.push(`/projects/${projectId}/dashboard`)
@@ -111,7 +111,7 @@ export function OnboardingGate({ projectId, projectName }: Props) {
             </div>
             <h2 className="text-xl font-bold">Welcome to {projectName}</h2>
             <p className="text-sm text-white/70 mt-1">
-              Let's build your Brand Core in 60 seconds.
+              Let&apos;s build your Brand Core in 60 seconds.
             </p>
 
             {/* Progress dots */}
@@ -154,7 +154,7 @@ export function OnboardingGate({ projectId, projectName }: Props) {
                   onClick={() => setDismissed(true)}
                   className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  I'll set up manually later
+                  I&apos;ll set up manually later
                 </button>
               </div>
             )}
@@ -162,7 +162,7 @@ export function OnboardingGate({ projectId, projectName }: Props) {
             {step === 1 && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Provide your brand's online presence. Leo will read these and extract your brand identity.
+                  Provide your brand&apos;s online presence. Leo will read these and extract your brand identity.
                 </p>
                 <div className="space-y-3">
                   <div className="relative">

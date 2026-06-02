@@ -10,12 +10,6 @@ import { usePillar10Store } from '@/stores/pillar10-store'
 import type { ProgressStep } from '@/types'
 import { cn } from '@/lib/utils'
 
-const METRIC_COLORS: Record<string, string> = {
-  high: 'text-green-600 dark:text-green-400',
-  medium: 'text-yellow-600 dark:text-yellow-400',
-  low: 'text-red-600 dark:text-red-400',
-}
-
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (

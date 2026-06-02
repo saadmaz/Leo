@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  RefreshCw, AlertCircle, ExternalLink, Loader2, TrendingDown, ArrowRight,
+  RefreshCw, AlertCircle, Loader2, TrendingDown, ArrowRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'

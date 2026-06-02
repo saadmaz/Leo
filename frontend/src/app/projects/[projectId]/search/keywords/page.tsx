@@ -104,7 +104,7 @@ function GSCOpportunitiesTab({ projectId }: { projectId: string }) {
         <div className="space-y-2 max-w-sm">
           <h2 className="font-semibold">Google Search Console not connected</h2>
           <p className="text-sm text-muted-foreground">
-            Connect GSC to see your actual keyword rankings, impressions, CTR, and quick-win opportunities from Google's own index.
+            Connect GSC to see your actual keyword rankings, impressions, CTR, and quick-win opportunities from Google&apos;s own index.
           </p>
         </div>
         <a

@@ -133,12 +133,12 @@ async def generate(
         keywords = body.keywords or [industry_hint]
 
         news_queries = [
-            f"{industry_hint} regulation law 2025 2026",
+            f"{industry_hint} regulation law 2026",
             f"{industry_hint} market risk trend disruption",
         ]
         if body.include_competitor_signals and competitors_from_core:
             comp = competitors_from_core[0]
-            news_queries.append(f"{comp} new feature launch campaign 2025")
+            news_queries.append(f"{comp} new feature launch campaign 2026")
 
         for q in news_queries[:3]:
             results = await _serp_news_search(q)

@@ -7,11 +7,11 @@ import { signOut, updateProfile } from 'firebase/auth'
 import {
   PlusIcon, LogOut, Layers,
   CreditCard, X, Moon, Sun, Settings, Menu, Megaphone, Sparkles,
-  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, BookOpen, Users, FileText,
-  LayoutTemplate, ClipboardCheck, ImageIcon, CalendarRange, Search, ClipboardList,
+  BarChart2, TrendingUp, ShieldCheck, Library, CalendarDays, Zap, LayoutDashboard, Send, Globe, Mail, Users, FileText,
+  LayoutTemplate, ImageIcon, Search, ClipboardList,
   ChevronDown, ChevronRight, PanelLeft, User, ArrowLeftRight, Loader2, Check, Map,
-  Mic2, Shield, DollarSign, Newspaper, FlaskConical, MessageSquare, Bell, Target,
-  Repeat2, Eye, LineChart, Lock,
+  Shield, DollarSign, Newspaper, FlaskConical, MessageSquare, Bell, Target,
+  Eye, LineChart, Lock,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -20,7 +20,7 @@ import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'
 import { MyBrandPanel } from '@/components/personal-brand/my-brand-panel'
 import { cn } from '@/lib/utils'
-import { useTier, type Tier } from '@/hooks/useTier'
+import { useTier } from '@/hooks/useTier'
 import { ChangelogModal, useHasUnseenChangelog } from '@/components/layout/changelog-modal'
 import { NotificationBell } from '@/components/layout/notification-bell'
 import { CommandPalette } from '@/components/layout/command-palette'
@@ -186,7 +186,6 @@ export function Sidebar() {
     sidebarOpen, setSidebarOpen,
     sidebarCollapsed, setSidebarCollapsed,
     setWizardOpen,
-    setMyBrandPanelOpen,
   } = useAppStore()
 
   const [mounted, setMounted] = useState(false)

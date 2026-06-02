@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { LayoutDashboard, Plus, X, AlertCircle, CheckCircle2, RefreshCw, Loader2 } from 'lucide-react'
+import { LayoutDashboard, Plus, X, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'
 import { api } from '@/lib/api'
@@ -26,7 +26,7 @@ interface DashboardPayload {
   budget_shift_recommendation: string; content_performance_note: string; quick_wins: string[]; strategic_priorities: string[]; risks_to_watch: string[]
 }
 
-function newChannel(i: number): ChannelRow {
+function newChannel(): ChannelRow {
   return { channel: '', sessions: '', conversions: '', revenue: '', spend: '' }
 }
 
@@ -37,7 +37,7 @@ export default function UnifiedDashboardPage() {
 
   const [dateRange, setDateRange] = useState(30)
   const [goals, setGoals] = useState(['traffic', 'conversions', 'revenue'])
-  const [channels, setChannels] = useState<ChannelRow[]>([newChannel(0)])
+  const [channels, setChannels] = useState<ChannelRow[]>([newChannel()])
   const [includeGa4, setIncludeGa4] = useState(true)
   const [includeMeta, setIncludeMeta] = useState(false)
   const [metaAccountId, setMetaAccountId] = useState('')
@@ -79,7 +79,7 @@ export default function UnifiedDashboardPage() {
     }
   }
 
-  function addChannel() { setChannels([...channels, newChannel(channels.length)]) }
+  function addChannel() { setChannels([...channels, newChannel()]) }
   function removeChannel(i: number) { setChannels(channels.filter((_, idx) => idx !== i)) }
   function updateChannel(i: number, field: keyof ChannelRow, val: string) {
     const next = [...channels]; next[i] = { ...next[i], [field]: val }; setChannels(next)

@@ -139,11 +139,11 @@ function CategoryCard({ category, items }: { category: string; items: ApiKeyStat
             {category}
           </span>
           {missing > 0 ? (
-            <Badge variant="destructive" className="text-xs font-normal">
+            <Badge variant="danger" className="text-xs font-normal">
               {missing} missing
             </Badge>
           ) : (
-            <Badge variant="secondary" className="text-xs font-normal text-emerald-600 bg-emerald-500/10">
+            <Badge variant="default" className="text-xs font-normal text-emerald-600 bg-emerald-500/10">
               All set
             </Badge>
           )}

@@ -14,8 +14,8 @@ import { api } from '@/lib/api'
 interface KnowledgeDoc {
   id: string
   title: string
-  source: string
-  contentType: string
+  source?: string
+  contentType?: string
   chunkCount: number
   charCount: number
   createdAt: string
@@ -95,7 +95,7 @@ export default function KnowledgePage() {
     <div className="flex flex-col min-h-screen">
       <PageHeader
         title="Brand Knowledge Base"
-        description="Upload brand documents, guidelines, and URLs. Leo retrieves relevant context for every chat."
+        subtitle="Upload brand documents, guidelines, and URLs. Leo retrieves relevant context for every chat."
         icon={<BookOpen className="w-5 h-5" />}
       />
 
@@ -194,8 +194,10 @@ export default function KnowledgePage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{doc.title}</p>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">{doc.chunkCount} chunks</Badge>
-                      <Badge variant="outline" className="text-xs">{formatSize(doc.charCount)}</Badge>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      <Badge variant={"outline" as any} className="text-xs">{doc.chunkCount} chunks</Badge>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      <Badge variant={"outline" as any} className="text-xs">{formatSize(doc.charCount)}</Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(doc.createdAt).toLocaleDateString()}
                       </span>

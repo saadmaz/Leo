@@ -130,7 +130,6 @@ export default function CrisisCommsPage() {
   }
 
   const canSubmit = !!crisisSummary.trim() && !!companyName.trim() && stakeholders.length > 0
-  const selectedSeverity = SEVERITY_LEVELS.find((s) => s.id === severity)
 
   const form = (
     <>
@@ -282,7 +281,7 @@ export default function CrisisCommsPage() {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Holding Statement (use within 24h)</p>
             <CopyButton text={result.holding_statement} />
           </div>
-          <p className="text-sm font-medium italic">"{result.holding_statement}"</p>
+          <p className="text-sm font-medium italic">&quot;{result.holding_statement}&quot;</p>
         </div>
       )}
 

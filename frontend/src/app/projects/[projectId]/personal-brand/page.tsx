@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
 import {
   Loader2, MessageSquare, Map, Mic2, ArrowRight, Target, BarChart2,
-  CheckCircle2, Circle, ChevronRight, Users, TrendingUp, Camera,
-  RotateCcw, Sparkles,
+  CheckCircle2, Circle, ChevronRight,
+  Sparkles,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app-store'

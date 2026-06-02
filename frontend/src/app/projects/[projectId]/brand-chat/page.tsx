@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  MessageCircle, Send, Loader2, RefreshCw, Sparkles,
-  Database, FileText, Users, BarChart2, X, ChevronRight,
+  MessageCircle, Send, Loader2, Sparkles,
+  Database, FileText, Users, BarChart2, ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, type BrandChatMessage, type BrandChatSource } from '@/lib/api'
@@ -71,7 +71,7 @@ function MessageBubble({ msg }: { msg: BrandChatMessage & { streaming?: boolean 
         {/* Source citations */}
         {!isUser && msg.sources && msg.sources.length > 0 && !msg.streaming && (
           <div className="flex flex-wrap gap-1 px-1">
-            {[...new Set(msg.sources.map((s) => s.type))].map((type) => (
+            {Array.from(new Set(msg.sources.map((s) => s.type))).map((type) => (
               <SourceChip key={type} source={{ id: type, type, text: '' }} />
             ))}
           </div>

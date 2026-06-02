@@ -1,11 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   async redirects() {
     // seo-pro → search (route rename, Phase 3a)
     // These server-side redirects handle any bookmarks or external links to the old paths.

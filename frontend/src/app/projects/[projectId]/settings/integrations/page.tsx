@@ -319,7 +319,7 @@ function GSCCard({ projectId }: { projectId: string }) {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-            Keyword rankings, impressions, and click data from Google's own index.
+            Keyword rankings, impressions, and click data from Google&apos;s own index.
           </p>
         </div>
       </div>

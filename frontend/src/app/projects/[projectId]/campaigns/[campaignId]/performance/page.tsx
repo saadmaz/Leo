@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ChevronLeft, BarChart2, Loader2, TrendingUp, ExternalLink,
+  ChevronLeft, BarChart2, Loader2, ExternalLink,
   BookOpen, CheckCircle2, Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -58,7 +58,6 @@ export default function CampaignPerformancePage() {
 
   // Aggregate stats from linked library items
   const posted = libraryItems.filter((i) => i.status === 'posted')
-  const scheduled = libraryItems.filter((i) => i.status === 'scheduled')
   const avgScore = libraryItems.filter((i) => i.voice_score != null).reduce(
     (sum, i, _, arr) => (arr.length ? sum + (i.voice_score ?? 0) / arr.length : sum), 0
   )

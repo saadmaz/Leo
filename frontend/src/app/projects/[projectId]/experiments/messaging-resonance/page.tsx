@@ -249,7 +249,7 @@ export default function MessagingResonancePage() {
             </div>
             {v.calculated_metrics && (
               <div className="flex flex-wrap gap-3">
-                {Object.entries(v.calculated_metrics).filter(([_, val]) => val).map(([key, val]) => (
+                {Object.entries(v.calculated_metrics).filter(([, val]) => val).map(([key, val]) => (
                   <div key={key} className="text-xs">
                     <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}: </span>
                     <span className="font-medium">{val}</span>

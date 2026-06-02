@@ -65,7 +65,7 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-function newComment(i: number): CommentRow {
+function newComment(): CommentRow {
   return { comment_id: '', author: '', platform: 'instagram', text: '', sentiment_hint: '' }
 }
 
@@ -76,12 +76,12 @@ export default function CommunityManagementPage() {
   const [replyTone, setReplyTone] = useState('warm, helpful, and on-brand')
   const [brandGuidelines, setBrandGuidelines] = useState('')
   const [ayrshareIds, setAyrshareIds] = useState('')
-  const [comments, setComments] = useState<CommentRow[]>([newComment(0)])
+  const [comments, setComments] = useState<CommentRow[]>([newComment()])
   const [result, setResult] = useState<CommunityPayload | null>(null)
   const [filter, setFilter] = useState<string>('all')
   const abortRef = useRef<AbortController | null>(null)
 
-  function addComment() { if (comments.length < 50) setComments([...comments, newComment(comments.length)]) }
+  function addComment() { if (comments.length < 50) setComments([...comments, newComment()]) }
   function removeComment(i: number) { setComments(comments.filter((_, idx) => idx !== i)) }
   function updateComment(i: number, field: keyof CommentRow, val: string) {
     const next = [...comments]; next[i] = { ...next[i], [field]: val }; setComments(next)
@@ -245,7 +245,7 @@ export default function CommunityManagementPage() {
               <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize', ACTION_STYLES[r.action_type] ?? 'bg-muted text-muted-foreground')}>{r.action_type}</span>
             </div>
             <div className="p-4 space-y-3">
-              <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 italic">"{r.original_comment}"</p>
+              <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 italic">&quot;{r.original_comment}&quot;</p>
               {r.action_type === 'reply' && r.suggested_reply && (
                 <div>
                   <div className="flex items-center justify-between mb-1">

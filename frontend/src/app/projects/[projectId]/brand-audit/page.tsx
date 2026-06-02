@@ -101,20 +101,11 @@ export default function BrandAuditPage() {
     }
   }
 
-  const gradeScore = (score: number | null): string => {
-    if (score === null) return '?'
-    if (score >= 85) return 'A'
-    if (score >= 70) return 'B'
-    if (score >= 55) return 'C'
-    if (score >= 40) return 'D'
-    return 'F'
-  }
-
   return (
     <div className="flex flex-col min-h-screen">
       <PageHeader
         title="Brand Audit"
-        description="Paste your existing content and get each piece scored against your Brand Core."
+        subtitle="Paste your existing content and get each piece scored against your Brand Core."
         icon={<BarChart2 className="w-5 h-5" />}
       />
 
@@ -223,7 +214,8 @@ export default function BrandAuditPage() {
                         )}
                       </div>
                       {result.score !== null && (
-                        <Badge variant="outline" className={cn('text-xs', result.grade ? GRADE_COLORS[result.grade] : '')}>
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        <Badge variant={"outline" as any} className={cn('text-xs', result.grade ? GRADE_COLORS[result.grade] : '')}>
                           {result.score}/100
                         </Badge>
                       )}

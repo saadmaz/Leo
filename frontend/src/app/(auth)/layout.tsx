@@ -39,7 +39,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Footer */}
-        <p className="relative z-10 text-white/25 text-xs">© 2025 LEO. All rights reserved.</p>
+        <p className="relative z-10 text-white/25 text-xs">© 2026 LEO. All rights reserved.</p>
       </div>
 
       {/* Right panel */}

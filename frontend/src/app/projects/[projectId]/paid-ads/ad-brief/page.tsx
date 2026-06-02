@@ -2,8 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { useRouter } from 'next/navigation'
-import { FileText, ChevronLeft, Plus, X } from 'lucide-react'
+import { FileText, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'
 import { api } from '@/lib/api'
@@ -65,7 +64,6 @@ interface AdBriefPayload {
 
 export default function AdBriefPage() {
   const { projectId } = useParams<{ projectId: string }>()
-  const router = useRouter()
   const store = usePillar4Store()
 
   const [campaignName, setCampaignName] = useState('')

@@ -40,7 +40,7 @@ function CopyBtn({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 
 function ChannelPanel({
-  channel, pack, projectId, onSave,
+  channel, pack, onSave,
 }: {
   channel: string
   pack: { captions?: { text: string; hashtags: string[] }[]; adCopy?: { headline: string; body: string; cta?: string }[] }

@@ -379,13 +379,13 @@ function InsightsTab({ projectId }: { projectId: string }) {
             <div className="grid grid-cols-2 gap-3">
               {result.winning_themes?.length > 0 && (
                 <div className="p-3 rounded-xl border border-green-500/30 bg-green-50/50 dark:bg-green-900/10">
-                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-2">What's Working</p>
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-2">What&apos;s Working</p>
                   <ul className="space-y-1">{result.winning_themes.map((t, i) => <li key={i} className="text-xs text-muted-foreground">✓ {t}</li>)}</ul>
                 </div>
               )}
               {result.losing_themes?.length > 0 && (
                 <div className="p-3 rounded-xl border border-red-500/30 bg-red-50/50 dark:bg-red-900/10">
-                  <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">What's Not Working</p>
+                  <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">What&apos;s Not Working</p>
                   <ul className="space-y-1">{result.losing_themes.map((t, i) => <li key={i} className="text-xs text-muted-foreground">✗ {t}</li>)}</ul>
                 </div>
               )}

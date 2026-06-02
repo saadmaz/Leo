@@ -95,7 +95,7 @@ export default function DeepSearchPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="What do you want to research? e.g. 'best email marketing tools 2025'"
+                placeholder="What do you want to research? e.g. 'best email marketing tools 2026'"
                 className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 disabled={running}
               />
