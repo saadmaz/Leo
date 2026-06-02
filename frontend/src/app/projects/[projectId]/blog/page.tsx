@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   FileText, Search, Loader2, Sparkles, ChevronDown, ChevronUp,

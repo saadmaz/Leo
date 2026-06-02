@@ -18,7 +18,7 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from backend.api.deps import get_project_as_editor, get_project_as_member, require_tier

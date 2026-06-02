@@ -429,6 +429,13 @@ export function Sidebar() {
                 />
                 <NavItem
                   icon={<FileText className="w-3.5 h-3.5" />}
+                  label="Blog Studio"
+                  onClick={() => nav(`/projects/${activeProject.id}/blog`)}
+                  active={isActive('blog')}
+                  locked={!meetsRequirement('pro')}
+                />
+                <NavItem
+                  icon={<FileText className="w-3.5 h-3.5" />}
                   label="Blog Brief"
                   onClick={() => nav(`/projects/${activeProject.id}/seo-pro/blog-brief`)}
                   active={isActive('seo-pro/blog-brief', 'search/blog-brief')}

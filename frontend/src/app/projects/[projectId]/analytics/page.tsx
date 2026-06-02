@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -213,6 +213,16 @@ export default function AnalyticsPage() {
             <Zap className="w-3 h-3" />
             Predict
           </button>
+          <button
+            onClick={() => setMainTab('leo')}
+            className={cn(
+              'flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors',
+              mainTab === 'leo' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Tag className="w-3 h-3" />
+            Leo Tag
+          </button>
         </div>
 
         <div className="ml-auto">
@@ -239,6 +249,13 @@ export default function AnalyticsPage() {
       {mainTab === 'predict' && (
         <div className="flex-1 overflow-y-auto">
           <PredictTab projectId={projectId} />
+        </div>
+      )}
+
+      {/* Leo Tag tab */}
+      {mainTab === 'leo' && (
+        <div className="flex-1 overflow-y-auto">
+          <LeoTagTab projectId={projectId} />
         </div>
       )}
 
@@ -1128,6 +1145,256 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Leo Tag tab — first-party analytics dashboard
+// ---------------------------------------------------------------------------
+
+type LeoInsight = { title: string; body: string; type: 'opportunity' | 'warning' | 'win' }
+
+function LeoTagTab({ projectId }: { projectId: string }) {
+  const [status, setStatus] = useState<{ enabled: boolean; token: string | null; pageviews_7d: number } | null>(null)
+  const [stats, setStats] = useState<{
+    pageviews: number; sessions: number
+    top_pages: { page: string; views: number }[]
+    top_sources: { source: string; views: number }[]
+    daily: { date: string; pageviews: number }[]
+  } | null>(null)
+  const [insights, setInsights] = useState<LeoInsight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [insightsDone, setInsightsDone] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [days, setDays] = useState(30)
+
+  useEffect(() => {
+    api.tracking.status(projectId)
+      .then((s) => setStatus({ enabled: s.enabled, token: s.token, pageviews_7d: s.pageviews_7d }))
+      .catch(() => setStatus({ enabled: false, token: null, pageviews_7d: 0 }))
+      .finally(() => setLoading(false))
+  }, [projectId])
+
+  useEffect(() => {
+    if (!status?.enabled) return
+    api.tracking.stats(projectId, days)
+      .then(setStats)
+      .catch(() => null)
+  }, [projectId, status, days])
+
+  async function handleInsights() {
+    setInsightsLoading(true)
+    try {
+      const { insights: data } = await api.tracking.insights(projectId)
+      setInsights(data ?? [])
+      setInsightsDone(true)
+    } catch {
+      toast.error('Failed to generate insights')
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!status?.enabled) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4 text-center p-8">
+        <div className="p-4 rounded-full bg-muted">
+          <Tag className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <div className="space-y-1.5 max-w-sm">
+          <h2 className="font-semibold">Leo Analytics not enabled</h2>
+          <p className="text-sm text-muted-foreground">
+            Enable the Leo Analytics Tag to track your website with first-party, cookieless data and AI-powered insights.
+          </p>
+        </div>
+        <a
+          href={`/projects/${projectId}/settings/integrations`}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" /> Enable in Integrations
+        </a>
+      </div>
+    )
+  }
+
+  const maxPageviews = Math.max(...(stats?.daily.map((d) => d.pageviews) ?? [1]), 1)
+
+  return (
+    <div className="p-4 space-y-5 max-w-4xl">
+
+      {/* Period + AI insights button */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Period:</span>
+          {[7, 30, 90].map((d) => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                days === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={handleInsights}
+          disabled={insightsLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {insightsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {insightsDone ? 'Regenerate Insights' : 'AI Insights'}
+        </button>
+      </div>
+
+      {/* Stat cards */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'Pageviews', value: stats.pageviews.toLocaleString() },
+            { label: 'Est. Sessions', value: stats.sessions.toLocaleString() },
+            { label: 'Top Page', value: stats.top_pages[0]?.page?.split('/').pop() || '—' },
+            { label: 'Top Source', value: stats.top_sources[0]?.source || 'direct' },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+              <p className="text-lg font-bold tabular-nums mt-0.5 truncate" title={value}>{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Daily chart */}
+      {stats && stats.daily.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-sm font-semibold mb-4">Pageviews Over Time</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={stats.daily} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(d) => d.slice(5)} />
+              <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="pageviews" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Top pages + top sources side by side */}
+      {stats && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Top pages */}
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <p className="text-sm font-semibold">Top Pages</p>
+            </div>
+            {stats.top_pages.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">No page data yet</div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {stats.top_pages.slice(0, 8).map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="text-[10px] text-muted-foreground tabular-nums w-4 shrink-0">{i + 1}</span>
+                    <p className="text-xs text-foreground truncate flex-1 font-medium">{p.page}</p>
+                    <span className="text-xs tabular-nums font-semibold shrink-0">{p.views.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top sources */}
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <p className="text-sm font-semibold">Traffic Sources</p>
+            </div>
+            {stats.top_sources.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">No source data yet</div>
+            ) : (
+              <div className="px-4 py-3 space-y-2.5">
+                {stats.top_sources.slice(0, 7).map((s, i) => {
+                  const pct = Math.round((s.views / (stats.pageviews || 1)) * 100)
+                  return (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-muted-foreground truncate max-w-[160px]">{s.source}</span>
+                        <span className="font-medium tabular-nums">{pct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                        <div className="h-full rounded-full bg-primary/70 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AI Insights */}
+      {insightsDone && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI Insights</p>
+          {insights.length === 0 ? (
+            <div className="rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">
+              Not enough data to surface insights yet. Check back after more visits are tracked.
+            </div>
+          ) : insights.map((ins, i) => {
+            const colors = {
+              opportunity: 'border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/50',
+              warning: 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900/50',
+              win: 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-900/50',
+            }
+            const labelColors = {
+              opportunity: 'text-blue-700 dark:text-blue-300',
+              warning: 'text-red-700 dark:text-red-300',
+              win: 'text-green-700 dark:text-green-300',
+            }
+            return (
+              <div key={i} className={cn('rounded-xl border p-4 space-y-1.5', colors[ins.type])}>
+                <div className="flex items-center gap-2">
+                  <p className={cn('text-sm font-semibold', labelColors[ins.type])}>{ins.title}</p>
+                  <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize bg-white/50 dark:bg-black/20', labelColors[ins.type])}>
+                    {ins.type}
+                  </span>
+                </div>
+                <p className="text-xs text-foreground/80 leading-relaxed">{ins.body}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Empty state when no data yet */}
+      {stats && stats.pageviews === 0 && !insightsDone && (
+        <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-3">
+          <Tag className="w-8 h-8 text-muted-foreground mx-auto" />
+          <div>
+            <p className="text-sm font-semibold">Waiting for first pageview</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Make sure the Leo tracking script is installed on your website. Pageviews appear here within seconds.
+            </p>
+          </div>
+          <a
+            href={`/projects/${projectId}/settings/integrations`}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ExternalLink className="w-3 h-3" /> View embed code
+          </a>
+        </div>
+      )}
     </div>
   )
 }
