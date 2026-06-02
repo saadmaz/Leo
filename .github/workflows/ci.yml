@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Frontend — TypeScript type check + ESLint
+  # ---------------------------------------------------------------------------
+  frontend-typecheck:
+    name: Frontend — TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        # Fails CI if any type errors exist.
+        # next.config.mjs must NOT have typescript.ignoreBuildErrors: true
+        # for this gate to be meaningful (it doesn't — see Fix 3B).
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Backend — Python tests
+  # ---------------------------------------------------------------------------
+  backend-test:
+    name: Backend — Python
+    runs-on: ubuntu-latest
+    # PYTHONPATH must be the repo root so `from backend.xxx import ...`
+    # resolves correctly. The tests run from backend/ but import via the
+    # backend package, which lives one directory up.
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      # Minimal fake values so Pydantic Settings loads without error.
+      # All external calls (Firebase, Anthropic, etc.) are mocked in tests —
+      # no real credentials are needed.
+      FIREBASE_PROJECT_ID: ci-test
+      ANTHROPIC_API_KEY: ci-test-key
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          # Path is relative to repo root, not working-directory
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install production dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install development dependencies
+        # pytest and pytest-asyncio are kept out of the production
+        # requirements.txt so they aren't shipped in the Docker image.
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        # 3 test files covering: brand_extractor, firebase_service, pipeline.
+        # All external I/O (Firebase, Anthropic, Firecrawl, Apify) is mocked —
+        # tests pass without live credentials.
+        run: pytest tests/ -v --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Summary job — required for branch protection rules.
+  # Set "CI passed" as the required status check in GitHub branch settings.
+  # ---------------------------------------------------------------------------
+  ci-success:
+    name: CI passed
+    needs: [frontend-typecheck, backend-test]
+    runs-on: ubuntu-latest
+    # Run even if a dependent job is skipped (e.g. path-filtered future config),
+    # but still fail if any needed job failed.
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.frontend-typecheck.result }}" != "success" ]]; then
+            echo "frontend-typecheck failed or was cancelled"
+            exit 1
+          fi
+          if [[ "${{ needs.backend-test.result }}" != "success" ]]; then
+            echo "backend-test failed or was cancelled"
+            exit 1
+          fi
+          echo "All checks passed"
