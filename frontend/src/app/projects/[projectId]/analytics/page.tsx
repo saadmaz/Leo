@@ -9,7 +9,7 @@ import {
 import {
   BarChart2, TrendingUp, FileText, Upload, Sparkles,
   RefreshCw, Clock, CheckCircle2, AlertCircle, Info,
-  Zap, Loader2, Globe, Search, ExternalLink,
+  Zap, Loader2, Globe, Search, ExternalLink, Tag,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -21,7 +21,7 @@ import type {
 } from '@/types'
 import { CHANNELS } from '@/components/chat/channel-selector'
 
-type MainTab = 'overview' | 'live' | 'predict'
+type MainTab = 'overview' | 'live' | 'predict' | 'leo'
 
 // ---------------------------------------------------------------------------
 // Colour palette

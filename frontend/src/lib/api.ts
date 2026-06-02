@@ -3270,6 +3270,39 @@ export const api = {
         `/projects/${projectId}/brand-chat/history?limit=${limit}`,
       ),
   },
+
+  // ---------------------------------------------------------------------------
+  // Leo Analytics Tag (premium first-party tracking)
+  // ---------------------------------------------------------------------------
+  tracking: {
+    status: (projectId: string) =>
+      get<{
+        enabled: boolean
+        token: string | null
+        created_at: string | null
+        pageviews_7d: number
+      }>(`/projects/${projectId}/tracking/status`),
+
+    enable: (projectId: string) =>
+      post<{ token: string; already_enabled: boolean }>(`/projects/${projectId}/tracking/enable`, {}),
+
+    disable: (projectId: string) =>
+      post<{ ok: boolean }>(`/projects/${projectId}/tracking/disable`, {}),
+
+    stats: (projectId: string, days = 30) =>
+      get<{
+        pageviews: number
+        sessions: number
+        top_pages: { page: string; views: number }[]
+        top_sources: { source: string; views: number }[]
+        daily: { date: string; pageviews: number }[]
+      }>(`/projects/${projectId}/tracking/stats?days=${days}`),
+
+    insights: (projectId: string) =>
+      post<{
+        insights: { title: string; body: string; type: 'opportunity' | 'warning' | 'win' }[]
+      }>(`/projects/${projectId}/tracking/insights`, {}),
+  },
 }
 
 // ---------------------------------------------------------------------------

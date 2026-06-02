@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   Layout, ArrowRight, CheckCircle2, AlertCircle, ExternalLink,
-  BarChart2, Search, Loader2, X, Link2, RefreshCw,
+  BarChart2, Search, Loader2, X, Link2, RefreshCw, Zap, Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SidebarToggle } from '@/components/layout/sidebar'
@@ -370,6 +370,144 @@ function GSCCard({ projectId }: { projectId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Leo Analytics Tag Card
+// ---------------------------------------------------------------------------
+
+function LeoTagCard({ projectId }: { projectId: string }) {
+  const [status, setStatus] = useState<{ enabled: boolean; token: string | null; pageviews_7d: number } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [enabling, setEnabling] = useState(false)
+  const [disabling, setDisabling] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    api.tracking.status(projectId)
+      .then((s) => setStatus({ enabled: s.enabled, token: s.token, pageviews_7d: s.pageviews_7d }))
+      .catch(() => setStatus({ enabled: false, token: null, pageviews_7d: 0 }))
+      .finally(() => setLoading(false))
+  }, [projectId])
+
+  async function handleEnable() {
+    setEnabling(true)
+    try {
+      const { token } = await api.tracking.enable(projectId)
+      setStatus({ enabled: true, token, pageviews_7d: 0 })
+      toast.success('Leo Analytics enabled!')
+    } catch (err) {
+      toast.error(String(err))
+    } finally {
+      setEnabling(false)
+    }
+  }
+
+  async function handleDisable() {
+    setDisabling(true)
+    try {
+      await api.tracking.disable(projectId)
+      setStatus((s) => s ? { ...s, enabled: false } : s)
+      toast.success('Leo Analytics disabled')
+    } catch {
+      toast.error('Failed to disable')
+    } finally {
+      setDisabling(false)
+    }
+  }
+
+  function handleCopySnippet() {
+    if (!status?.token) return
+    const snippet = `<script src="${window.location.origin}/api/backend/track.js" data-token="${status.token}" async></script>`
+    navigator.clipboard.writeText(snippet).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+      <div className="flex items-start gap-4">
+        <div className={cn(
+          'p-2.5 rounded-xl shrink-0',
+          status?.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+        )}>
+          <Zap className="w-6 h-6" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-sm">Leo Analytics Tag</p>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider">Premium</span>
+            {loading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            ) : status?.enabled ? (
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+                <CheckCircle2 className="w-3 h-3" /> Active
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                Not enabled
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+            First-party, cookieless analytics for your website. Better than GA — AI-powered insights, no consent banners required.
+          </p>
+        </div>
+      </div>
+
+      {!loading && status?.enabled && status.token && (
+        <div className="space-y-3">
+          {/* Stats row */}
+          <div className="flex items-center gap-4 p-3 rounded-lg bg-primary/5 border border-primary/10">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Last 7 days</p>
+              <p className="text-lg font-bold tabular-nums">{status.pageviews_7d.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">pageviews</p>
+            </div>
+            <div className="flex-1" />
+            <button
+              onClick={handleDisable}
+              disabled={disabling}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+            >
+              {disabling ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+              Disable
+            </button>
+          </div>
+
+          {/* Embed snippet */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Embed Code</p>
+            <p className="text-[11px] text-muted-foreground">Add this to the <code className="text-[10px] bg-muted px-1 py-0.5 rounded">&lt;head&gt;</code> of every page you want to track.</p>
+            <div className="relative">
+              <code className="block text-[10px] font-mono bg-muted/50 border border-border rounded-lg px-3 py-2 overflow-x-auto pr-8 text-muted-foreground">
+                {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/api/backend/track.js"\n  data-token="${status.token}" async></script>`}
+              </code>
+              <button
+                onClick={handleCopySnippet}
+                className="absolute top-2 right-2 p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                title="Copy snippet"
+              >
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && !status?.enabled && (
+        <button
+          onClick={handleEnable}
+          disabled={enabling}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {enabling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+          Enable Leo Analytics
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -412,9 +550,15 @@ export default function IntegrationsPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto space-y-6">
 
-          {/* Analytics */}
+          {/* Leo Analytics (first-party) */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">Analytics</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">First-Party Analytics</p>
+            <LeoTagCard projectId={projectId} />
+          </div>
+
+          {/* Third-party Analytics */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">Google Analytics</p>
             <div className="space-y-3">
               <GA4Card projectId={projectId} />
               <GSCCard projectId={projectId} />
