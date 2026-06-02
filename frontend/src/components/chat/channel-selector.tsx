@@ -1,5 +1,6 @@
 'use client'
 
+import { MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type ChannelKey =
@@ -14,17 +15,19 @@ export type ChannelKey =
 export interface Channel {
   key: ChannelKey
   label: string
-  icon: string
+  short: string
+  /** @deprecated use short for display; retained for backward compat */
+  icon?: string
 }
 
 export const CHANNELS: Channel[] = [
-  { key: 'instagram',  label: 'Instagram',   icon: '📸' },
-  { key: 'linkedin',   label: 'LinkedIn',     icon: '💼' },
-  { key: 'twitter',    label: 'X / Twitter',  icon: '𝕏' },
-  { key: 'tiktok',     label: 'TikTok',       icon: '🎵' },
-  { key: 'meta_ads',   label: 'Meta Ads',     icon: '📢' },
-  { key: 'google_ads', label: 'Google Ads',   icon: '🔍' },
-  { key: 'email',      label: 'Email',        icon: '✉️' },
+  { key: 'instagram',  label: 'Instagram',   short: 'IG',   icon: '📸' },
+  { key: 'linkedin',   label: 'LinkedIn',    short: 'LI',   icon: '💼' },
+  { key: 'twitter',    label: 'X / Twitter', short: 'X',    icon: '𝕏'  },
+  { key: 'tiktok',     label: 'TikTok',      short: 'TT',   icon: '🎵' },
+  { key: 'meta_ads',   label: 'Meta Ads',    short: 'Meta', icon: '📢' },
+  { key: 'google_ads', label: 'Google Ads',  short: 'Ads',  icon: '🔍' },
+  { key: 'email',      label: 'Email',       short: 'Mail', icon: '✉️'  },
 ]
 
 interface ChannelSelectorProps {
@@ -34,37 +37,41 @@ interface ChannelSelectorProps {
 
 export function ChannelSelector({ value, onChange }: ChannelSelectorProps) {
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-      <span className="shrink-0 text-xs text-muted-foreground/60 pr-1">Channel:</span>
-
-      {/* "All" pill - clears selection */}
-      <button
-        onClick={() => onChange(null)}
-        className={cn(
-          'shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors whitespace-nowrap',
-          value === null
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
-        )}
-      >
-        General
-      </button>
-
-      {CHANNELS.map((ch) => (
+    <div className="relative flex items-center gap-1 overflow-hidden">
+      <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none pr-6">
+        {/* General — icon only */}
         <button
-          key={ch.key}
-          onClick={() => onChange(value === ch.key ? null : ch.key)}
+          title="General"
+          onClick={() => onChange(null)}
           className={cn(
-            'shrink-0 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors whitespace-nowrap',
-            value === ch.key
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
+            'shrink-0 flex items-center justify-center px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+            value === null
+              ? 'bg-primary/15 text-primary border border-primary/30'
+              : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent',
           )}
         >
-          <span>{ch.icon}</span>
-          <span>{ch.label}</span>
+          <MessageSquare className="w-3.5 h-3.5" />
         </button>
-      ))}
+
+        {CHANNELS.map((ch) => (
+          <button
+            key={ch.key}
+            title={ch.label}
+            onClick={() => onChange(value === ch.key ? null : ch.key)}
+            className={cn(
+              'shrink-0 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap',
+              value === ch.key
+                ? 'bg-primary/15 text-primary border border-primary/30'
+                : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent',
+            )}
+          >
+            {ch.short}
+          </button>
+        ))}
+      </div>
+
+      {/* Fade indicator — more chips available */}
+      <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none" />
     </div>
   )
 }

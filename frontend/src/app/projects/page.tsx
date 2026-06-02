@@ -2,36 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  MessageSquare, Library, BarChart2, Plus, Sparkles,
-  CheckCircle2, Clock, ArrowRight, Globe,
-} from 'lucide-react'
+import { MessageSquare, Library, BarChart2, PlusCircle } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { api } from '@/lib/api'
 import { Sidebar, SidebarToggle } from '@/components/layout/sidebar'
 import { AnnouncementBanner } from '@/components/layout/announcement-banner'
 import { OnboardingCard } from '@/components/onboarding/onboarding-card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getBrandGradient, getBrandInitials, getBrandTextColor } from '@/lib/brand-utils'
+import { cn } from '@/lib/utils'
 import type { Project } from '@/types'
-
-// ---------------------------------------------------------------------------
-// Greeting
-// ---------------------------------------------------------------------------
-
-function greeting(name: string | null) {
-  const hour = new Date().getHours()
-  const time = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  return name ? `${time}, ${name.split(' ')[0]}` : time
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(diff / 86400000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days}d ago`
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 // ---------------------------------------------------------------------------
 // Project card
@@ -47,107 +27,103 @@ function ProjectCard({
   onNavigate: (path: string) => void
 }) {
   const hasBrandCore = !!project.brandCore
-  const initials = project.name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  const initials = getBrandInitials(project.name)
+  const gradient = getBrandGradient(project.name)
+  const textColor = getBrandTextColor(project.name)
 
   return (
     <div
-      className="group relative bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
+      className={cn(
+        'group relative flex flex-col rounded-2xl overflow-hidden cursor-pointer',
+        'bg-card/60 hover:bg-card/90',
+        'shadow-sm hover:shadow-md',
+        'transition-all duration-200',
+        'backdrop-blur-sm',
+        !hasBrandCore && 'border-l-2 border-amber-500/60',
+      )}
       onClick={() => onNavigate(`/projects/${project.id}/dashboard`)}
     >
-      {/* Left accent bar */}
-      <div className="absolute left-0 inset-y-0 w-[3px] rounded-l-2xl bg-transparent group-hover:bg-primary transition-colors duration-200" />
-
-      {/* Card header */}
-      <div className="p-5 pb-3">
+      {/* Card body */}
+      <div className="p-5 pb-3 flex-1">
+        {/* Top row: avatar + name + secondary icon actions */}
         <div className="flex items-start gap-3">
-          {/* Logo or initials avatar */}
+          {/* Avatar */}
           {project.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={project.logoUrl}
               alt={project.name}
-              className="w-10 h-10 rounded-xl object-cover shrink-0 border border-border"
+              className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-border/50"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-              {initials}
+            <div
+              className={cn(
+                'w-14 h-14 rounded-2xl bg-gradient-to-br shrink-0',
+                'flex items-center justify-center',
+                gradient,
+              )}
+            >
+              <span className={cn('text-lg font-bold', textColor)}>{initials}</span>
             </div>
           )}
-          <div className="flex-1 min-w-0">
+
+          {/* Name and description */}
+          <div className="flex-1 min-w-0 pt-0.5">
             <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">
               {project.name}
             </h3>
             {project.description && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{project.description}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                {project.description}
+              </p>
             )}
-            {/* Website link */}
-            {project.websiteUrl && (
-              <a
-                href={project.websiteUrl.startsWith('http') ? project.websiteUrl : `https://${project.websiteUrl}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 mt-1 text-[10px] text-primary/70 hover:text-primary hover:underline transition-colors"
-              >
-                <Globe className="w-2.5 h-2.5" />
-                {project.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-              </a>
-            )}
+          </div>
+
+          {/* Icon-only secondary actions */}
+          <div
+            className="flex items-center gap-1 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              title="Open chat"
+              onClick={onOpenChat}
+              className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Library"
+              onClick={() => onNavigate(`/projects/${project.id}/library`)}
+              className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
+            >
+              <Library className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Analytics"
+              onClick={() => onNavigate(`/projects/${project.id}/analytics`)}
+              className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Brand Core status */}
-        <div className="flex items-center gap-1.5 mt-3">
-          {hasBrandCore ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
-              <CheckCircle2 className="w-2.5 h-2.5" />
-              Brand Core ready
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
-              <Clock className="w-2.5 h-2.5" />
-              Brand Core needed
-            </span>
-          )}
-          {project.createdAt && (
-            <span className="text-[10px] text-muted-foreground/60 ml-auto">
-              {timeAgo(project.createdAt)}
-            </span>
-          )}
-        </div>
+        {/* Brand setup nudge — only shown when core is missing */}
+        {!hasBrandCore && (
+          <p className="text-[11px] text-amber-500/80 mt-3">
+            Complete brand setup →
+          </p>
+        )}
       </div>
 
-      {/* Quick actions - stop propagation so they don't trigger card click */}
-      <div className="px-4 pb-4 flex items-center gap-1.5">
+      {/* Primary CTA — full width at card bottom */}
+      <div className="px-5 pb-5 pt-2" onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={(e) => { e.stopPropagation(); onOpenChat() }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          onClick={() => onNavigate(`/projects/${project.id}/dashboard`)}
+          className="w-full py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
         >
-          <MessageSquare className="w-3 h-3" />
-          Chat
+          Open
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onNavigate(`/projects/${project.id}/library`) }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground border border-border hover:bg-muted transition-colors"
-        >
-          <Library className="w-3 h-3" />
-          Library
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onNavigate(`/projects/${project.id}/analytics`) }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground border border-border hover:bg-muted transition-colors"
-        >
-          <BarChart2 className="w-3 h-3" />
-          Analytics
-        </button>
-        <div className="ml-auto p-1.5 rounded-lg text-muted-foreground group-hover:text-primary transition-colors">
-          <ArrowRight className="w-3.5 h-3.5" />
-        </div>
       </div>
     </div>
   )
@@ -161,12 +137,14 @@ function NewProjectCard({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group bg-muted/30 border border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 hover:border-primary/30 transition-all min-h-36"
+      className={cn(
+        'group flex flex-col items-center justify-center gap-2 rounded-2xl p-5 min-h-44',
+        'border-2 border-dashed border-white/10 hover:border-primary/40',
+        'transition-all duration-200',
+      )}
     >
-      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-        <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-      </div>
-      <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+      <PlusCircle className="w-8 h-8 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+      <span className="text-sm text-muted-foreground/60 group-hover:text-primary transition-colors font-medium">
         New brand
       </span>
     </button>
@@ -179,13 +157,8 @@ function NewProjectCard({ onClick }: { onClick: () => void }) {
 
 export default function ProjectsPage() {
   const router = useRouter()
-  const { user, projects, setProjects, setChats, setActiveChat, setWizardOpen } = useAppStore()
+  const { projects, setProjects, setChats, setActiveChat, setWizardOpen, user } = useAppStore()
   const [loading, setLoading] = useState(true)
-  const [greetingText, setGreetingText] = useState('')
-
-  useEffect(() => {
-    setGreetingText(greeting(user?.displayName ?? null))
-  }, [user?.displayName])
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return }
@@ -213,6 +186,8 @@ export default function ProjectsPage() {
     }
   }
 
+  const brandCount = projects.length
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
@@ -223,65 +198,52 @@ export default function ProjectsPage() {
         {/* Top bar */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
           <SidebarToggle />
-          <span className="text-sm font-medium text-muted-foreground">All Brands</span>
-          <div className="ml-auto">
-            <button
-              onClick={() => setWizardOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              New brand
-            </button>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-semibold leading-none">Your brands</h1>
+            {!loading && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {brandCount === 0 ? 'No brands yet' : `${brandCount} workspace${brandCount !== 1 ? 's' : ''}`}
+              </p>
+            )}
           </div>
+
+          <button
+            onClick={() => setWizardOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            + New brand
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-[radial-gradient(ellipse_60%_30%_at_50%_0%,hsl(var(--primary)/0.07),transparent)]">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-
-            {/* Greeting */}
-            <div>
-              <h1 className="text-xl font-bold">
-                {greetingText}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {loading
-                  ? 'Loading your brands…'
-                  : projects.length === 0
-                  ? 'Create your first brand to get started.'
-                  : `You have ${projects.length} brand${projects.length !== 1 ? 's' : ''}.`}
-              </p>
-            </div>
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
 
             {/* Loading skeleton */}
             {loading && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2].map((i) => (
-                  <div key={i} className="bg-card border border-border rounded-2xl p-5 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="w-10 h-10 rounded-xl" />
-                      <div className="space-y-1.5 flex-1">
+                  <div key={i} className="bg-card/60 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <Skeleton className="w-14 h-14 rounded-2xl" />
+                      <div className="space-y-1.5 flex-1 pt-1">
                         <Skeleton className="h-3.5 w-32" />
                         <Skeleton className="h-2.5 w-24" />
                       </div>
                     </div>
-                    <Skeleton className="h-2 w-28 rounded-full" />
-                    <div className="flex gap-1.5 pt-1">
-                      <Skeleton className="h-7 w-16 rounded-lg" />
-                      <Skeleton className="h-7 w-16 rounded-lg" />
-                      <Skeleton className="h-7 w-20 rounded-lg" />
-                    </div>
+                    <Skeleton className="h-7 w-full rounded-lg" />
                   </div>
                 ))}
               </div>
             )}
 
-            {/* No projects - onboarding */}
-            {!loading && projects.length === 0 && (
+            {/* No projects — onboarding */}
+            {!loading && brandCount === 0 && (
               <OnboardingCard />
             )}
 
-            {/* Project cards grid */}
-            {!loading && projects.length > 0 && (
+            {/* Brand cards grid */}
+            {!loading && brandCount > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {projects.map((project) => (
                   <ProjectCard
@@ -292,31 +254,6 @@ export default function ProjectsPage() {
                   />
                 ))}
                 <NewProjectCard onClick={() => setWizardOpen(true)} />
-              </div>
-            )}
-
-            {/* Tips section - shown when has projects */}
-            {!loading && projects.length > 0 && (
-              <div className="bg-muted/30 border border-border rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-semibold">Quick tips</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { icon: <MessageSquare className="w-3.5 h-3.5" />, title: 'Chat to create', desc: 'Ask for captions, scripts, or campaigns directly in chat.' },
-                    { icon: <Library className="w-3.5 h-3.5" />,        title: 'Build your library', desc: 'Save generated content and schedule it to your calendar.' },
-                    { icon: <BarChart2 className="w-3.5 h-3.5" />,      title: 'Track performance', desc: 'Log metrics and get AI-powered weekly digests.' },
-                  ].map((tip) => (
-                    <div key={tip.title} className="flex items-start gap-2.5">
-                      <div className="p-1.5 rounded-md bg-muted text-muted-foreground shrink-0 mt-0.5">{tip.icon}</div>
-                      <div>
-                        <p className="text-xs font-medium">{tip.title}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{tip.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 

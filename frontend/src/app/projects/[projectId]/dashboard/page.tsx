@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Loader2, Library, CalendarDays, BarChart2,
   Brain, TrendingUp, Zap, ChevronRight, RefreshCw,
   AlertTriangle, Lightbulb, Star, Info, ArrowUpRight, ArrowDownRight,
+  Target, MessageSquare, Search, Megaphone,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -182,6 +183,15 @@ export default function DashboardPage() {
     </div>
   )
 
+  // Quick actions for this project
+  const QUICK_ACTIONS = [
+    { label: 'Write a post',         icon: MessageSquare, href: `/projects/${params.projectId}/library` },
+    { label: 'Research competitors', icon: Target,        href: `/projects/${params.projectId}/intelligence` },
+    { label: 'Check keywords',       icon: Search,        href: `/projects/${params.projectId}/search` },
+    { label: 'Campaign brief',       icon: Megaphone,     href: `/projects/${params.projectId}/campaigns` },
+    { label: 'Schedule content',     icon: CalendarDays,  href: `/projects/${params.projectId}/calendar` },
+  ]
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader
@@ -195,13 +205,32 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4 page-enter">
         {activeProject && <SetupChecklist project={activeProject} />}
 
-        {/* Hero row: brand health gauge + stat cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4 items-stretch">
-          <div className="card-raised p-5 flex flex-col items-center justify-center gap-1">
-            <BrandHealthGauge score={healthScore} />
-            <p className="text-xs text-muted-foreground">Brand Health</p>
+        {/* Brand health + stat cards */}
+        <div className="space-y-3">
+          {/* Health gauge — full-width hero */}
+          <div className="card-raised p-5">
+            <div className="flex items-center gap-6">
+              <BrandHealthGauge score={healthScore} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-medium mb-1">
+                  Brand Health
+                </p>
+                <h2 className="text-xl font-bold truncate">{activeProject?.name}</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Score {healthScore}/100 &mdash;{' '}
+                  {healthScore >= 70 ? 'strong foundation' : healthScore >= 40 ? 'growing steadily' : 'early stage'}
+                </p>
+                <button
+                  onClick={() => router.push(`/projects/${params.projectId}/brand-audit`)}
+                  className="mt-2 text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  Improve score →
+                </button>
+              </div>
+            </div>
           </div>
 
+          {/* Stat cards — 2×2 grid */}
           <div className="grid grid-cols-2 gap-3">
             <StatCard
               icon={<Library className="w-4 h-4" />}
@@ -211,6 +240,12 @@ export default function DashboardPage() {
               sub={`${lib?.by_status?.['posted'] ?? 0} posted`}
               trend={comparison?.library.pct_change ?? null}
               onClick={() => router.push(`/projects/${params.projectId}/library`)}
+              emptyState={{
+                icon: <Library className="w-8 h-8" />,
+                text: 'No content saved yet',
+                subtext: 'Generated content appears here',
+                ctaLabel: 'Start creating →',
+              }}
             />
             <StatCard
               icon={<CalendarDays className="w-4 h-4" />}
@@ -220,6 +255,12 @@ export default function DashboardPage() {
               sub="next 30 days"
               trend={comparison?.calendar.pct_change ?? null}
               onClick={() => router.push(`/projects/${params.projectId}/calendar`)}
+              emptyState={{
+                icon: <CalendarDays className="w-8 h-8" />,
+                text: 'Nothing scheduled',
+                subtext: 'Next 30 days are clear',
+                ctaLabel: 'Plan your calendar →',
+              }}
             />
             <StatCard
               icon={<Brain className="w-4 h-4" />}
@@ -228,19 +269,49 @@ export default function DashboardPage() {
               value={mem?.count ?? 0}
               sub="signals learned"
               onClick={() => router.push(`/projects/${params.projectId}/intelligence`)}
+              emptyState={{
+                icon: <Brain className="w-8 h-8" />,
+                text: 'Learning your brand',
+                subtext: 'Signals are captured from chats',
+              }}
             />
             <StatCard
-              icon={<BarChart2 className="w-4 h-4" />}
+              icon={<Target className="w-4 h-4" />}
               iconColor="bg-rose-500/10 text-rose-600"
               label="Competitors"
               value={comp?.count ?? 0}
               sub={comp?.last_analysis ? `Last: ${timeAgo(comp.last_analysis)}` : 'Not analysed'}
               onClick={() => router.push(`/projects/${params.projectId}/intelligence`)}
+              emptyState={{
+                icon: <Target className="w-8 h-8" />,
+                text: 'No competitors tracked',
+                subtext: 'Add competitors to benchmark against',
+                ctaLabel: 'Add competitors →',
+              }}
             />
           </div>
         </div>
 
-        {/* Content Pipeline — Kanban pills */}
+        {/* Quick actions */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {QUICK_ACTIONS.map(({ label, icon: Icon, href }) => (
+            <button
+              key={label}
+              onClick={() => router.push(href)}
+              className={cn(
+                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium',
+                'border border-border/50 text-muted-foreground',
+                'hover:bg-primary/10 hover:text-primary hover:border-primary/30',
+                'transition-all duration-150',
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content Pipeline */}
         <div className="card-raised p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold">Content Pipeline</h3>
@@ -436,8 +507,7 @@ function BrandHealthGauge({ score }: { score: number }) {
   const label = score >= 70 ? 'Great' : score >= 40 ? 'Growing' : 'Starting'
 
   return (
-    <svg width={120} height={104} viewBox="0 0 120 110" className="overflow-visible">
-      {/* Track */}
+    <svg width={120} height={104} viewBox="0 0 120 110" className="overflow-visible shrink-0">
       <circle
         cx={60} cy={62} r={r}
         fill="none"
@@ -447,7 +517,6 @@ function BrandHealthGauge({ score }: { score: number }) {
         strokeDasharray={`${trackLength} ${circumference - trackLength}`}
         transform="rotate(135 60 62)"
       />
-      {/* Fill */}
       <circle
         cx={60} cy={62} r={r}
         fill="none"
@@ -529,11 +598,25 @@ function InsightCard({ insight, projectId }: { insight: ProjectInsight; projectI
 }
 
 // ---------------------------------------------------------------------------
-// StatCard
+// StatCard — with designed empty states
 // ---------------------------------------------------------------------------
 
+interface StatCardEmptyState {
+  icon: React.ReactNode
+  text: string
+  subtext: string
+  ctaLabel?: string
+}
+
 function StatCard({
-  icon, iconColor, label, value, sub, trend, onClick,
+  icon,
+  iconColor,
+  label,
+  value,
+  sub,
+  trend,
+  onClick,
+  emptyState,
 }: {
   icon: React.ReactNode
   iconColor: string
@@ -542,31 +625,54 @@ function StatCard({
   sub: string
   trend?: number | null
   onClick?: () => void
+  emptyState?: StatCardEmptyState
 }) {
   const animated = useAnimatedCount(value)
+  const isEmpty = value === 0 && !!emptyState
 
   return (
     <button
       onClick={onClick}
       className="card-raised p-4 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group w-full"
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', iconColor)}>
-          {icon}
-        </div>
-        {trend !== null && trend !== undefined && (
-          <div className={cn(
-            'flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-            trend > 0 ? 'bg-emerald-500/10 text-emerald-600' : trend < 0 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground',
-          )}>
-            {trend > 0 ? <ArrowUpRight className="w-3 h-3" /> : trend < 0 ? <ArrowDownRight className="w-3 h-3" /> : null}
-            {Math.abs(trend)}%
+      {isEmpty ? (
+        /* Designed empty state */
+        <div className="flex flex-col items-center justify-center py-2 gap-2 min-h-[80px]">
+          <div className="text-muted-foreground/25 group-hover:text-muted-foreground/40 transition-colors">
+            {emptyState!.icon}
           </div>
-        )}
-      </div>
-      <p className="text-2xl font-bold tabular-nums count-enter">{animated}</p>
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
-      <p className="text-[10px] text-muted-foreground/70">{sub}</p>
+          <div className="text-center">
+            <p className="text-xs font-medium text-muted-foreground/70">{emptyState!.text}</p>
+            <p className="text-[10px] text-muted-foreground/50 mt-0.5">{emptyState!.subtext}</p>
+          </div>
+          {emptyState!.ctaLabel && (
+            <span className="text-[11px] text-primary/60 group-hover:text-primary transition-colors">
+              {emptyState!.ctaLabel}
+            </span>
+          )}
+        </div>
+      ) : (
+        /* Non-zero state */
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', iconColor)}>
+              {icon}
+            </div>
+            {trend !== null && trend !== undefined && (
+              <div className={cn(
+                'flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                trend > 0 ? 'bg-emerald-500/10 text-emerald-600' : trend < 0 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground',
+              )}>
+                {trend > 0 ? <ArrowUpRight className="w-3 h-3" /> : trend < 0 ? <ArrowDownRight className="w-3 h-3" /> : null}
+                {Math.abs(trend)}%
+              </div>
+            )}
+          </div>
+          <p className="text-2xl font-bold tabular-nums count-enter">{animated}</p>
+          <p className="text-xs text-muted-foreground mt-1">{label}</p>
+          <p className="text-[10px] text-muted-foreground/70">{sub}</p>
+        </>
+      )}
     </button>
   )
 }

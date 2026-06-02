@@ -3,8 +3,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import Image from 'next/image'
-import { Sparkles, Zap, ChevronRight, ChevronDown, ChevronUp, Cpu, Megaphone, Map, MessageSquare, CalendarDays, Mail } from 'lucide-react'
+import { Sparkles, Zap, ChevronRight, Cpu, Megaphone } from 'lucide-react'
+import { WelcomeMessage } from '@/components/chat/WelcomeMessage'
 import { ThinkingIndicator } from '@/components/chat/thinking-indicator'
 import { SidebarToggle } from '@/components/layout/sidebar'
 import { MessageCard } from '@/components/chat/message-card'
@@ -34,7 +34,6 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
   const [messagesLoading, setMessagesLoading] = useState(false)
-  const [hintsOpen, setHintsOpen] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [activeToolCall, setActiveToolCall] = useState<{ tool: string; query: string } | null>(null)
@@ -484,100 +483,23 @@ export default function ChatPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6 py-8"
+                className="flex flex-col items-center justify-center min-h-[50vh] py-12 gap-8"
               >
-                {/* Logo with glow */}
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-2xl blur-xl bg-violet-500/25 scale-125" />
-                  <Image
-                    src="/Leo.png"
-                    alt="LEO"
-                    width={64}
-                    height={64}
-                    className="relative rounded-2xl shadow-lg"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <h2 className="text-lg font-semibold">
-                    {activeProject ? `Chat about ${activeProject.name}` : 'Start a conversation'}
-                  </h2>
-                  <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-                    {hasBrandCore
-                      ? 'Brand Core is active — ask for captions, campaigns, ad copy, or strategy.'
-                      : 'Paste your website or Instagram URL and LEO will build your Brand Core.'}
-                  </p>
-                </div>
-
-                {/* Suggestion chips with icons */}
-                <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                  {(hasBrandCore ? [
-                    { icon: <Map className="w-3.5 h-3.5 shrink-0" />, text: 'Build me a marketing strategy', color: 'text-amber-600 bg-amber-500/8 border-amber-500/25 hover:border-amber-500/50 hover:bg-amber-500/12' },
-                    { icon: <MessageSquare className="w-3.5 h-3.5 shrink-0" />, text: 'Write 5 Instagram captions', color: 'text-pink-600 bg-pink-500/8 border-pink-500/25 hover:border-pink-500/50 hover:bg-pink-500/12' },
-                    { icon: <Megaphone className="w-3.5 h-3.5 shrink-0" />, text: 'Create a campaign brief', color: 'text-violet-600 bg-violet-500/8 border-violet-500/25 hover:border-violet-500/50 hover:bg-violet-500/12' },
-                    { icon: <CalendarDays className="w-3.5 h-3.5 shrink-0" />, text: 'Generate a content calendar', color: 'text-blue-600 bg-blue-500/8 border-blue-500/25 hover:border-blue-500/50 hover:bg-blue-500/12' },
-                    { icon: <Zap className="w-3.5 h-3.5 shrink-0" />, text: "What's my brand tone?", color: 'text-emerald-600 bg-emerald-500/8 border-emerald-500/25 hover:border-emerald-500/50 hover:bg-emerald-500/12' },
-                    { icon: <Mail className="w-3.5 h-3.5 shrink-0" />, text: 'Write a promotional email', color: 'text-orange-600 bg-orange-500/8 border-orange-500/25 hover:border-orange-500/50 hover:bg-orange-500/12' },
-                  ] : [
-                    { icon: <Map className="w-3.5 h-3.5 shrink-0" />, text: 'Build me a marketing strategy', color: 'text-amber-600 bg-amber-500/8 border-amber-500/25 hover:border-amber-500/50' },
-                    { icon: <Sparkles className="w-3.5 h-3.5 shrink-0" />, text: 'What can LEO do for my brand?', color: 'text-violet-600 bg-violet-500/8 border-violet-500/25 hover:border-violet-500/50' },
-                    { icon: <MessageSquare className="w-3.5 h-3.5 shrink-0" />, text: 'Write 5 Instagram captions', color: 'text-pink-600 bg-pink-500/8 border-pink-500/25 hover:border-pink-500/50' },
-                    { icon: <CalendarDays className="w-3.5 h-3.5 shrink-0" />, text: 'Create a content calendar', color: 'text-blue-600 bg-blue-500/8 border-blue-500/25 hover:border-blue-500/50' },
-                  ]).map((chip) => (
-                    <button
-                      key={chip.text}
-                      onClick={() => setInput(chip.text)}
-                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${chip.color}`}
-                    >
-                      {chip.icon}
-                      {chip.text}
-                    </button>
-                  ))}
-                </div>
+                <WelcomeMessage
+                  brandName={activeProject?.name ?? 'your brand'}
+                  brandCore={activeProject?.brandCore}
+                  onCapabilityClick={setInput}
+                />
 
                 {!hasBrandCore && !isProcessing && activeProject && (
                   <button
                     onClick={() => setIngestionOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/10 border border-violet-500/25 text-violet-600 text-sm hover:bg-violet-500/15 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/25 text-primary text-sm hover:bg-primary/15 transition-colors"
                   >
                     <Zap className="w-4 h-4" />
-                    Build my Brand Core
+                    Build Brand Core
                   </button>
                 )}
-
-                {/* What can LEO do? collapsible */}
-                <div className="max-w-xs text-left">
-                  <button
-                    onClick={() => setHintsOpen((v) => !v)}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto"
-                  >
-                    {hintsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    What can LEO do?
-                  </button>
-                  <AnimatePresence>
-                    {hintsOpen && (
-                      <motion.ul
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="mt-2 space-y-1.5 overflow-hidden text-left"
-                      >
-                        {[
-                          'Generate on-brand captions, ad copy & emails',
-                          'Build campaign briefs and content calendars',
-                          'Analyse and refine your brand voice',
-                          'Generate images from prompts (DALL-E 3)',
-                          'Switch channels - Instagram, LinkedIn, TikTok & more',
-                        ].map((item) => (
-                          <li key={item} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                            <span className="text-violet-500 mt-0.5 shrink-0">✦</span>
-                            {item}
-                          </li>
-                        ))}
-                      </motion.ul>
-                    )}
-                  </AnimatePresence>
-                </div>
               </motion.div>
             )}
 
