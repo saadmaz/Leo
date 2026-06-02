@@ -200,6 +200,41 @@ def _chunks_from_analytics(project_id: str) -> list[dict]:
 # Indexing
 # ---------------------------------------------------------------------------
 
+async def index_document(
+    project_id: str,
+    doc_type: str,
+    doc_id: str,
+    text: str,
+    metadata: dict | None = None,
+) -> int:
+    """
+    Embed and upsert a single document into the RAG index.
+    Uses a deterministic Firestore document ID so repeated calls are idempotent.
+    Returns 1 on success, 0 if text is empty.
+    """
+    if not text or not text.strip():
+        return 0
+
+    meta = metadata or {}
+    vectors = await _embed_texts([text[:8000]])
+
+    def _write():
+        col = _rag_collection(project_id)
+        safe_id = f"{doc_type}__{doc_id[:60]}"
+        col.document(safe_id).set({
+            "type": doc_type,
+            "doc_id": doc_id,
+            "text": text[:2000],
+            "embedding": vectors[0],
+            "metadata": meta,
+            "indexedAt": datetime.now(timezone.utc).isoformat(),
+        })
+
+    await asyncio.to_thread(_write)
+    logger.info("RAG: upserted chunk %s/%s for project %s", doc_type, doc_id, project_id)
+    return 1
+
+
 async def index_project(project_id: str) -> int:
     """
     Full re-index of all brand data for a project.

@@ -22,13 +22,13 @@ import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.api.deps import get_project_as_member, get_project_as_editor
 from backend.middleware.auth import CurrentUser
-from backend.services import firebase_service, content_ops_service
+from backend.services import firebase_service, content_ops_service, rag_service
 from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
@@ -121,6 +121,7 @@ class CalendarEntryUpdate(BaseModel):
 async def save_to_library(
     project_id: str,
     body: ContentLibraryItemCreate,
+    background_tasks: BackgroundTasks,
     user: CurrentUser,
 ):
     """Save a content item to the project's library."""
@@ -129,6 +130,15 @@ async def save_to_library(
         firebase_service.save_content_library_item,
         project_id,
         body.model_dump(),
+    )
+    content_label = f"{body.platform} {body.type}"
+    background_tasks.add_task(
+        rag_service.index_document,
+        project_id,
+        "content",
+        item["id"],
+        f"{content_label}\n\n{body.content}",
+        {"source": "Content Library", "platform": body.platform, "type": body.type},
     )
     return item
 

@@ -13,12 +13,12 @@ Auth is delegated to backend.api.deps.
 import logging
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Body, HTTPException
 from pydantic import BaseModel
 
 from backend.api.deps import get_project_as_editor, get_project_as_member
 from backend.middleware.auth import CurrentUser
-from backend.services import firebase_service
+from backend.services import firebase_service, rag_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["brand-core"])
@@ -48,6 +48,23 @@ _ALLOWED_FIELDS = frozenset({
 })
 
 
+def _build_brand_core_text(brand_core: dict) -> str:
+    parts = []
+    if tone := (brand_core.get("tone") or {}).get("style"):
+        parts.append(f"Tone: {tone}")
+    if val_prop := (brand_core.get("messaging") or {}).get("valueProp"):
+        parts.append(f"Value proposition: {val_prop}")
+    if themes := brand_core.get("themes"):
+        parts.append(f"Brand themes: {', '.join(themes)}")
+    if audience := (brand_core.get("audience") or {}).get("demographics"):
+        parts.append(f"Target audience: {audience}")
+    if tagline := brand_core.get("tagline"):
+        parts.append(f"Tagline: {tagline}")
+    if competitors := brand_core.get("competitors"):
+        parts.append(f"Competitors: {', '.join(str(c) for c in competitors)}")
+    return "\n".join(parts)
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -66,6 +83,7 @@ async def get_brand_core(project_id: str, user: CurrentUser) -> dict:
 async def update_brand_core(
     project_id: str,
     body: BrandCoreUpdate,
+    background_tasks: BackgroundTasks,
     user: CurrentUser,
 ) -> dict:
     """
@@ -79,6 +97,15 @@ async def update_brand_core(
     # Shallow merge - replaces top-level sections that were provided.
     merged = {**existing, **updates}
     firebase_service.update_project(project_id, {"brandCore": merged})
+
+    background_tasks.add_task(
+        rag_service.index_document,
+        project_id,
+        "brand_core",
+        "brand_core",
+        _build_brand_core_text(merged),
+        {"source": "Brand Core"},
+    )
     return {"brandCore": merged}
 
 
@@ -89,6 +116,7 @@ async def update_brand_core_field(
     # Body() tells FastAPI to read this from the JSON request body rather
     # than treating it as a query/path param.
     body: Annotated[Any, Body()],
+    background_tasks: BackgroundTasks,
     user: CurrentUser,
 ) -> dict:
     """
@@ -109,6 +137,15 @@ async def update_brand_core_field(
     merged = {**existing, field: value}
 
     firebase_service.update_project(project_id, {"brandCore": merged})
+
+    background_tasks.add_task(
+        rag_service.index_document,
+        project_id,
+        "brand_core",
+        "brand_core",
+        _build_brand_core_text(merged),
+        {"source": "Brand Core"},
+    )
     return {"brandCore": merged}
 
 

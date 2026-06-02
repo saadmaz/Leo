@@ -23,12 +23,12 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel, Field
 
 from backend.api.deps import get_project_as_member, get_project_as_editor, require_tier
 from backend.middleware.auth import CurrentUser
-from backend.services import firebase_service, intelligence_service, cache_service
+from backend.services import firebase_service, intelligence_service, cache_service, rag_service
 from backend.services.credits_service import check_and_deduct
 
 logger = logging.getLogger(__name__)
@@ -143,6 +143,7 @@ async def predict_performance(
 async def refresh_intelligence(
     project_id: str,
     body: RefreshIntelligenceRequest,
+    background_tasks: BackgroundTasks,
     user: CurrentUser,
     _tier: None = require_tier("pro"),
 ):
@@ -165,6 +166,10 @@ async def refresh_intelligence(
             yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
         finally:
             yield "data: [DONE]\n\n"
+
+    # Re-index competitor data after the stream completes so brand-chat reflects
+    # the latest snapshots. BackgroundTasks runs after the last byte is sent.
+    background_tasks.add_task(rag_service.index_project, project_id)
 
     return _SR(
         event_stream(),
