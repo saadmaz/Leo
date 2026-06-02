@@ -298,6 +298,7 @@ export default function ForecastPage() {
                         </tr>
                       </thead>
                       <tbody>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {f.periods.map((p: any, pi: number) => (
                           <tr key={pi} className="border-b border-gray-100 last:border-0">
                             <td className="py-2 pr-4 font-medium text-gray-700">{p.period}</td>

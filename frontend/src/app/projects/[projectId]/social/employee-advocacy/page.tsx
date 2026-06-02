@@ -2,14 +2,13 @@
 
 import { useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Users, Lock, Zap, Loader2 } from 'lucide-react'
+import { Users, Lock, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SSEFeaturePage } from '@/components/pillar1/SSEFeaturePage'
 import { api } from '@/lib/api'
 import { usePillar6Store } from '@/stores/pillar6-store'
 import { useFeatureFlag } from '@/hooks/useFeatureFlag'
 import { SidebarToggle } from '@/components/layout/sidebar'
-import { cn } from '@/lib/utils'
 import type { ProgressStep } from '@/types'
 
 const PLATFORMS = ['LinkedIn', 'X / Twitter', 'Instagram', 'Facebook', 'Threads']

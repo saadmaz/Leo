@@ -95,7 +95,6 @@ function score(draftText: string, targetKeyword: string, serpWordCount: number):
   let densityPts = 0
   if (density >= 1.0 && density <= 2.5) densityPts = 20
   else if ((density >= 0.5 && density < 1.0) || (density > 2.5 && density <= 3.0)) densityPts = 5
-  const densityPassed = densityPts >= 15
   criteria.push({
     label: `Keyword density (${density.toFixed(1)}%)`,
     pts: densityPts,

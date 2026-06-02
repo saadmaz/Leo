@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink, BookmarkPlus, BookmarkCheck, Globe, Users, TrendingUp, BarChart2, Map, Search, ShieldCheck, CheckCircle2, XCircle, Lightbulb } from 'lucide-react'
+import { Copy, Check, Instagram, Megaphone, FileText, Palette, CalendarDays, Video, Mail, ImageIcon, Loader2, Download, ExternalLink, BookmarkPlus, BookmarkCheck, Globe, Users, TrendingUp, BarChart2, Map, Search, ShieldCheck, CheckCircle2, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'

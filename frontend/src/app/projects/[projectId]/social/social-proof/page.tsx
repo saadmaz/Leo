@@ -201,7 +201,7 @@ export default function SocialProofPage() {
                   <CopyBtn text={t.quote} />
                 </div>
               </div>
-              <p className="text-sm font-medium italic">"{t.quote}"</p>
+              <p className="text-sm font-medium italic">&quot;{t.quote}&quot;</p>
               {t.author !== 'Anonymous' && <p className="text-[10px] text-muted-foreground">- {t.author}</p>}
               <p className="text-[10px] text-muted-foreground">{t.why_it_works}</p>
             </div>
