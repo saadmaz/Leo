@@ -8,7 +8,7 @@ import {
   Globe, Instagram, Youtube, Linkedin, Facebook, Target,
   ArrowRight, CheckCircle2, Flame, Shield, Swords,
   TrendingDown, Minus, Activity, Sparkles, MapPin, DollarSign, Building2,
-  Users, Star, ExternalLink,
+  Users, Star, ExternalLink, LayoutGrid, List, MoreHorizontal, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -83,6 +83,8 @@ const PRIORITY_CONFIG = {
   long_term:  { label: 'Long-term',   color: 'text-blue-500',   bg: 'bg-blue-500/10',   border: 'border-blue-500/30' },
 }
 
+const THREAT_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 }
+
 function emptyForm(): CompetitorForm {
   return { name: '', website: '', instagram: '', facebook: '', tiktok: '', linkedin: '', youtube: '' }
 }
@@ -114,6 +116,12 @@ export default function IntelligencePage() {
   const [reportSnapshot, setReportSnapshot] = useState<CompetitorSnapshot | null>(null)
   const [report, setReport] = useState<CompetitorReport | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
+
+  // Intelligence view state
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [threatFilter, setThreatFilter] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'threat' | 'name' | 'revenue'>('threat')
 
   const loadSnapshots = useCallback(async () => {
     setLoading(true)
@@ -321,6 +329,37 @@ export default function IntelligencePage() {
   }
 
   // ---------------------------------------------------------------------------
+  // Computed / derived values
+  // ---------------------------------------------------------------------------
+
+  const threatCounts = { high: 0, medium: 0, low: 0 }
+  snapshots.forEach(s => {
+    const level = (s.web_analysis?.threat_level ?? 'medium') as keyof typeof threatCounts
+    if (level in threatCounts) threatCounts[level]++
+  })
+
+  const filteredSnapshots = snapshots
+    .filter(s => {
+      if (threatFilter && (s.web_analysis?.threat_level ?? 'medium') !== threatFilter) return false
+      if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy === 'threat') {
+        const aL = a.web_analysis?.threat_level ?? 'medium'
+        const bL = b.web_analysis?.threat_level ?? 'medium'
+        return (THREAT_ORDER[aL] ?? 1) - (THREAT_ORDER[bL] ?? 1)
+      }
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return 0
+    })
+
+  const latestRefreshDate = snapshots.length > 0
+    ? new Date(Math.max(...snapshots.map(s => new Date(s.scrapedAt).getTime())))
+        .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -449,10 +488,147 @@ export default function IntelligencePage() {
         ) : snapshots.length === 0 && !refreshing && tab !== 'influencers' ? (
           <EmptyState onAdd={() => setShowAddForm(true)} />
         ) : tab === 'snapshots' ? (
-          <div className="px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl">
-            {snapshots.map(snapshot => (
-              <CompetitorCard key={snapshot.id} snapshot={snapshot} onOpenReport={handleOpenReport} />
-            ))}
+          <div>
+            {/* Page header */}
+            <div className="px-6 pt-6 pb-3">
+              <h1 className="text-2xl font-bold">Competitor intelligence</h1>
+              {snapshots.length > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Tracking {snapshots.length} competitor{snapshots.length !== 1 ? 's' : ''}
+                  {latestRefreshDate && ` · refreshed ${latestRefreshDate}`}
+                </p>
+              )}
+            </div>
+
+            {/* Filter bar */}
+            <div className="px-6 py-3 flex items-center gap-3 flex-wrap border-b border-border/50">
+              {/* Threat summary chips */}
+              {snapshots.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {threatCounts.high > 0 && (
+                    <button
+                      onClick={() => setThreatFilter(threatFilter === 'high' ? null : 'high')}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors',
+                        threatFilter === 'high'
+                          ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                          : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20',
+                      )}
+                    >
+                      <Flame className="w-3.5 h-3.5" /> {threatCounts.high} High threat
+                    </button>
+                  )}
+                  {threatCounts.medium > 0 && (
+                    <button
+                      onClick={() => setThreatFilter(threatFilter === 'medium' ? null : 'medium')}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors',
+                        threatFilter === 'medium'
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                          : 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20',
+                      )}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" /> {threatCounts.medium} Medium threat
+                    </button>
+                  )}
+                  {threatCounts.low > 0 && (
+                    <button
+                      onClick={() => setThreatFilter(threatFilter === 'low' ? null : 'low')}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors',
+                        threatFilter === 'low'
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                          : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20',
+                      )}
+                    >
+                      <Shield className="w-3.5 h-3.5" /> {threatCounts.low} Low threat
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="flex-1" />
+
+              {/* Search */}
+              {snapshots.length > 0 && (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search competitors"
+                    className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-1 focus:ring-primary/30 w-44 placeholder:text-muted-foreground/60"
+                  />
+                </div>
+              )}
+
+              {/* Sort */}
+              {snapshots.length > 0 && (
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-border bg-muted/30 focus:outline-none cursor-pointer text-foreground"
+                >
+                  <option value="threat">↑ Threat</option>
+                  <option value="name">A–Z Name</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              )}
+
+              {/* View toggle */}
+              {snapshots.length > 0 && (
+                <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    title="Grid view"
+                    className={cn(
+                      'p-1.5 rounded-md transition-colors',
+                      viewMode === 'grid' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    title="List view"
+                    className={cn(
+                      'p-1.5 rounded-md transition-colors',
+                      viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Cards — grid or list */}
+            {viewMode === 'grid' ? (
+              <div className="px-6 py-5 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl">
+                {filteredSnapshots.map(s => (
+                  <CompetitorCard key={s.id} snapshot={s} onOpenReport={handleOpenReport} />
+                ))}
+              </div>
+            ) : (
+              <div className="px-6 py-5 flex flex-col gap-3 max-w-5xl">
+                {filteredSnapshots.map(s => (
+                  <CompetitorListRow key={s.id} snapshot={s} onOpenReport={handleOpenReport} />
+                ))}
+              </div>
+            )}
+
+            {/* Empty filter result */}
+            {filteredSnapshots.length === 0 && snapshots.length > 0 && (
+              <div className="px-6 py-16 text-center">
+                <p className="text-sm text-muted-foreground">No competitors match your filters.</p>
+                <button
+                  onClick={() => { setSearchQuery(''); setThreatFilter(null) }}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
           </div>
         ) : tab === 'influencers' ? (
           <InfluencersPanel projectId={params.projectId} />
@@ -922,7 +1098,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Competitor Card
+// Competitor Card (grid view) & List Row (list view)
 // ---------------------------------------------------------------------------
 
 const AVATAR_GRADIENTS = [
@@ -939,210 +1115,181 @@ function getGradient(name: string) {
 }
 
 function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapshot; onOpenReport: (s: CompetitorSnapshot) => void }) {
-  const [expanded, setExpanded] = useState(true)
-  const { analysis, web_analysis } = snapshot
+  const { web_analysis } = snapshot
   const platforms = Object.keys(snapshot.platforms || {})
   const gradient = getGradient(snapshot.name)
-
-  const scrapedDate = snapshot.scrapedAt
-    ? new Date(snapshot.scrapedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    : null
-
-  // Determine a threat vibe from the web_analysis or analysis
-  const threatLevel = (web_analysis as { threat_level?: string } | undefined)?.threat_level ?? 'medium'
+  const threatLevel = web_analysis?.threat_level ?? 'medium'
   const threat = THREAT_CONFIG[threatLevel as keyof typeof THREAT_CONFIG] ?? THREAT_CONFIG.medium
 
+  const stats = [
+    { label: 'REVENUE',  value: snapshot.revenue,         icon: <DollarSign className="w-3 h-3" /> },
+    { label: 'MARKETS',  value: snapshot.markets_count != null ? String(snapshot.markets_count) : undefined, icon: <MapPin className="w-3 h-3" /> },
+    { label: 'TEAM',     value: snapshot.employee_count,  icon: <Users className="w-3 h-3" /> },
+    { label: 'HQ',       value: snapshot.location?.split(',')[0]?.trim(), icon: <Building2 className="w-3 h-3" /> },
+  ].filter(s => s.value)
+
+  const sovPositive = snapshot.share_of_voice ? !snapshot.share_of_voice.startsWith('-') : null
+
   return (
-    <div className="border border-border rounded-2xl bg-card overflow-hidden group transition-all hover:border-border/80 hover:shadow-lg hover:shadow-black/10">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden hover:border-border/80 hover:shadow-xl hover:shadow-black/20 transition-all group">
 
-      {/* ── Card header ── */}
-      <div className="relative px-5 pt-5 pb-4">
-        {/* Subtle gradient tint in top-right */}
-        <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-[80px] bg-gradient-to-bl ${gradient} opacity-[0.06] pointer-events-none`} />
-
-        <div className="flex items-start gap-3 relative">
-          {/* Avatar */}
-          <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base shrink-0 shadow-md`}>
-            {snapshot.name.charAt(0).toUpperCase()}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-semibold leading-tight">{snapshot.name}</h3>
-              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${threat.bg} ${threat.color}`}>
-                {threat.icon}{threat.label}
-              </span>
-            </div>
-
-            {/* Platform badges */}
-            <div className="flex items-center flex-wrap gap-1.5 mt-2">
-              {platforms.map(p => (
-                <span key={p} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${PLATFORM_COLORS[p] ?? 'text-muted-foreground bg-muted'}`}>
-                  {PLATFORM_ICONS[p]} {p}
-                </span>
-              ))}
-              {scrapedDate && (
-                <span className="text-[10px] text-muted-foreground ml-auto">Updated {scrapedDate}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Collapse toggle */}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="p-1.5 rounded-lg hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground shrink-0"
-          >
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
+      {/* Header */}
+      <div className="flex items-start gap-3 p-5 pb-3">
+        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base shrink-0 shadow-md`}>
+          {snapshot.name.charAt(0).toUpperCase()}
         </div>
-      </div>
-
-      {/* ── Deep-dive CTA ── */}
-      <div className="px-5 pb-4">
-        <button
-          onClick={() => onOpenReport(snapshot)}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-xl bg-gradient-to-r ${gradient} text-white shadow-sm hover:opacity-90 transition-opacity`}
-        >
-          <BarChart2 className="w-3.5 h-3.5" />
-          View Deep-Dive Report
+        <div className="flex-1 min-w-0 pt-0.5">
+          <h3 className="font-semibold text-base leading-tight">{snapshot.name}</h3>
+          {snapshot.location && (
+            <p className="text-xs text-muted-foreground mt-0.5 font-mono">{snapshot.location}</p>
+          )}
+        </div>
+        <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted/60 transition-colors shrink-0">
+          <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
 
-      {/* ── Expanded body ── */}
-      {expanded && (
-        <div className="border-t border-border/60 px-5 pt-4 pb-5 space-y-4">
+      {/* Threat badge + platform icons */}
+      <div className="px-5 pb-4 flex items-center gap-2 flex-wrap">
+        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${threat.bg} ${threat.color}`}>
+          {threat.icon}{threat.label}
+        </span>
+        {platforms.slice(0, 4).map(p => (
+          <div key={p} className="w-8 h-8 rounded-lg bg-muted/50 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            {PLATFORM_ICONS[p]}
+          </div>
+        ))}
+      </div>
 
-          {/* Market position - redesigned as intelligence brief */}
-          {web_analysis?.market_position && (
-            <div className="relative rounded-xl overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/8 to-violet-500/5 rounded-xl" />
-              <div className="relative border border-blue-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 rounded-md bg-blue-500/15 flex items-center justify-center">
-                    <Globe className="w-3 h-3 text-blue-400" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Market Position</span>
-                </div>
-                <p className="text-xs text-foreground/85 leading-relaxed">{web_analysis.market_position}</p>
-                {web_analysis.opportunity && (
-                  <div className="mt-3 flex items-start gap-2 pt-2.5 border-t border-blue-500/15">
-                    <div className="w-4 h-4 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                      <ArrowRight className="w-2.5 h-2.5 text-emerald-400" />
-                    </div>
-                    <p className="text-xs text-emerald-400 leading-relaxed">{web_analysis.opportunity}</p>
-                  </div>
-                )}
-              </div>
+      {/* Stats box */}
+      {stats.length > 0 && (
+        <div
+          className="mx-5 mb-4 rounded-xl bg-muted/30 border border-border/60 grid divide-x divide-border/50"
+          style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}
+        >
+          {stats.map(({ label, value, icon }) => (
+            <div key={label} className="px-3 py-2.5 text-center min-w-0">
+              <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1 flex items-center justify-center gap-1">
+                {icon}{label}
+              </p>
+              <p className="text-sm font-bold truncate">{value}</p>
             </div>
-          )}
-
-          {analysis && (
-            <>
-              {/* Voice + Themes row */}
-              {(analysis.tone && analysis.tone !== 'Unknown') || (analysis.key_themes?.length ?? 0) > 0 ? (
-                <div className="grid grid-cols-1 gap-3">
-                  {analysis.tone && analysis.tone !== 'Unknown' && (
-                    <div className="rounded-xl bg-muted/30 border border-border/60 px-4 py-3">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Brand Voice</p>
-                      <p className="text-xs text-foreground/80 leading-relaxed">{analysis.tone}</p>
-                    </div>
-                  )}
-                  {(analysis.key_themes?.length ?? 0) > 0 && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Key Themes</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {analysis.key_themes.map((theme, i) => (
-                          <span key={i} className="text-[10px] px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-foreground/70 font-medium">
-                            {theme}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-
-              {/* Strengths vs Weaknesses */}
-              {((analysis.strengths?.length ?? 0) > 0 || (analysis.weaknesses?.length ?? 0) > 0) && (
-                <div className="grid grid-cols-2 gap-2.5">
-                  {(analysis.strengths?.length ?? 0) > 0 && (
-                    <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3.5">
-                      <div className="flex items-center gap-1.5 mb-2.5">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                          <TrendingUp className="w-2.5 h-2.5 text-emerald-500" />
-                        </div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">They Excel</p>
-                      </div>
-                      <ul className="space-y-1.5">
-                        {analysis.strengths.slice(0, 4).map((s, i) => (
-                          <li key={i} className="text-[11px] text-foreground/75 flex items-start gap-1.5">
-                            <span className="w-1 h-1 rounded-full bg-emerald-500/60 shrink-0 mt-1.5" />
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {(analysis.weaknesses?.length ?? 0) > 0 && (
-                    <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-3.5">
-                      <div className="flex items-center gap-1.5 mb-2.5">
-                        <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                          <AlertTriangle className="w-2.5 h-2.5 text-red-500" />
-                        </div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500">Weaknesses</p>
-                      </div>
-                      <ul className="space-y-1.5">
-                        {analysis.weaknesses.slice(0, 4).map((w, i) => (
-                          <li key={i} className="text-[11px] text-foreground/75 flex items-start gap-1.5">
-                            <span className="w-1 h-1 rounded-full bg-red-500/60 shrink-0 mt-1.5" />
-                            {w}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Opportunities */}
-              {(analysis.content_gaps?.length ?? 0) > 0 && (
-                <div className="rounded-xl bg-amber-500/5 border border-amber-500/25 p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 rounded-md bg-amber-500/20 flex items-center justify-center">
-                      <Lightbulb className="w-3 h-3 text-amber-500" />
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Gaps You Can Exploit</span>
-                  </div>
-                  <ul className="space-y-2">
-                    {analysis.content_gaps.map((gap, i) => (
-                      <li key={i} className="flex items-start gap-2.5">
-                        <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-500 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
-                        <span className="text-xs text-foreground/80 leading-relaxed">{gap}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Hashtags */}
-              {(analysis.top_hashtags?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Their Top Hashtags</p>
-                  <div className="flex flex-wrap gap-1">
-                    {analysis.top_hashtags.slice(0, 12).map((tag, i) => (
-                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 border border-border/50 text-muted-foreground font-mono">
-                        #{tag.replace(/^#/, '')}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          ))}
         </div>
       )}
+
+      {/* Market position */}
+      {web_analysis?.market_position && (
+        <div className="px-5 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">MARKET POSITION</p>
+          <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">{web_analysis.market_position}</p>
+        </div>
+      )}
+
+      {/* Our opportunity */}
+      {web_analysis?.opportunity && (
+        <div className="mx-5 mb-4 rounded-xl bg-violet-500/8 border border-violet-500/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+              <Target className="w-3 h-3 text-violet-400" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400">OUR OPPORTUNITY</span>
+          </div>
+          <p className="text-xs text-foreground/80 leading-relaxed">{web_analysis.opportunity}</p>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="px-5 pb-5 flex items-center justify-between gap-3">
+        {sovPositive !== null ? (
+          <div className={`flex items-center gap-1.5 text-xs font-semibold font-mono ${sovPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+            {sovPositive
+              ? <TrendingUp className="w-3.5 h-3.5" />
+              : <TrendingDown className="w-3.5 h-3.5" />}
+            {snapshot.share_of_voice} share of voice
+          </div>
+        ) : <div />}
+        <button
+          onClick={() => onOpenReport(snapshot)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition-colors shadow-sm"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Deep-dive report
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CompetitorListRow({ snapshot, onOpenReport }: { snapshot: CompetitorSnapshot; onOpenReport: (s: CompetitorSnapshot) => void }) {
+  const { web_analysis } = snapshot
+  const platforms = Object.keys(snapshot.platforms || {})
+  const gradient = getGradient(snapshot.name)
+  const threatLevel = web_analysis?.threat_level ?? 'medium'
+  const threat = THREAT_CONFIG[threatLevel as keyof typeof THREAT_CONFIG] ?? THREAT_CONFIG.medium
+  const sovPositive = snapshot.share_of_voice ? !snapshot.share_of_voice.startsWith('-') : null
+
+  return (
+    <div className="flex items-center gap-4 px-5 py-4 rounded-2xl border border-border bg-card hover:border-border/80 hover:shadow-md hover:shadow-black/10 transition-all group">
+
+      {/* Avatar */}
+      <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
+        {snapshot.name.charAt(0).toUpperCase()}
+      </div>
+
+      {/* Name + location */}
+      <div className="min-w-0 w-44 shrink-0">
+        <p className="font-semibold text-sm truncate">{snapshot.name}</p>
+        {snapshot.location && (
+          <p className="text-xs text-muted-foreground font-mono truncate">{snapshot.location}</p>
+        )}
+      </div>
+
+      {/* Threat badge */}
+      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${threat.bg} ${threat.color} shrink-0`}>
+        {threat.icon}{threat.label}
+      </span>
+
+      {/* Revenue */}
+      {snapshot.revenue && (
+        <div className="shrink-0 min-w-[80px]">
+          <p className="text-[9px] text-muted-foreground uppercase tracking-widest">REVENUE</p>
+          <p className="text-sm font-bold">{snapshot.revenue}</p>
+        </div>
+      )}
+
+      {/* Markets */}
+      {snapshot.markets_count != null && (
+        <div className="shrink-0 min-w-[60px]">
+          <p className="text-[9px] text-muted-foreground uppercase tracking-widest">MARKETS</p>
+          <p className="text-sm font-bold">{snapshot.markets_count}</p>
+        </div>
+      )}
+
+      {/* Platform icons */}
+      <div className="flex items-center gap-1.5 ml-auto shrink-0">
+        {platforms.slice(0, 3).map(p => (
+          <div key={p} className="w-7 h-7 rounded-lg bg-muted/60 border border-border flex items-center justify-center text-muted-foreground">
+            {PLATFORM_ICONS[p]}
+          </div>
+        ))}
+      </div>
+
+      {/* Share of voice */}
+      {sovPositive !== null && (
+        <div className={`flex items-center gap-1 text-xs font-semibold font-mono shrink-0 ${sovPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          {sovPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+          {snapshot.share_of_voice} share of voice
+        </div>
+      )}
+
+      {/* Deep-dive button */}
+      <button
+        onClick={() => onOpenReport(snapshot)}
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition-colors shrink-0 shadow-sm"
+      >
+        Deep-dive <ArrowRight className="w-3.5 h-3.5" />
+      </button>
     </div>
   )
 }

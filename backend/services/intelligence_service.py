@@ -1738,11 +1738,14 @@ WEB SUMMARY: {summary[:500]}
 Return ONLY valid JSON:
 {{
   "recent_news_summary": "<1-2 sentence summary>",
-  "market_position": "<current positioning>",
-  "momentum": "growing",
-  "recent_moves": [],
-  "opportunity": "<key opportunity for our brand>"
-}}"""
+  "market_position": "<current positioning in 1-2 sentences>",
+  "momentum": "growing|stable|declining",
+  "threat_level": "high|medium|low",
+  "recent_moves": ["<move1>", "<move2>"],
+  "opportunity": "<key opportunity for our brand vs this competitor>"
+}}
+
+threat_level guide: high=direct competitor with significant market overlap and strong traction, medium=partial overlap or different segment/geography, low=adjacent space with minimal overlap."""
 
     response = await client.messages.create(
         model=settings.LLM_CHAT_MODEL,
@@ -2619,6 +2622,25 @@ async def stream_add_discovered_competitor(
     yield _evt("Running full social media intelligence refresh…", "activity")
     async for event in stream_refresh_competitor_intelligence(project_id, [merged_competitor]):
         yield event
+
+    # ── Step 3b: Persist enrichment metadata from discovery into the snapshot ─
+    meta: dict = {}
+    if competitor.get("location"):
+        meta["location"] = competitor["location"]
+    rev = competitor.get("estimated_revenue_range", "")
+    if rev and str(rev).lower() not in ("", "unknown"):
+        meta["revenue"] = rev
+    emp = competitor.get("employee_count", "")
+    if emp and str(emp).lower() not in ("", "unknown"):
+        meta["employee_count"] = emp
+    if meta:
+        try:
+            from backend.services import firebase_service as _fs_meta
+            existing_snap = _fs_meta.get_competitor_snapshot(project_id, name)
+            if existing_snap:
+                _fs_meta.save_competitor_snapshot(project_id, {**existing_snap, **meta})
+        except Exception as _exc:
+            logger.warning("Could not persist enrichment meta for %s: %s", name, _exc)
 
     # ── Step 4: 5-Dimension classification (saves to competitor_profiles) ─────
     # This is what populates the Profiles tab. Run synchronously in the same

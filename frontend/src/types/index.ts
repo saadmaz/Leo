@@ -468,6 +468,7 @@ export interface CompetitorWebAnalysis {
   recent_news_summary: string
   market_position: string
   momentum: string
+  threat_level?: 'high' | 'medium' | 'low'
   recent_moves: string[]
   opportunity: string
 }
@@ -480,6 +481,12 @@ export interface CompetitorSnapshot {
   platforms: Record<string, unknown>
   analysis?: CompetitorAnalysis
   web_analysis?: CompetitorWebAnalysis
+  // Enrichment metadata from discovery
+  location?: string
+  revenue?: string
+  employee_count?: string
+  markets_count?: number
+  share_of_voice?: string
 }
 
 export interface CompetitorStrategyBreakdown {
