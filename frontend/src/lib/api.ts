@@ -751,6 +751,9 @@ export const api = {
 
     report: (projectId: string, competitorName: string, signal?: AbortSignal) =>
       get<CompetitorReport>(`/projects/${projectId}/intelligence/competitors/${encodeURIComponent(competitorName)}/report`, signal),
+
+    remove: (projectId: string, competitorName: string, signal?: AbortSignal) =>
+      del(`/projects/${projectId}/intelligence/competitors/${encodeURIComponent(competitorName)}`, signal),
   },
 
   // -------------------------------------------------------------------------

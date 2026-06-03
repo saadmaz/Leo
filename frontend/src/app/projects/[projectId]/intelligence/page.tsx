@@ -9,6 +9,7 @@ import {
   ArrowRight, CheckCircle2, Flame, Shield, Swords,
   TrendingDown, Minus, Activity, Sparkles, MapPin, DollarSign, Building2,
   Users, Star, ExternalLink, LayoutGrid, List, MoreHorizontal, FileText,
+  Edit3, Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -117,11 +118,19 @@ export default function IntelligencePage() {
   const [report, setReport] = useState<CompetitorReport | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
 
-  // Intelligence view state
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  // Intelligence view state (viewMode persisted to localStorage)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'grid'
+    return (localStorage.getItem('leo-competitor-view') as 'grid' | 'list') ?? 'grid'
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [threatFilter, setThreatFilter] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'threat' | 'name' | 'revenue'>('threat')
+
+  function handleSetViewMode(mode: 'grid' | 'list') {
+    setViewMode(mode)
+    localStorage.setItem('leo-competitor-view', mode)
+  }
 
   const loadSnapshots = useCallback(async () => {
     setLoading(true)
@@ -269,6 +278,33 @@ export default function IntelligencePage() {
       toast.error(userMsg)
     } finally {
       setStrategyLoading(false)
+    }
+  }
+
+  function handleEditCompetitor(snapshot: CompetitorSnapshot) {
+    setCompetitors([{
+      name:      snapshot.name,
+      website:   snapshot.website ?? '',
+      instagram: '',
+      facebook:  '',
+      tiktok:    '',
+      linkedin:  '',
+      youtube:   '',
+    }])
+    setShowAddForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function handleRemoveCompetitor(snapshot: CompetitorSnapshot) {
+    if (!confirm(`Remove "${snapshot.name}" from your tracked competitors?`)) return
+    try {
+      await api.intelligence.remove(params.projectId, snapshot.name)
+      setSnapshots(prev => prev.filter(s => s.id !== snapshot.id))
+      setStrategy(null)
+      toast.success(`${snapshot.name} removed.`)
+    } catch (err) {
+      toast.error('Could not remove competitor. Try again.')
+      console.error(err)
     }
   }
 
@@ -579,7 +615,7 @@ export default function IntelligencePage() {
               {snapshots.length > 0 && (
                 <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5">
                   <button
-                    onClick={() => setViewMode('grid')}
+                    onClick={() => handleSetViewMode('grid')}
                     title="Grid view"
                     className={cn(
                       'p-1.5 rounded-md transition-colors',
@@ -589,7 +625,7 @@ export default function IntelligencePage() {
                     <LayoutGrid className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => setViewMode('list')}
+                    onClick={() => handleSetViewMode('list')}
                     title="List view"
                     className={cn(
                       'p-1.5 rounded-md transition-colors',
@@ -606,13 +642,25 @@ export default function IntelligencePage() {
             {viewMode === 'grid' ? (
               <div className="px-6 py-5 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl">
                 {filteredSnapshots.map(s => (
-                  <CompetitorCard key={s.id} snapshot={s} onOpenReport={handleOpenReport} />
+                  <CompetitorCard
+                    key={s.id}
+                    snapshot={s}
+                    onOpenReport={handleOpenReport}
+                    onEdit={handleEditCompetitor}
+                    onRemove={handleRemoveCompetitor}
+                  />
                 ))}
               </div>
             ) : (
               <div className="px-6 py-5 flex flex-col gap-3 max-w-5xl">
                 {filteredSnapshots.map(s => (
-                  <CompetitorListRow key={s.id} snapshot={s} onOpenReport={handleOpenReport} />
+                  <CompetitorListRow
+                    key={s.id}
+                    snapshot={s}
+                    onOpenReport={handleOpenReport}
+                    onEdit={handleEditCompetitor}
+                    onRemove={handleRemoveCompetitor}
+                  />
                 ))}
               </div>
             )}
@@ -1098,6 +1146,60 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
+// Kebab menu (shared by grid card + list row)
+// ---------------------------------------------------------------------------
+
+function KebabMenu({
+  onEdit,
+  onRemove,
+}: {
+  onEdit: () => void
+  onRemove: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
+        className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted/60 transition-colors"
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-border bg-card shadow-xl shadow-black/25 z-50 overflow-hidden py-1">
+          <button
+            onClick={() => { setOpen(false); onEdit() }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-muted/60 transition-colors text-left"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            Edit competitor
+          </button>
+          <div className="my-1 border-t border-border/60" />
+          <button
+            onClick={() => { setOpen(false); onRemove() }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-red-500 hover:bg-red-500/10 transition-colors text-left"
+          >
+            <Trash2 className="w-3.5 h-3.5 shrink-0" />
+            Remove competitor
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Competitor Card (grid view) & List Row (list view)
 // ---------------------------------------------------------------------------
 
@@ -1114,7 +1216,12 @@ function getGradient(name: string) {
   return AVATAR_GRADIENTS[code]
 }
 
-function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapshot; onOpenReport: (s: CompetitorSnapshot) => void }) {
+function CompetitorCard({ snapshot, onOpenReport, onEdit, onRemove }: {
+  snapshot: CompetitorSnapshot
+  onOpenReport: (s: CompetitorSnapshot) => void
+  onEdit: (s: CompetitorSnapshot) => void
+  onRemove: (s: CompetitorSnapshot) => void
+}) {
   const { web_analysis } = snapshot
   const platforms = Object.keys(snapshot.platforms || {})
   const gradient = getGradient(snapshot.name)
@@ -1144,9 +1251,7 @@ function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapsh
             <p className="text-xs text-muted-foreground mt-0.5 font-mono">{snapshot.location}</p>
           )}
         </div>
-        <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted/60 transition-colors shrink-0">
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+        <KebabMenu onEdit={() => onEdit(snapshot)} onRemove={() => onRemove(snapshot)} />
       </div>
 
       {/* Threat badge + platform icons */}
@@ -1221,7 +1326,12 @@ function CompetitorCard({ snapshot, onOpenReport }: { snapshot: CompetitorSnapsh
   )
 }
 
-function CompetitorListRow({ snapshot, onOpenReport }: { snapshot: CompetitorSnapshot; onOpenReport: (s: CompetitorSnapshot) => void }) {
+function CompetitorListRow({ snapshot, onOpenReport, onEdit, onRemove }: {
+  snapshot: CompetitorSnapshot
+  onOpenReport: (s: CompetitorSnapshot) => void
+  onEdit: (s: CompetitorSnapshot) => void
+  onRemove: (s: CompetitorSnapshot) => void
+}) {
   const { web_analysis } = snapshot
   const platforms = Object.keys(snapshot.platforms || {})
   const gradient = getGradient(snapshot.name)
@@ -1290,6 +1400,8 @@ function CompetitorListRow({ snapshot, onOpenReport }: { snapshot: CompetitorSna
       >
         Deep-dive <ArrowRight className="w-3.5 h-3.5" />
       </button>
+
+      <KebabMenu onEdit={() => onEdit(snapshot)} onRemove={() => onRemove(snapshot)} />
     </div>
   )
 }

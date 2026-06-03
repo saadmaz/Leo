@@ -6,6 +6,7 @@ Endpoints:
   POST /projects/{id}/content/predict                 - Predict content performance
   POST /projects/{id}/intelligence/refresh            - Scrape + analyse competitors (SSE)
   GET  /projects/{id}/intelligence                    - Get stored competitor snapshots
+  DELETE /projects/{id}/intelligence/competitors/{name} - Remove a competitor snapshot
   POST /projects/{id}/memory/feedback                 - Record user feedback on AI output
   GET  /projects/{id}/memory                          - Get brand memory summary
   POST /projects/{id}/drift/check                     - Check for brand voice drift
@@ -299,6 +300,19 @@ async def get_competitor_report(
     except Exception as exc:
         logger.error("Competitor report generation failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.delete("/intelligence/competitors/{competitor_name}", status_code=204)
+async def delete_competitor(
+    project_id: str,
+    competitor_name: str,
+    user: CurrentUser,
+):
+    """Remove a competitor snapshot (and its web analysis) from the project."""
+    get_project_as_editor(project_id, user["uid"])
+    await asyncio.to_thread(
+        firebase_service.delete_competitor_snapshot, project_id, competitor_name
+    )
 
 
 # ---------------------------------------------------------------------------

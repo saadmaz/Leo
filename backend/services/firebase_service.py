@@ -1333,6 +1333,17 @@ def get_competitor_snapshot(project_id: str, name: str) -> Optional[dict]:
     return {"id": doc.id, **doc.to_dict()} if doc.exists else None
 
 
+def delete_competitor_snapshot(project_id: str, name: str) -> None:
+    """Delete a competitor snapshot by competitor name."""
+    db = get_db()
+    doc_id = name.lower().replace(" ", "_").replace("/", "_")[:64]
+    (
+        db.collection("projects").document(project_id)
+        .collection("competitor_snapshots").document(doc_id)
+        .delete()
+    )
+
+
 def get_competitor_snapshots(project_id: str) -> list[dict]:
     """
     Return all stored competitor snapshots for a project.
