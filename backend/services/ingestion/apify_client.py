@@ -5,7 +5,7 @@ Supported platforms:
   - Instagram  (apify/instagram-scraper)
   - Facebook   (apify/facebook-pages-scraper)
   - TikTok     (clockworks/tiktok-scraper)
-  - LinkedIn   (voyager/linkedin-company-scraper)
+  - LinkedIn   (johnvc/linkedin-company-api)
   - X/Twitter  (quacker/twitter-scraper)
   - YouTube    (streamers/youtube-scraper)
 
@@ -26,7 +26,7 @@ APIFY_BASE = "https://api.apify.com/v2"
 INSTAGRAM_ACTOR = "apify/instagram-scraper"
 FACEBOOK_ACTOR  = "apify/facebook-pages-scraper"
 TIKTOK_ACTOR    = "clockworks/tiktok-scraper"
-LINKEDIN_ACTOR  = "voyager/linkedin-company-scraper"
+LINKEDIN_ACTOR  = "johnvc/linkedin-company-api"
 X_ACTOR         = "quacker/twitter-scraper"
 YOUTUBE_ACTOR   = "streamers/youtube-scraper"
 THREADS_ACTOR   = "apidojo/threads-scraper"
@@ -225,14 +225,13 @@ async def scrape_tiktok(profile_url: str, api_key: str, max_videos: int = 20) ->
 
 async def scrape_linkedin(company_url: str, api_key: str) -> dict:
     """
-    Scrape a LinkedIn Company page using the linkedin-company-scraper actor.
-    Returns company info and recent posts.
+    Scrape a LinkedIn Company page using the linkedin-company-api actor.
+    Returns company info. The actor does not return posts, so posts is empty.
     """
     logger.info("Apify: scraping LinkedIn %s", company_url)
 
     run_input = {
-        "startUrls": [{"url": company_url}],
-        "count": 20,
+        "companyUrls": [company_url],
     }
 
     try:
@@ -241,34 +240,30 @@ async def scrape_linkedin(company_url: str, api_key: str) -> dict:
         logger.warning("LinkedIn scrape failed for %s: %s", company_url, exc)
         return _empty("linkedin", url=company_url)
 
-    if not items:
+    # Error rows carry error_message / error_type instead of company fields
+    companies = [i for i in items or [] if not i.get("error_message")]
+    if not companies:
+        if items:
+            logger.warning("LinkedIn scrape returned an error for %s: %s",
+                           company_url, items[0].get("error_message", ""))
         return _empty("linkedin", url=company_url)
 
-    company = items[0] if items else {}
-    posts_raw = company.get("posts", []) or []
-
-    posts = [
-        {
-            "text": p.get("text", "") or p.get("commentary", "") or "",
-            "likes": p.get("numLikes", 0),
-            "comments": p.get("numComments", 0),
-        }
-        for p in posts_raw[:20]
-    ]
-
-    raw_text = "\n\n---\n\n".join(p["text"] for p in posts if p["text"])
+    company = companies[0]
+    industries = company.get("industries") or ""
+    if isinstance(industries, list):
+        industries = ", ".join(str(i) for i in industries if i)
 
     return {
         "source_type": "linkedin",
         "url": company_url,
-        "name": company.get("name", ""),
-        "tagline": company.get("tagline", "") or company.get("headline", ""),
-        "description": company.get("description", ""),
-        "industry": company.get("industry", ""),
-        "followers": company.get("followersCount", 0),
-        "employees": company.get("staffCount", 0),
-        "posts": posts,
-        "raw_text": raw_text,
+        "name": company.get("name", "") or "",
+        "tagline": company.get("slogan", "") or "",
+        "description": company.get("description", "") or company.get("summary", "") or "",
+        "industry": industries,
+        "followers": company.get("followers", 0) or 0,
+        "employees": company.get("employeesInLinkedin", 0) or 0,
+        "posts": [],
+        "raw_text": "",
     }
 
 
